@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SGO 5º BPM - Sistema de Gestão Operacional</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+  <!-- Google Fonts: Inter e Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons (CDN) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Leaflet (CDN) — usado no Mapa de Eventos -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- -------------------------------------------------------------
+       TELA DE LOGIN OVERLAY
+       ------------------------------------------------------------- -->
+  <div id="login-container" class="login-container">
+    <div class="login-box">
+      <div class="login-header">
+        <div class="login-logo-container">
+          <i data-lucide="shield-check"></i>
+        </div>
+        <h2>SGO - 5º BPM</h2>
+        <h3>Sistema de Gestão Operacional</h3>
+        <p>Insira suas credenciais de serviço para acessar o sistema.</p>
+      </div>
+      <form id="form-login">
+        <div class="form-group">
+          <label for="login-usuario">Usuário</label>
+          <input type="text" id="login-usuario" required placeholder="Ex: p3, adjunto ou oficial" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="login-senha">Senha</label>
+          <input type="password" id="login-senha" required placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div id="login-error" class="login-error-message hidden">
+          <i data-lucide="alert-triangle"></i>
+          <span>Usuário ou senha inválidos.</span>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">
+          <i data-lucide="log-in"></i> Entrar
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- -------------------------------------------------------------
+       LAYOUT APLICATIVO PRINCIPAL (FICA VISÍVEL APÓS LOGIN)
+       ------------------------------------------------------------- -->
+  <div class="app-container">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <i data-lucide="shield"></i>
+        </div>
+        <div class="brand-text">
+          <h2>SGO 5º BPM</h2>
+          <span>Gestão Operacional</span>
+        </div>
+      </div>
+      
+      <!-- Menu de Navegação Dinâmico -->
+      <nav class="nav-menu" id="sidebar-nav">
+        <!-- Standalone -->
+        <button class="nav-btn" id="nav-btn-dashboard" data-target="tab-dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard</span>
+        </button>
+
+        <!-- Seção: Eventos -->
+        <div class="nav-section-label" id="nav-section-eventos">Eventos</div>
+        <button class="nav-btn" id="nav-btn-cadastro" data-target="tab-cadastro">
+          <i data-lucide="file-plus-2"></i>
+          <span>Novo Evento</span>
+        </button>
+        <button class="nav-btn" id="nav-btn-eventos" data-target="tab-eventos">
+          <i data-lucide="calendar-range"></i>
+          <span>Listar Eventos</span>
+        </button>
+        <button class="nav-btn" id="nav-btn-mapa" data-target="tab-mapa">
+          <i data-lucide="map"></i>
+          <span>Mapa</span>
+        </button>
+
+        <!-- Seção: Patrulhamento -->
+        <div class="nav-section-label" id="nav-section-patrulhamento">Patrulhamento</div>
+        <button class="nav-btn" id="nav-btn-turno" data-target="tab-turno">
+          <i data-lucide="user-check"></i>
+          <span>Meu Turno</span>
+        </button>
+        <button class="nav-btn" id="nav-btn-cartao" data-target="tab-cartao">
+          <i data-lucide="route"></i>
+          <span>Cartão Programa</span>
+        </button>
+
+        <!-- Seção: Diárias -->
+        <div class="nav-section-label" id="nav-section-diarias">Diárias</div>
+        <button class="nav-btn" id="nav-btn-planejador" data-target="tab-planejador">
+          <i data-lucide="wallet"></i>
+          <span>Planejador Diárias</span>
+        </button>
+        <button class="nav-btn" id="nav-btn-relatorio" data-target="tab-relatorio">
+          <i data-lucide="file-text"></i>
+          <span>Relatório Diárias</span>
+        </button>
+
+        <!-- Seção: Análise -->
+        <div class="nav-section-label" id="nav-section-analise">Análise</div>
+        <button class="nav-btn" id="nav-btn-estatisticas" data-target="tab-estatisticas">
+          <i data-lucide="bar-chart-3"></i>
+          <span>Estatísticas</span>
+        </button>
+
+        <!-- Seção: Administração -->
+        <div class="nav-section-label" id="nav-section-administracao">Administração</div>
+        <button class="nav-btn" id="nav-btn-usuarios" data-target="tab-usuarios">
+          <i data-lucide="users-round"></i>
+          <span>Usuários</span>
+        </button>
+        <button class="nav-btn" id="nav-btn-pessoal" data-target="tab-pessoal">
+          <i data-lucide="contact"></i>
+          <span>Cadastro de Pessoal</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer com dados de Usuário -->
+      <div class="sidebar-footer">
+        <div class="user-display">
+          <h4 id="user-display-name">Carregando...</h4>
+          <span id="user-display-role">Perfil</span>
+        </div>
+        <button id="btn-alterar-senha" class="btn-alterar-senha">
+          <i data-lucide="key-round"></i>
+          <span>Alterar Senha</span>
+        </button>
+        <button id="btn-logout" class="btn-logout">
+          <i data-lucide="log-out"></i>
+          <span>Sair do Sistema</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="header-title">
+          <h1 id="tab-title">Dashboard Operacional</h1>
+          <p id="tab-subtitle">Visão geral do policiamento e pautas do batalhão.</p>
+        </div>
+        <div class="header-actions">
+          <button id="btn-refresh" class="btn btn-secondary">
+            <i data-lucide="refresh-cw"></i>
+            <span>Sincronizar</span>
+          </button>
+          <div class="profile">
+            <div class="profile-avatar" id="avatar-display">P3</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Aba 1: Dashboard (Apenas P3) -->
+      <section id="tab-dashboard" class="tab-content">
+        <!-- Faixa de Alertas Consolidados (só aparece se houver algo urgente) -->
+        <div id="dashboard-alertas" class="panel cartao-alertas-panel hidden">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i data-lucide="alert-triangle"></i>
+              <h2>Alertas Operacionais</h2>
+            </div>
+          </div>
+          <div id="dashboard-alertas-lista" class="cartao-alertas-lista"></div>
+        </div>
+
+        <!-- Top Stats Row -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i data-lucide="calendar"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Eventos na Semana</h3>
+              <p id="stat-eventos-semana">0</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon info">
+              <i data-lucide="wallet"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Diárias no Mês / Cota</h3>
+              <p id="stat-diarias-mes">0 / 0</p>
+            </div>
+          </div>
+          <div class="stat-card" id="stat-card-cartao-hoje" style="cursor:pointer;" onclick="handleIrParaCartaoHoje()" title="Ir para o Cartão Programa de hoje">
+            <div class="stat-icon alert" id="stat-cartao-hoje-icon">
+              <i data-lucide="route"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Cartão Programa de Hoje</h3>
+              <p id="stat-cartao-hoje">Verificando...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Layout Grid -->
+        <div class="dashboard-grid">
+          <!-- Calendário -->
+          <div class="panel calendar-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="calendar-days"></i>
+                <h2>Calendário de Eventos</h2>
+              </div>
+              <div class="calendar-nav">
+                <button id="btn-prev-month" class="btn-icon"><i data-lucide="chevron-left"></i></button>
+                <span id="calendar-month-year">Julho 2026</span>
+                <button id="btn-next-month" class="btn-icon"><i data-lucide="chevron-right"></i></button>
+              </div>
+            </div>
+            <div class="calendar-container">
+              <div class="calendar-weekdays">
+                <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+              </div>
+              <div id="calendar-grid" class="calendar-grid">
+                <!-- Injetado dinamicamente -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Patrulhamento de Hoje (preview do Cartão Programa) -->
+        <div class="panel dash-patrulhamento-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i data-lucide="route"></i>
+              <h2>Patrulhamento de Hoje</h2>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="handleIrParaCartaoHoje()">
+              <i data-lucide="arrow-right"></i> Ver Cartão Completo
+            </button>
+          </div>
+
+          <div id="dash-patrulhamento-vazio" class="cartao-empty-state hidden" style="padding:32px 24px;">
+            <i data-lucide="clipboard-x"></i>
+            <h3>Nenhum Cartão Programa lançado para hoje</h3>
+            <p>Lance o cartão de patrulhamento para orientar as viaturas do dia.</p>
+            <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="handleIrParaCartaoHoje()">
+              <i data-lucide="plus"></i> Lançar Cartão de Hoje
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="styled-table" id="table-dash-patrulhamento">
+              <thead>
+                <tr>
+                  <th>Viatura</th>
+                  <th>Setor</th>
+                  <th>Companhia</th>
+                  <th>Comandante</th>
+                </tr>
+              </thead>
+              <tbody id="dash-patrulhamento-lista"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 2: Novo Evento / Cadastro (Apenas P3) -->
+      <section id="tab-cadastro" class="tab-content">
+        <div class="form-container">
+          <div class="panel form-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="file-plus"></i>
+                <h2>Entrada de Novo Evento</h2>
+              </div>
+            </div>
+            <form id="form-evento" class="styled-form">
+              <div class="form-row">
+                <div class="form-group col-md-6">
+                  <label for="num_oficio">Número do Ofício</label>
+                  <input type="text" id="num_oficio" placeholder="Ex: Of. nº 123/2026-GAB/Prefeitura">
+                </div>
+                <div class="form-group col-md-6">
+                  <label for="tipo_evento">Tipo de Evento *</label>
+                  <select id="tipo_evento" required>
+                    <option value="" disabled selected>Selecione o tipo...</option>
+                    <option value="Show">Show</option>
+                    <option value="Futebol">Futebol</option>
+                    <option value="Ato Público">Ato Público</option>
+                    <option value="Religioso">Religioso</option>
+                    <option value="Cultural">Cultural</option>
+                    <option value="Missão Avulsa">Missão Avulsa</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group col-md-6">
+                  <label for="num_os_manual">Número da OS (se já conhecido)</label>
+                  <input type="text" id="num_os_manual" placeholder="Ex: OS Nº 045/2026 - P3/5º BPM">
+                </div>
+                <div class="form-group col-md-6">
+                  <label for="num_sei">Número SEI</label>
+                  <input type="text" id="num_sei" placeholder="Ex: 23100.000000/2026-00">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group col-md-6">
+                  <label for="nome_evento">Nome do Evento *</label>
+                  <input type="text" id="nome_evento" placeholder="Ex: Carnaval de Rua / Bloco da Segurança" required>
+                </div>
+                <div class="form-group col-md-6">
+                  <label for="demandante">Demandante / Solicitante *</label>
+                  <input type="text" id="demandante" placeholder="Ex: Prefeitura Municipal, Paróquia de São Jorge" required>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group col-md-4">
+                  <label for="data_inicio">Data de Início *</label>
+                  <input type="date" id="data_inicio" required>
+                </div>
+                <div class="form-group col-md-4">
+                  <label for="data_termino">Data de Término</label>
+                  <input type="date" id="data_termino">
+                </div>
+                <div class="form-group col-md-4">
+                  <label for="horario_inicio">Horário de Início</label>
+                  <input type="time" id="horario_inicio">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group col-md-8">
+                  <label for="local_itinerario">Local / Itinerário *</label>
+                  <input type="text" id="local_itinerario" placeholder="Ex: Avenida Principal, do número 10 ao 500" required>
+                </div>
+                <div class="form-group col-md-4">
+                  <label for="bairro">Bairro</label>
+                  <select id="bairro">
+                    <option value="">Selecione...</option>
+                    <!-- Injetado dinamicamente a partir do cadastro de bairros -->
+                    <option value="__outro__">Outro (não cadastrado)</option>
+                  </select>
+                  <input type="text" id="bairro_outro" class="hidden" placeholder="Digite o nome do bairro" style="margin-top:8px;">
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="reset" class="btn btn-secondary">Limpar</button>
+                <button type="submit" class="btn btn-primary">
+                  <i data-lucide="check"></i> Salvar Evento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 3: Meu Turno (Para Oficial de Dia / Adjunto / P3) -->
+      <section id="tab-turno" class="tab-content">
+        <div class="turno-header-info">
+          <p>Visão simplificada focada na escala de serviço diário.</p>
+        </div>
+        <div class="turno-grid">
+          <!-- Coluna Hoje -->
+          <div class="panel turno-column">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="calendar" class="color-success"></i>
+                <h2>Eventos de Hoje</h2>
+              </div>
+              <span class="badge badge-date" id="turno-data-hoje">05/07/2026</span>
+            </div>
+            <div class="turno-cards-container" id="turno-cards-hoje">
+              <!-- Injetado via JS -->
+            </div>
+          </div>
+
+          <!-- Coluna Amanhã -->
+          <div class="panel turno-column">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="arrow-right-circle" class="color-primary"></i>
+                <h2>Eventos de Amanhã</h2>
+              </div>
+              <span class="badge badge-date" id="turno-data-amanha">06/07/2026</span>
+            </div>
+            <div class="turno-cards-container" id="turno-cards-amanha">
+              <!-- Injetado via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 4: Listar Eventos (Compartilhado com Filtro de Datas) -->
+      <section id="tab-eventos" class="tab-content">
+        <div class="panel events-panel">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="calendar-search"></i>
+              <h2>Consulta Geral de Pauta de Eventos</h2>
+            </div>
+            <div class="events-filters-bar">
+              <div class="filter-group">
+                <label for="filter-eventos-inicio">Data Inicial</label>
+                <input type="date" id="filter-eventos-inicio">
+              </div>
+              <div class="filter-group">
+                <label for="filter-eventos-fim">Data Final</label>
+                <input type="date" id="filter-eventos-fim">
+              </div>
+              <div class="filter-search">
+                <label for="filter-eventos-search">Filtrar Texto</label>
+                <input type="text" id="filter-eventos-search" placeholder="Buscar por Evento, Local ou Demandante...">
+              </div>
+              <button id="btn-clear-date-filter" class="btn btn-secondary btn-sm">Limpar Filtros</button>
+              <button id="btn-gerar-relatorio-sei" class="btn btn-primary btn-sm">
+                <i data-lucide="file-output"></i> Gerar Relatório para SEI
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="styled-table" id="table-eventos">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Nome do Evento</th>
+                  <th>Tipo</th>
+                  <th>Demandante</th>
+                  <th>Bairro / Local</th>
+                  <th>Nº OS</th>
+                  <th>Nº SEI</th>
+                  <th>Diária</th>
+                </tr>
+              </thead>
+              <tbody id="table-eventos-body">
+                <!-- Injetado dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 4b: Mapa de Eventos da Semana -->
+      <section id="tab-mapa" class="tab-content">
+        <div class="panel">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="map"></i>
+              <h2>Mapa de Eventos da Semana</h2>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <p style="font-size:0.75rem;color:var(--text-muted);">Eventos da pauta com data dentro da semana corrente (segunda a domingo), agrupados por bairro.</p>
+              <button id="btn-toggle-gerenciar-bairros" class="btn btn-secondary btn-sm admin-only">
+                <i data-lucide="map-pin-plus"></i> Gerenciar Bairros
+              </button>
+            </div>
+          </div>
+          <div id="mapa-aviso-sem-coordenada" class="mapa-aviso hidden"></div>
+          <div id="mapa-eventos-semana" class="mapa-container"></div>
+        </div>
+
+        <!-- Cadastro de Bairros (P3) -->
+        <div id="gerenciar-bairros-panel" class="panel cartao-historico-panel hidden">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="map-pin-plus"></i>
+              <h2>Cadastro de Bairros</h2>
+            </div>
+            <p style="font-size:0.75rem;color:var(--text-muted);">Alimenta o Mapa e a lista de Bairro em Novo Evento.</p>
+          </div>
+          <form id="form-bairro" class="styled-form" style="padding:0 20px 16px;">
+            <div class="form-row">
+              <div class="form-group col-md-5">
+                <label for="bairro-nome">Nome do Bairro</label>
+                <input type="text" id="bairro-nome" required placeholder="Ex: Nova Descoberta">
+              </div>
+              <div class="form-group col-md-3">
+                <label for="bairro-lat">Latitude</label>
+                <input type="text" id="bairro-lat" required placeholder="Ex: -5.8080">
+              </div>
+              <div class="form-group col-md-3">
+                <label for="bairro-lon">Longitude</label>
+                <input type="text" id="bairro-lon" required placeholder="Ex: -35.2250">
+              </div>
+              <div class="form-group col-md-1" style="display:flex;align-items:flex-end;">
+                <button type="submit" class="btn btn-primary btn-sm" id="btn-salvar-bairro" style="width:100%;">
+                  <i data-lucide="plus"></i>
+                </button>
+              </div>
+            </div>
+          </form>
+          <div class="table-responsive">
+            <table class="styled-table" id="table-bairros">
+              <thead>
+                <tr>
+                  <th>Nome do Bairro</th>
+                  <th>Latitude</th>
+                  <th>Longitude</th>
+                  <th class="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="table-bairros-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 5: Relatório Diárias (Apenas P3) -->
+      <section id="tab-relatorio" class="tab-content">
+        <div class="panel report-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i data-lucide="file-spreadsheet"></i>
+              <h2>Relatório Consolidado de Diárias por Militar</h2>
+            </div>
+            <div class="report-filters">
+              <div class="filter-group">
+                <label for="filter-mes">Mês</label>
+                <select id="filter-mes">
+                  <option value="01">Janeiro</option>
+                  <option value="02">Fevereiro</option>
+                  <option value="03">Março</option>
+                  <option value="04">Abril</option>
+                  <option value="05">Maio</option>
+                  <option value="06">Junho</option>
+                  <option value="07" selected>Julho</option>
+                  <option value="08">Agosto</option>
+                  <option value="09">Setembro</option>
+                  <option value="10">Outubro</option>
+                  <option value="11">Novembro</option>
+                  <option value="12">Dezembro</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filter-ano">Ano</label>
+                <select id="filter-ano">
+                  <option value="2026" selected>2026</option>
+                  <option value="2027">2027</option>
+                </select>
+              </div>
+              <div class="filter-search">
+                <label for="filter-search-input">Pesquisar Militar</label>
+                <input type="text" id="filter-search-input" placeholder="Nome ou Matrícula...">
+              </div>
+              <button id="btn-export" class="btn btn-success">
+                <i data-lucide="download"></i>
+                <span>Exportar</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="styled-table" id="table-relatorio">
+              <thead>
+                <tr>
+                  <th>Matrícula</th>
+                  <th>Nome do Militar</th>
+                  <th class="text-center">Quantidade de Escalas</th>
+                  <th class="text-center">Total de Aparições</th>
+                  <th class="text-right">Total de Diárias (Un.)</th>
+                </tr>
+              </thead>
+              <tbody id="table-relatorio-body">
+                <!-- Injetado dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 6: Planejador Mensal de Diárias (Apenas P3) -->
+      <section id="tab-planejador" class="tab-content">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i data-lucide="wallet"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Cota Mensal de Diárias</h3>
+              <p id="plan-stat-cota">0</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon alert">
+              <i data-lucide="trending-up"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Diárias Planejadas</h3>
+              <p id="plan-stat-consumido">0</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon success">
+              <i data-lucide="piggy-bank"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Saldo Disponível</h3>
+              <p id="plan-stat-saldo">0</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Calendário de Diárias -->
+        <div class="panel calendario-diarias-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i data-lucide="calendar-days"></i>
+              <h2>Calendário de Diárias</h2>
+            </div>
+            <div class="calendar-nav">
+              <button id="btn-prev-month-diarias" class="btn-icon"><i data-lucide="chevron-left"></i></button>
+              <span id="calendar-diarias-month-year">Julho 2026</span>
+              <button id="btn-next-month-diarias" class="btn-icon"><i data-lucide="chevron-right"></i></button>
+            </div>
+          </div>
+          <div class="calendar-container">
+            <div class="calendar-weekdays">
+              <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+            </div>
+            <div id="calendar-diarias-grid" class="calendar-grid">
+              <!-- Injetado dinamicamente -->
+            </div>
+          </div>
+          <p class="calendario-diarias-dica">
+            <i data-lucide="info"></i>
+            Clique em um dia para lançar uma diária avulsa (Missa, Bar, etc.) sem precisar do cadastro completo de evento.
+          </p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="calendar-clock"></i>
+              <h2>Planejamento Mensal Dentro da Cota</h2>
+            </div>
+            <div class="report-filters">
+              <div class="filter-group">
+                <label for="plan-filter-mes">Mês</label>
+                <select id="plan-filter-mes">
+                  <option value="01">Janeiro</option>
+                  <option value="02">Fevereiro</option>
+                  <option value="03">Março</option>
+                  <option value="04">Abril</option>
+                  <option value="05">Maio</option>
+                  <option value="06">Junho</option>
+                  <option value="07">Julho</option>
+                  <option value="08">Agosto</option>
+                  <option value="09">Setembro</option>
+                  <option value="10">Outubro</option>
+                  <option value="11">Novembro</option>
+                  <option value="12">Dezembro</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="plan-filter-ano">Ano</label>
+                <select id="plan-filter-ano"></select>
+              </div>
+              <div class="filter-group admin-only">
+                <label for="input-cota">Definir Cota Mensal</label>
+                <div class="cota-input-wrap">
+                  <input type="number" id="input-cota" min="0" placeholder="Ex: 60">
+                  <button id="btn-save-cota" class="btn btn-primary btn-sm">
+                    <i data-lucide="save"></i> Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Barra de consumo da cota -->
+          <div class="budget-bar-section">
+            <div class="budget-bar-labels">
+              <span id="budget-label-text">0 de 0 diárias planejadas</span>
+              <span id="budget-label-pct">0%</span>
+            </div>
+            <div class="budget-bar">
+              <div class="budget-bar-fill" id="budget-bar-fill"></div>
+            </div>
+            <p class="budget-alert hidden" id="budget-alert">
+              <i data-lucide="alert-triangle"></i>
+              <span id="budget-alert-text">Cota mensal excedida.</span>
+            </p>
+          </div>
+
+          <div class="table-responsive">
+            <table class="styled-table" id="table-planejador">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Evento</th>
+                  <th>Tipo</th>
+                  <th class="text-center">Militares Escalados</th>
+                  <th class="text-right">Diárias</th>
+                  <th class="text-right">% da Cota</th>
+                </tr>
+              </thead>
+              <tbody id="table-planejador-body">
+                <!-- Injetado dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 7: Estatísticas (Painel Analítico para Planejamento) (Apenas P3) -->
+      <section id="tab-estatisticas" class="tab-content">
+        <div class="panel-header flex-column-mobile" style="border:none;padding:0 0 16px 0;">
+          <div class="panel-title">
+            <i data-lucide="bar-chart-3"></i>
+            <h2>Painel Analítico de Policiamento</h2>
+          </div>
+          <div class="filter-group">
+            <label for="stats-filter-ano">Ano de Referência</label>
+            <select id="stats-filter-ano"></select>
+          </div>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i data-lucide="calendar"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Eventos no Ano</h3>
+              <p id="stats-total-eventos">0</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon info">
+              <i data-lucide="users"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Efetivo Total Empregado</h3>
+              <p id="stats-total-policiais">0</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon alert">
+              <i data-lucide="car"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Viaturas Totais Empregadas</h3>
+              <p id="stats-total-viaturas">0</p>
+            </div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-icon success">
+              <i data-lucide="wallet"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Diárias Pagas no Ano</h3>
+              <p id="stats-total-diarias">0</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="map-pin"></i>
+                <h2>Efetivo Empregado por Bairro</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-stats-bairro">
+                <thead>
+                  <tr>
+                    <th>Bairro</th>
+                    <th class="text-center">Eventos</th>
+                    <th class="text-center">Policiais</th>
+                    <th class="text-center">Viaturas</th>
+                  </tr>
+                </thead>
+                <tbody id="table-stats-bairro-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="tag"></i>
+                <h2>Demanda por Tipo de Evento</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-stats-tipo">
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th class="text-center">Eventos</th>
+                    <th class="text-center">Policiais</th>
+                    <th class="text-center">Média PM/Evento</th>
+                  </tr>
+                </thead>
+                <tbody id="table-stats-tipo-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="shield-half"></i>
+                <h2>Distribuição por Modalidade</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-stats-modalidade">
+                <thead>
+                  <tr>
+                    <th>Modalidade</th>
+                    <th class="text-center">Policiais</th>
+                    <th class="text-center">Viaturas</th>
+                    <th class="text-right">% do Efetivo</th>
+                  </tr>
+                </thead>
+                <tbody id="table-stats-modalidade-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="activity"></i>
+                <h2>Sazonalidade — Planejados x Realizados</h2>
+              </div>
+            </div>
+            <div class="sazonalidade-wrap">
+              <div id="chart-sazonalidade" class="sazonalidade-chart"></div>
+              <div class="sazonalidade-legenda">
+                <span><i class="legenda-dot legenda-planejado"></i> Planejados</span>
+                <span><i class="legenda-dot legenda-realizado"></i> Realizados</span>
+                <span><i class="legenda-dot legenda-pico"></i> Pico de diárias</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="trending-up"></i>
+                <h2>Tendência Mensal (Eventos x Efetivo)</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-stats-tendencia">
+                <thead>
+                  <tr>
+                    <th>Mês</th>
+                    <th class="text-center">Eventos</th>
+                    <th>Efetivo Empregado</th>
+                  </tr>
+                </thead>
+                <tbody id="table-stats-tendencia-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estatísticas do Cartão Programa (Patrulhamento) -->
+        <div class="stats-section-divider">
+          <i data-lucide="route"></i>
+          <h2>Estatísticas de Patrulhamento (Cartão Programa)</h2>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i data-lucide="clipboard-list"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Cartões Lançados no Ano</h3>
+              <p id="stats-cartao-total-cartoes">0</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon info">
+              <i data-lucide="car"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Viaturas-Dia no Ano</h3>
+              <p id="stats-cartao-total-viaturas-dia">0</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon alert">
+              <i data-lucide="list-checks"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Itens de Roteiro Lançados</h3>
+              <p id="stats-cartao-total-itens">0</p>
+            </div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-icon success">
+              <i data-lucide="clock"></i>
+            </div>
+            <div class="stat-info">
+              <h3>Horas de Patrulhamento Registradas</h3>
+              <p id="stats-cartao-total-horas">0</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="map-pin"></i>
+                <h2>Patrulhamento por Setor / Bairro</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-stats-cartao-setor">
+                <thead>
+                  <tr>
+                    <th>Setor</th>
+                    <th class="text-center">Itens de Roteiro</th>
+                    <th class="text-center">Horas Registradas</th>
+                  </tr>
+                </thead>
+                <tbody id="table-stats-cartao-setor-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="tag"></i>
+                <h2>Distribuição por Tipo de Atividade</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-stats-cartao-atividade">
+                <thead>
+                  <tr>
+                    <th>Atividade</th>
+                    <th class="text-center">Ocorrências</th>
+                    <th class="text-right">% do Total</th>
+                  </tr>
+                </thead>
+                <tbody id="table-stats-cartao-atividade-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="car"></i>
+                <h2>Utilização por Viatura</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-stats-cartao-viatura">
+                <thead>
+                  <tr>
+                    <th>Viatura</th>
+                    <th class="text-center">Dias Escalada</th>
+                    <th class="text-center">Itens de Roteiro</th>
+                  </tr>
+                </thead>
+                <tbody id="table-stats-cartao-viatura-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="trending-up"></i>
+                <h2>Tendência Mensal (Cartões x Viaturas-Dia)</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-stats-cartao-tendencia">
+                <thead>
+                  <tr>
+                    <th>Mês</th>
+                    <th class="text-center">Cartões Lançados</th>
+                    <th>Viaturas-Dia</th>
+                  </tr>
+                </thead>
+                <tbody id="table-stats-cartao-tendencia-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 8: Cartão Programa (Patrulhamento Diário - Todos os Perfis) -->
+      <section id="tab-cartao" class="tab-content">
+        <!-- Barra de ferramentas -->
+        <div class="panel cartao-toolbar-panel">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="route"></i>
+              <h2>Cartão Programa de Patrulhamento</h2>
+            </div>
+            <div class="report-filters cartao-toolbar">
+              <div class="filter-group">
+                <label for="cartao-data">Data do Cartão</label>
+                <input type="date" id="cartao-data">
+              </div>
+              <button id="btn-novo-cartao" class="btn btn-primary btn-sm">
+                <i data-lucide="plus"></i> Criar Cartão
+              </button>
+              <button id="btn-copiar-cartao" class="btn btn-secondary btn-sm">
+                <i data-lucide="copy"></i> Copiar do Dia Anterior
+              </button>
+              <button id="btn-imprimir-cartao" class="btn btn-success btn-sm">
+                <i data-lucide="printer"></i> Imprimir
+              </button>
+              <button id="btn-excluir-cartao" class="btn btn-danger btn-sm">
+                <i data-lucide="trash-2"></i> Excluir
+              </button>
+              <button id="btn-toggle-historico" class="btn btn-secondary btn-sm">
+                <i data-lucide="history"></i> Histórico
+              </button>
+              <button id="btn-toggle-templates" class="btn btn-secondary btn-sm admin-only">
+                <i data-lucide="layout-template"></i> Templates
+              </button>
+              <button id="btn-novo-template" class="btn btn-secondary btn-sm admin-only">
+                <i data-lucide="file-plus-2"></i> Novo Template
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Templates de Cartão Programa (P3) -->
+        <div id="cartao-templates-panel" class="panel cartao-historico-panel hidden">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="layout-template"></i>
+              <h2>Templates de Patrulhamento</h2>
+            </div>
+            <p style="font-size:0.75rem;color:var(--text-muted);">Modelos reutilizáveis de setores/viaturas por período e quantidade de frota.</p>
+          </div>
+          <div class="table-responsive">
+            <table class="styled-table" id="table-templates">
+              <thead>
+                <tr>
+                  <th>Nome do Template</th>
+                  <th>Período</th>
+                  <th class="text-center">Qtd. VTRs Base</th>
+                  <th class="text-center">Viaturas Cadastradas</th>
+                  <th class="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="table-templates-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Histórico de Cartões Já Lançados -->
+        <div id="cartao-historico-panel" class="panel cartao-historico-panel hidden">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="history"></i>
+              <h2>Histórico de Cartões Programa</h2>
+            </div>
+            <div class="report-filters">
+              <div class="filter-group">
+                <label for="cartao-hist-mes">Mês</label>
+                <select id="cartao-hist-mes">
+                  <option value="">Todos</option>
+                  <option value="01">Janeiro</option>
+                  <option value="02">Fevereiro</option>
+                  <option value="03">Março</option>
+                  <option value="04">Abril</option>
+                  <option value="05">Maio</option>
+                  <option value="06">Junho</option>
+                  <option value="07">Julho</option>
+                  <option value="08">Agosto</option>
+                  <option value="09">Setembro</option>
+                  <option value="10">Outubro</option>
+                  <option value="11">Novembro</option>
+                  <option value="12">Dezembro</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="cartao-hist-ano">Ano</label>
+                <select id="cartao-hist-ano"></select>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="styled-table" id="table-cartao-historico">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Fiscal de Operações</th>
+                  <th>Adjunto</th>
+                  <th class="text-center">Viaturas</th>
+                  <th class="text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="table-cartao-historico-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Estado vazio -->
+        <div id="cartao-vazio" class="cartao-empty-state hidden">
+          <i data-lucide="clipboard-x"></i>
+          <h3>Nenhum Cartão Programa para esta data</h3>
+          <p>Crie um cartão em branco, copie a estrutura do dia anterior, ou importe um template pronto.</p>
+
+          <div class="cartao-sugestao-template">
+            <div class="cartao-sugestao-linha">
+              <span id="cartao-sugestao-badge-periodo" class="badge">-</span>
+              <div class="filter-group">
+                <label for="sugestao-qtd-viaturas">Quantidade de Viaturas</label>
+                <select id="sugestao-qtd-viaturas">
+                  <option value="5">5 viaturas</option>
+                  <option value="6">6 viaturas</option>
+                  <option value="7">7 viaturas</option>
+                </select>
+              </div>
+              <button id="btn-buscar-template" class="btn btn-secondary btn-sm">
+                <i data-lucide="search"></i> Buscar Template Sugerido
+              </button>
+            </div>
+            <div id="cartao-sugestao-resultado"></div>
+          </div>
+        </div>
+
+        <!-- Conteúdo do Cartão -->
+        <div id="cartao-conteudo" class="hidden">
+          <!-- Alertas de Conflito -->
+          <div id="cartao-alertas-panel" class="panel cartao-alertas-panel hidden">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="alert-triangle"></i>
+                <h2>Alertas de Conflito</h2>
+              </div>
+            </div>
+            <div id="cartao-alertas-lista" class="cartao-alertas-lista"></div>
+          </div>
+
+          <!-- Cabeçalho oficial do cartão -->
+          <div class="panel cartao-header-panel" id="cartao-print-header">
+            <div class="cartao-print-title">
+              <h2 id="cartao-titulo-print">CARTÃO PROGRAMA - 5º BPM</h2>
+              <span id="cartao-subtitulo-print">Policiamento Ostensivo Diário</span>
+            </div>
+            <div class="cartao-header-fields">
+              <div class="form-group">
+                <label for="cartao-fiscal">Fiscal de Operações</label>
+                <select id="cartao-fiscal">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="cartao-adjunto">Adjunto</label>
+                <select id="cartao-adjunto">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="cartao-sobreaviso">Oficial de Sobreaviso</label>
+                <select id="cartao-sobreaviso">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quadro Resumo Consolidado -->
+          <div class="panel cartao-resumo-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="table-2"></i>
+                <h2>Quadro Resumo</h2>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="styled-table" id="table-cartao-resumo">
+                <thead>
+                  <tr>
+                    <th>Companhia</th>
+                    <th>Viatura</th>
+                    <th>Setor</th>
+                    <th>QTL Almoço</th>
+                    <th>QTL Jantar</th>
+                    <th>Madrugada Segura / Observação</th>
+                  </tr>
+                </thead>
+                <tbody id="table-cartao-resumo-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Grid de Viaturas -->
+          <div id="cartao-vtr-grid" class="cartao-vtr-grid">
+            <!-- Injetado via JS -->
+          </div>
+
+          <!-- Adicionar Viatura -->
+          <div class="panel cartao-add-vtr-panel">
+            <div class="section-actions" style="padding:16px 20px 0 20px;">
+              <h4><i data-lucide="car" style="width:14px;height:14px;vertical-align:middle;"></i> Adicionar Viatura ao Cartão</h4>
+            </div>
+            <form id="form-cartao-vtr" class="styled-form" style="padding-top:8px;">
+              <div class="form-row">
+                <div class="form-group col-md-3">
+                  <label for="vtr_prefixo">Prefixo VTR *</label>
+                  <input type="text" id="vtr_prefixo" placeholder="Ex: B05-05" required>
+                </div>
+                <div class="form-group col-md-4">
+                  <label for="vtr_setor">Setor / Bairro *</label>
+                  <input type="text" id="vtr_setor" placeholder="Ex: PONTA NEGRA" required>
+                </div>
+                <div class="form-group col-md-5">
+                  <label for="vtr_comandante">Comandante da Guarnição</label>
+                  <input type="text" id="vtr_comandante" placeholder="Ex: 2º SGT PM DÊNIS">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group col-md-4">
+                  <label for="vtr_companhia">Companhia</label>
+                  <select id="vtr_companhia">
+                    <option value="">Não informada</option>
+                    <option value="1ª Companhia">1ª Companhia</option>
+                    <option value="2ª Companhia">2ª Companhia</option>
+                    <option value="3ª Companhia">3ª Companhia</option>
+                  </select>
+                </div>
+                <div class="form-group col-md-4">
+                  <label for="vtr_categoria">Categoria da Viatura</label>
+                  <select id="vtr_categoria">
+                    <option value="Ordinária">Ordinária</option>
+                    <option value="Força Tática">Força Tática</option>
+                    <option value="Suplementar">Suplementar</option>
+                  </select>
+                </div>
+                <div class="form-group col-md-4">
+                  <label for="vtr_observacao">Obs. / Turno da Madrugada</label>
+                  <input type="text" id="vtr_observacao" placeholder="Ex: 1º TURNO - HEMISFÉRIO SUL">
+                </div>
+              </div>
+              <div class="form-row" style="justify-content:flex-end;">
+                <button type="submit" class="btn btn-primary">
+                  <i data-lucide="plus"></i> Adicionar Viatura
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 9: Gestão de Usuários (Apenas P3) -->
+      <section id="tab-usuarios" class="tab-content">
+        <div class="panel">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="users-round"></i>
+              <h2>Usuários do Sistema</h2>
+            </div>
+            <button id="btn-novo-usuario" class="btn btn-primary btn-sm">
+              <i data-lucide="user-plus"></i> Novo Usuário
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="styled-table" id="table-usuarios">
+              <thead>
+                <tr>
+                  <th>Login</th>
+                  <th>Nome</th>
+                  <th>Perfil</th>
+                  <th class="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="table-usuarios-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Aba 10: Cadastro de Pessoal (Apenas P3) -->
+      <section id="tab-pessoal" class="tab-content">
+        <div class="panel">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="contact"></i>
+              <h2>Cadastro de Pessoal</h2>
+            </div>
+            <button id="btn-nova-pessoa" class="btn btn-primary btn-sm">
+              <i data-lucide="user-plus"></i> Nova Pessoa
+            </button>
+          </div>
+
+          <div class="pessoal-filtro-categorias" id="pessoal-filtro-categorias">
+            <button class="btn btn-secondary btn-sm pessoal-filtro-btn active" data-categoria="">Todos</button>
+            <button class="btn btn-secondary btn-sm pessoal-filtro-btn" data-categoria="Adjunto">Adjuntos</button>
+            <button class="btn btn-secondary btn-sm pessoal-filtro-btn" data-categoria="Fiscal de Operações">Fiscais de Operações</button>
+            <button class="btn btn-secondary btn-sm pessoal-filtro-btn" data-categoria="Oficial de Operações">Oficiais de Operações</button>
+            <button class="btn btn-secondary btn-sm pessoal-filtro-btn" data-categoria="Oficial de Sobreaviso">Oficiais de Sobreaviso</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="styled-table" id="table-pessoal">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Posto/Graduação</th>
+                  <th>Tipo</th>
+                  <th>Categorias</th>
+                  <th class="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="table-pessoal-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Modal: Criar / Editar Usuário -->
+  <div id="modal-usuario" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-usuario-titulo"><i data-lucide="user-plus"></i> Novo Usuário</h3>
+        <button class="btn-close" id="btn-fechar-modal-usuario">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-usuario">
+        <div class="form-group">
+          <label for="usr-login">Login</label>
+          <input type="text" id="usr-login" required placeholder="Ex: oficial2" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="usr-nome">Nome de Exibição</label>
+          <input type="text" id="usr-nome" required placeholder="Ex: Oficial de Dia - Turma B">
+        </div>
+        <div class="form-group">
+          <label for="usr-role">Perfil</label>
+          <select id="usr-role" required>
+            <option value="P3">P3 (Administrador)</option>
+            <option value="Adjunto">Adjunto</option>
+            <option value="Oficial">Oficial</option>
+          </select>
+        </div>
+        <div class="form-group" id="usr-senha-group">
+          <label for="usr-senha">Senha Inicial</label>
+          <input type="password" id="usr-senha" minlength="3" placeholder="Mínimo 3 caracteres" autocomplete="new-password">
+        </div>
+        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-usuario">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Criar / Editar Pessoa (Cadastro de Pessoal) -->
+  <div id="modal-pessoa" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-pessoa-titulo"><i data-lucide="user-plus"></i> Nova Pessoa</h3>
+        <button class="btn-close" id="btn-fechar-modal-pessoa">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-pessoa">
+        <div class="form-group">
+          <label for="pes-nome">Nome (como deve aparecer no Cartão Programa)</label>
+          <input type="text" id="pes-nome" required placeholder="Ex: 3º SGT PM HERAYSON">
+        </div>
+        <div class="form-group">
+          <label for="pes-posto">Posto/Graduação</label>
+          <select id="pes-posto" required>
+            <optgroup label="Praças">
+              <option value="Soldado PM">Soldado PM</option>
+              <option value="Cabo PM">Cabo PM</option>
+              <option value="3º Sargento PM">3º Sargento PM</option>
+              <option value="2º Sargento PM">2º Sargento PM</option>
+              <option value="1º Sargento PM">1º Sargento PM</option>
+              <option value="Subtenente PM">Subtenente PM</option>
+            </optgroup>
+            <optgroup label="Oficiais">
+              <option value="Aspirante a Oficial PM">Aspirante a Oficial PM</option>
+              <option value="2º Tenente PM">2º Tenente PM</option>
+              <option value="1º Tenente PM">1º Tenente PM</option>
+              <option value="Capitão PM">Capitão PM</option>
+              <option value="Major PM">Major PM</option>
+              <option value="Tenente-Coronel PM">Tenente-Coronel PM</option>
+              <option value="Coronel PM">Coronel PM</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Categorias (pode marcar mais de uma)</label>
+          <div class="pessoal-categorias-checkboxes">
+            <label><input type="checkbox" value="Adjunto"> Adjunto</label>
+            <label><input type="checkbox" value="Fiscal de Operações"> Fiscal de Operações</label>
+            <label><input type="checkbox" value="Oficial de Operações"> Oficial de Operações</label>
+            <label><input type="checkbox" value="Oficial de Sobreaviso"> Oficial de Sobreaviso</label>
+          </div>
+        </div>
+        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-pessoa">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Resetar Senha de Usuário -->
+  <div id="modal-reset-senha" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3><i data-lucide="key-round"></i> Resetar Senha</h3>
+        <button class="btn-close" id="btn-fechar-modal-reset">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-reset-senha">
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">
+          Definindo nova senha para <strong id="reset-senha-usuario-nome">-</strong>. O usuário precisará usar esta nova senha no próximo login.
+        </p>
+        <div class="form-group">
+          <label for="reset-senha-nova">Nova Senha</label>
+          <input type="password" id="reset-senha-nova" required minlength="3" placeholder="Mínimo 3 caracteres" autocomplete="new-password">
+        </div>
+        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-reset">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="key-round"></i> Redefinir Senha
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Editar Viatura do Cartão Programa -->
+  <div id="modal-editar-vtr" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3><i data-lucide="car"></i> Editar Viatura</h3>
+        <button class="btn-close" id="btn-fechar-modal-editar-vtr">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-editar-vtr">
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="edit-vtr-prefixo">Prefixo VTR *</label>
+            <input type="text" id="edit-vtr-prefixo" required>
+          </div>
+          <div class="form-group col-md-6">
+            <label for="edit-vtr-setor">Setor / Bairro *</label>
+            <input type="text" id="edit-vtr-setor" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="edit-vtr-companhia">Companhia</label>
+            <select id="edit-vtr-companhia">
+              <option value="">Não informada</option>
+              <option value="1ª Companhia">1ª Companhia</option>
+              <option value="2ª Companhia">2ª Companhia</option>
+              <option value="3ª Companhia">3ª Companhia</option>
+            </select>
+          </div>
+          <div class="form-group col-md-6">
+            <label for="edit-vtr-categoria">Categoria da Viatura</label>
+            <select id="edit-vtr-categoria">
+              <option value="Ordinária">Ordinária</option>
+              <option value="Força Tática">Força Tática</option>
+              <option value="Suplementar">Suplementar</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-vtr-comandante">Comandante da Guarnição</label>
+          <input type="text" id="edit-vtr-comandante">
+        </div>
+        <div class="form-group">
+          <label for="edit-vtr-observacao">Observação / Turno da Madrugada</label>
+          <input type="text" id="edit-vtr-observacao">
+        </div>
+        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-editar-vtr">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Salvar Viatura
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Lançar Missão Avulsa (Diária Rápida) -->
+  <div id="modal-missao-avulsa" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3><i data-lucide="calendar-plus"></i> Lançar Missão Avulsa</h3>
+        <button class="btn-close" id="btn-fechar-modal-missao">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">
+        Registro rápido para diárias avulsas (Missa, Bar, etc.), sem o cadastro completo de evento.
+        Depois de criar, você poderá escalar o(s) militar(es) na gaveta de detalhes.
+      </p>
+      <form id="form-missao-avulsa">
+        <div class="form-group">
+          <label for="missao-nome">Nome da Missão *</label>
+          <input type="text" id="missao-nome" required placeholder="Ex: Missa Dominical - Paróquia São Jorge">
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="missao-data">Data *</label>
+            <input type="date" id="missao-data" required>
+          </div>
+          <div class="form-group col-md-6">
+            <label for="missao-horario">Horário</label>
+            <input type="time" id="missao-horario">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="missao-local">Local (opcional)</label>
+          <input type="text" id="missao-local" placeholder="Ex: Bar do Zé, Av. Principal, 123">
+        </div>
+        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-missao">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Criar e Escalar Militares
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Novo Template de Cartão Programa -->
+  <div id="modal-novo-template" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3><i data-lucide="layout-template"></i> Novo Template de Patrulhamento</h3>
+        <button class="btn-close" id="btn-fechar-modal-template">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-novo-template">
+        <div class="form-group">
+          <label for="template-nome">Nome do Template *</label>
+          <input type="text" id="template-nome" required placeholder="Ex: Dia Útil - 5 VTRs">
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="template-tipo-periodo">Período *</label>
+            <select id="template-tipo-periodo" required>
+              <option value="semana">Dia Útil (Semana)</option>
+              <option value="fim_de_semana">Fim de Semana</option>
+            </select>
+          </div>
+          <div class="form-group col-md-6">
+            <label for="template-qtd-viaturas">Quantidade de Viaturas Base *</label>
+            <select id="template-qtd-viaturas" required>
+              <option value="5">5 viaturas</option>
+              <option value="6">6 viaturas</option>
+              <option value="7">7 viaturas</option>
+            </select>
+          </div>
+        </div>
+        <p style="font-size:0.75rem;color:var(--text-muted);">
+          Depois de criado, adicione as viaturas e os roteiros do template normalmente — o campo Comandante pode ficar em branco, já que será preenchido pelo Adjunto no dia.
+        </p>
+        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-template">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Criar Template
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Relatório para o SEI -->
+  <div id="modal-relatorio-sei" class="modal-overlay hidden">
+    <div class="modal-box modal-box-lg">
+      <div class="modal-header">
+        <h3><i data-lucide="file-output"></i> Relatório para o SEI</h3>
+        <button class="btn-close" id="btn-fechar-modal-sei">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div id="sei-print-area" class="sei-print-area">
+        <div class="sei-cabecalho">
+          <strong>POLÍCIA MILITAR DO ESTADO DO RIO GRANDE DO NORTE</strong>
+          <span>5º BATALHÃO DE POLÍCIA MILITAR</span>
+          <span>SEÇÃO DE PLANEJAMENTO E OPERAÇÕES — P3</span>
+        </div>
+
+        <h4 id="sei-titulo">Relatório de Emprego Operacional</h4>
+        <p id="sei-periodo" class="sei-subtitulo">-</p>
+
+        <div class="sei-resumo-grid" id="sei-resumo-grid"><!-- injetado --></div>
+
+        <div class="sei-secao">
+          <h5>Bairros Atendidos</h5>
+          <p id="sei-bairros">-</p>
+        </div>
+
+        <div class="sei-secao">
+          <h5>Efetivo Empregado (Diárias)</h5>
+          <ol id="sei-lista-efetivo" class="sei-lista-efetivo"><!-- injetado --></ol>
+        </div>
+      </div>
+
+      <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+        <button type="button" class="btn btn-secondary" id="btn-copiar-relatorio-sei">
+          <i data-lucide="clipboard-copy"></i> Copiar Texto Formatado
+        </button>
+        <button type="button" class="btn btn-secondary" id="btn-exportar-pdf-sei">
+          <i data-lucide="file-down"></i> Exportar PDF
+        </button>
+        <button type="button" class="btn btn-primary" id="btn-fechar-modal-sei-footer">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide-out Drawer (Gaveta Lateral de Detalhes do Evento) -->
+  <div id="drawer" class="drawer">
+    <div class="drawer-overlay" id="drawer-overlay"></div>
+    <div class="drawer-content">
+      
+      <div class="drawer-header">
+        <div class="drawer-title-area">
+          <span class="badge" id="drawer-event-badge">Show</span>
+          <h2 id="drawer-event-title">Nome do Evento</h2>
+        </div>
+        <button class="btn-close" id="btn-close-drawer">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        
+        <!-- Detalhes do Evento -->
+        <div class="drawer-section">
+          <h3><i data-lucide="info"></i> Detalhes do Ofício</h3>
+          <div class="details-grid">
+            <div class="detail-item"><strong>Ofício:</strong> <span id="detail-oficio">-</span></div>
+            <div class="detail-item"><strong>Número da OS:</strong> <span id="detail-os-manual">-</span></div>
+            <div class="detail-item"><strong>Número SEI:</strong> <span id="detail-sei">-</span></div>
+            <div class="detail-item"><strong>Demandante:</strong> <span id="detail-demandante">-</span></div>
+            <div class="detail-item"><strong>Início:</strong> <span id="detail-inicio">-</span></div>
+            <div class="detail-item"><strong>Término:</strong> <span id="detail-termino">-</span></div>
+            <div class="detail-item"><strong>Hora:</strong> <span id="detail-hora">-</span></div>
+            <div class="detail-item"><strong>Bairro:</strong> <span id="detail-bairro">-</span></div>
+            <div class="detail-item" style="grid-column: span 2;"><strong>Local/Itinerário:</strong> <span id="detail-local">-</span></div>
+          </div>
+        </div>
+
+        <hr class="drawer-divider">
+
+        <!-- Abas Internas da Gaveta -->
+        <div class="drawer-tabs">
+          <button class="drawer-tab-btn active" data-drawer-tab="drawer-tab-policiamento">Alocação de Policiamento</button>
+          <button class="drawer-tab-btn" data-drawer-tab="drawer-tab-escala">Escala de Militares (Diárias)</button>
+        </div>
+
+        <!-- Aba Policiamento (Viaturas e Efetivo Geral) -->
+        <div id="drawer-tab-policiamento" class="drawer-tab-content active">
+          <div class="section-actions">
+            <h4>Modalidades Alocadas</h4>
+            <button class="btn btn-secondary btn-sm admin-only" id="btn-add-alocacao">
+              <i data-lucide="plus"></i> Alocar Modalidade
+            </button>
+          </div>
+          
+          <div id="form-alocacao-container" class="sub-form-panel hidden">
+            <form id="form-alocacao">
+              <div class="form-row">
+                <div class="form-group col-md-6">
+                  <label for="aloc_modalidade">Modalidade *</label>
+                  <select id="aloc_modalidade" required>
+                    <option value="A Pé">A Pé</option>
+                    <option value="Rádio Patrulha">Rádio Patrulha</option>
+                    <option value="Motopatrulhamento">Motopatrulhamento</option>
+                    <option value="Cavalaria">Cavalaria</option>
+                    <option value="Trânsito">Trânsito</option>
+                  </select>
+                </div>
+                <div class="form-group col-md-3">
+                  <label for="aloc_policiais">Policiais *</label>
+                  <input type="number" id="aloc_policiais" min="1" required value="2">
+                </div>
+                <div class="form-group col-md-3">
+                  <label for="aloc_viaturas">Viaturas</label>
+                  <input type="number" id="aloc_viaturas" min="0" value="1">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group col-md-6">
+                  <label for="aloc_prefixos">Prefixos das Viaturas</label>
+                  <input type="text" id="aloc_prefixos" placeholder="Ex: M-05101, M-05102">
+                </div>
+                <div class="form-group col-md-6">
+                  <label for="aloc_comando">Comando do Serviço</label>
+                  <input type="text" id="aloc_comando" placeholder="Ex: Sgt PM Ribeiro">
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-alocacao">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm">Confirmar Alocação</button>
+              </div>
+            </form>
+          </div>
+
+          <div id="alocacoes-list" class="sub-list">
+            <!-- Injetado via JS -->
+          </div>
+        </div>
+
+        <!-- Aba Escala (Membros da Guarnição com Diárias) -->
+        <div id="drawer-tab-escala" class="drawer-tab-content">
+          <div class="section-actions">
+            <h4>Militares Escalados</h4>
+            <button class="btn btn-secondary btn-sm admin-only" id="btn-add-escala">
+              <i data-lucide="user-plus"></i> Escalar Militar
+            </button>
+          </div>
+
+          <div id="form-escala-container" class="sub-form-panel hidden">
+            <form id="form-escala">
+              <div class="form-row">
+                <div class="form-group col-md-5">
+                  <label for="esc_militar_nome">Nome Completo *</label>
+                  <input type="text" id="esc_militar_nome" placeholder="Ex: Sgt PM Silva" required>
+                </div>
+                <div class="form-group col-md-4">
+                  <label for="esc_militar_id">Matrícula / ID *</label>
+                  <input type="text" id="esc_militar_id" placeholder="Ex: 123.456-7" required>
+                </div>
+                <div class="form-group col-md-3">
+                  <label for="esc_qtd_aparicoes">Nº Aparições *</label>
+                  <input type="number" id="esc_qtd_aparicoes" min="1" required value="1">
+                </div>
+              </div>
+              <div class="calculation-preview">
+                <i data-lucide="calculator"></i>
+                <span>Cálculo automático de diárias: <strong id="diarias-calc-preview">2</strong> diárias operacionais.</span>
+              </div>
+              <div class="calculation-preview budget" id="escala-budget-preview">
+                <i data-lucide="wallet"></i>
+                <span id="escala-budget-text">Verificando saldo da cota mensal...</span>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-escala">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm">Confirmar Escala</button>
+              </div>
+            </form>
+          </div>
+
+          <div id="escalas-list" class="sub-list">
+            <!-- Injetado via JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <div class="drawer-footer">
+        <button class="btn btn-danger admin-only" id="btn-delete-evento">
+          <i data-lucide="trash-2"></i> Excluir Evento
+        </button>
+        <button class="btn btn-secondary" id="btn-drawer-relatorio-sei">
+          <i data-lucide="file-output"></i> Relatório SEI
+        </button>
+        <button class="btn btn-primary" id="btn-close-drawer-footer">Fechar</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal: Alterar Senha -->
+  <div id="modal-senha" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3><i data-lucide="key-round"></i> Alterar Minha Senha</h3>
+        <button class="btn-close" id="btn-fechar-modal-senha">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-alterar-senha">
+        <div class="form-group">
+          <label for="senha-atual">Senha Atual</label>
+          <input type="password" id="senha-atual" required autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label for="senha-nova">Nova Senha</label>
+          <input type="password" id="senha-nova" required minlength="3" autocomplete="new-password" placeholder="Mínimo 3 caracteres">
+        </div>
+        <div class="form-group">
+          <label for="senha-confirma">Confirmar Nova Senha</label>
+          <input type="password" id="senha-confirma" required minlength="3" autocomplete="new-password" placeholder="Repita a nova senha">
+        </div>
+        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-senha">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Salvar Nova Senha
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Rodar app.js -->
+  <script src="app.js"></script>
+</body>
+</html>
