@@ -1663,6 +1663,40 @@ button, input, select, textarea {
   z-index: 0;
 }
 
+.mapa-controles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mapa-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.mapa-toggle input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.mapa-controles #mapa-select-estilo {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  outline: none;
+}
+
 .mapa-aviso {
   display: flex;
   align-items: flex-start;

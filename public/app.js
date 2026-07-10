@@ -281,6 +281,11 @@ function setupEventListeners() {
     painel.classList.toggle('hidden');
     if (!painel.classList.contains('hidden')) renderGerenciarBairrosTab();
   });
+
+  // Painel de controle de camadas do Mapa (toggles + estilo de tile)
+  document.getElementById('mapa-toggle-eventos').addEventListener('change', handleMudarPrefsMapa);
+  document.getElementById('mapa-toggle-viaturas').addEventListener('change', handleMudarPrefsMapa);
+  document.getElementById('mapa-select-estilo').addEventListener('change', handleMudarPrefsMapa);
   document.getElementById('form-bairro').addEventListener('submit', handleSalvarBairro);
 
   const fecharModalReset = () => document.getElementById('modal-reset-senha').classList.add('hidden');
@@ -1212,29 +1217,98 @@ async function handleCopiarRelatorioSei() {
 }
 
 // -------------------------------------------------------------
-// MAPA DE EVENTOS DA SEMANA (LEAFLET, DARK MODE)
+// MAPA DE EVENTOS DA SEMANA (LEAFLET, DARK MODE) + CAMADA DE VIATURAS
 // -------------------------------------------------------------
 let mapaLeafletInstancia = null;
-let mapaLeafletMarkers = [];
+let mapaLeafletTileLayer = null;
+let mapaLeafletMarkersEventos = [];
+let mapaLeafletMarkersViaturas = [];
+
+const MAPA_PREFS_KEY = 'sgo_mapa_prefs';
+const MAPA_TILES = {
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  voyager: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+};
+
+function carregarPrefsMapa() {
+  try {
+    const salvo = JSON.parse(localStorage.getItem(MAPA_PREFS_KEY) || '{}');
+    return {
+      mostrarEventos: salvo.mostrarEventos !== false,
+      mostrarViaturas: salvo.mostrarViaturas !== false,
+      estilo: salvo.estilo === 'voyager' ? 'voyager' : 'dark'
+    };
+  } catch {
+    return { mostrarEventos: true, mostrarViaturas: true, estilo: 'dark' };
+  }
+}
+
+function salvarPrefsMapa(prefs) {
+  localStorage.setItem(MAPA_PREFS_KEY, JSON.stringify(prefs));
+}
+
+// Cor do marcador de viatura por categoria — reaproveita as mesmas cores dos badges do Cartão Programa
+const CORES_CATEGORIA_VIATURA = {
+  'Força Tática': '#ef4444',
+  'Suplementar': '#f59e0b',
+  'Ordinária': '#4f46e5'
+};
+
+function criarIconeViatura(categoria) {
+  const cor = CORES_CATEGORIA_VIATURA[categoria] || CORES_CATEGORIA_VIATURA['Ordinária'];
+  return L.divIcon({
+    className: 'mapa-icone-viatura',
+    html: `<div style="background:${cor};width:16px;height:16px;border-radius:4px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    popupAnchor: [0, -8]
+  });
+}
+
+// Acha o item de roteiro ativo de uma viatura no horário atual (mesma lógica de janela usada
+// nos alertas de conflito do Cartão Programa), com fallback pro setor se nada estiver ativo agora
+function itemAtivoAgora(vtr) {
+  const agora = new Date();
+  const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
+  return (vtr.itens || []).find(item => {
+    if (!item.fim) return false;
+    const ini = horaParaMinutos(item.inicio);
+    let fim = horaParaMinutos(item.fim);
+    if (fim <= ini) fim += 24 * 60;
+    let atual = minutosAgora;
+    if (atual < ini) atual += 24 * 60;
+    return atual >= ini && atual < fim;
+  }) || null;
+}
 
 async function renderMapaTab() {
   const container = document.getElementById('mapa-eventos-semana');
   const avisoEl = document.getElementById('mapa-aviso-sem-coordenada');
   if (!container) return;
 
+  const prefs = carregarPrefsMapa();
+  document.getElementById('mapa-toggle-eventos').checked = prefs.mostrarEventos;
+  document.getElementById('mapa-toggle-viaturas').checked = prefs.mostrarViaturas;
+  document.getElementById('mapa-select-estilo').value = prefs.estilo;
+
   // Inicializa o mapa uma única vez (Leaflet não gosta de ser recriado sobre o mesmo elemento)
   if (!mapaLeafletInstancia) {
     mapaLeafletInstancia = L.map(container).setView([-5.85, -35.21], 12); // centro aproximado da Zona Sul de Natal
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(mapaLeafletInstancia);
   }
 
+  // Troca o tile conforme o estilo salvo (dark vs. colorido)
+  if (mapaLeafletTileLayer) mapaLeafletInstancia.removeLayer(mapaLeafletTileLayer);
+  mapaLeafletTileLayer = L.tileLayer(MAPA_TILES[prefs.estilo], {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(mapaLeafletInstancia);
+
   // Limpa marcadores da renderização anterior
-  mapaLeafletMarkers.forEach(m => mapaLeafletInstancia.removeLayer(m));
-  mapaLeafletMarkers = [];
+  mapaLeafletMarkersEventos.forEach(m => mapaLeafletInstancia.removeLayer(m));
+  mapaLeafletMarkersEventos = [];
+  mapaLeafletMarkersViaturas.forEach(m => mapaLeafletInstancia.removeLayer(m));
+  mapaLeafletMarkersViaturas = [];
 
   try {
     const resCoords = await apiFetch(`${API_BASE_URL}/api/bairros-coordenadas`);
@@ -1289,29 +1363,81 @@ async function renderMapaTab() {
     }
 
     // Plota um marcador por bairro, com todos os eventos daquele bairro na semana no popup
-    Object.values(gruposPorCoordenada).forEach(grupo => {
-      const marker = L.marker([grupo.coordenada.latitude, grupo.coordenada.longitude]).addTo(mapaLeafletInstancia);
+    if (prefs.mostrarEventos) {
+      Object.values(gruposPorCoordenada).forEach(grupo => {
+        const marker = L.marker([grupo.coordenada.latitude, grupo.coordenada.longitude]).addTo(mapaLeafletInstancia);
 
-      const popupHtml = grupo.eventos.map(evt => {
-        const alocacoesEvt = state.alocacoes.filter(a => a.evento_id === evt.id);
-        const efetivo = alocacoesEvt.reduce((sum, a) => sum + (a.qtd_policiais || 0), 0);
-        const viaturas = alocacoesEvt.reduce((sum, a) => sum + (a.qtd_viaturas || 0), 0);
-        const dataBr = evt.data_inicio.split('-').reverse().join('/');
-        return `
-          <div class="mapa-popup-evento">
-            <strong>${esc(evt.nome_evento)}</strong> (${esc(evt.tipo_evento)})<br>
-            ${dataBr}${evt.horario_inicio ? ' às ' + esc(evt.horario_inicio) : ''}<br>
-            Efetivo: ${efetivo} PM(s) · Viaturas: ${viaturas}
-          </div>`;
-      }).join('<hr>');
+        const popupHtml = grupo.eventos.map(evt => {
+          const alocacoesEvt = state.alocacoes.filter(a => a.evento_id === evt.id);
+          const efetivo = alocacoesEvt.reduce((sum, a) => sum + (a.qtd_policiais || 0), 0);
+          const viaturas = alocacoesEvt.reduce((sum, a) => sum + (a.qtd_viaturas || 0), 0);
+          const dataBr = evt.data_inicio.split('-').reverse().join('/');
+          return `
+            <div class="mapa-popup-evento">
+              <strong>${esc(evt.nome_evento)}</strong> (${esc(evt.tipo_evento)})<br>
+              ${dataBr}${evt.horario_inicio ? ' às ' + esc(evt.horario_inicio) : ''}<br>
+              Efetivo: ${efetivo} PM(s) · Viaturas: ${viaturas}
+            </div>`;
+        }).join('<hr>');
 
-      marker.bindPopup(`<div class="mapa-popup"><h4>${esc(grupo.coordenada.nome_bairro)}</h4>${popupHtml}</div>`);
-      mapaLeafletMarkers.push(marker);
-    });
+        marker.bindPopup(`<div class="mapa-popup"><h4>${esc(grupo.coordenada.nome_bairro)}</h4>${popupHtml}</div>`);
+        mapaLeafletMarkersEventos.push(marker);
+      });
+    }
+
+    // Camada de viaturas: cartão de hoje, uma por viatura, na coordenada do bairro do item
+    // de roteiro ativo agora (fallback pro setor da viatura se nada estiver ativo no momento)
+    if (prefs.mostrarViaturas) {
+      const hojeStr = getLocalDateStr();
+      const resCartoes = await apiFetch(`${API_BASE_URL}/api/cartoes?data=${hojeStr}`);
+      const listaCartoes = await resCartoes.json();
+
+      if (listaCartoes.length > 0) {
+        const resDetalhe = await apiFetch(`${API_BASE_URL}/api/cartoes/${listaCartoes[0].id}`);
+        const cartaoHoje = await resDetalhe.json();
+
+        (cartaoHoje.viaturas || []).forEach(vtr => {
+          const itemAtivo = itemAtivoAgora(vtr);
+          const localReferencia = itemAtivo ? itemAtivo.local : vtr.setor;
+          const localNorm = normalizarTexto(localReferencia);
+          const setorNorm = normalizarTexto(vtr.setor);
+
+          // Tenta casar pelo local do item ativo primeiro; se não achar, cai pro setor da viatura
+          const coordenada = bairrosCoordenadas.find(b => {
+            const bNorm = normalizarTexto(b.nome_bairro);
+            return bNorm === localNorm || localNorm.includes(bNorm) || bNorm.includes(localNorm);
+          }) || bairrosCoordenadas.find(b => {
+            const bNorm = normalizarTexto(b.nome_bairro);
+            return bNorm === setorNorm || setorNorm.includes(bNorm) || bNorm.includes(setorNorm);
+          });
+
+          if (!coordenada) return; // viatura sem bairro correspondente cadastrado: fica fora do mapa, sem quebrar nada
+
+          const marker = L.marker([coordenada.latitude, coordenada.longitude], {
+            icon: criarIconeViatura(vtr.categoria)
+          }).addTo(mapaLeafletInstancia);
+
+          marker.bindPopup(`
+            <div class="mapa-popup">
+              <h4>VTR ${esc(vtr.prefixo)}</h4>
+              <div class="mapa-popup-evento">
+                <strong>Setor:</strong> ${esc(vtr.setor)}<br>
+                <strong>Comandante:</strong> ${esc(vtr.comandante) || 'Não informado'}<br>
+                ${itemAtivo
+                  ? `<strong>Atividade agora:</strong> ${esc(itemAtivo.atividade)} — ${esc(itemAtivo.local)} (${esc(itemAtivo.inicio)} às ${esc(itemAtivo.fim)})`
+                  : '<strong>Sem atividade ativa no momento.</strong>'}
+              </div>
+            </div>
+          `);
+          mapaLeafletMarkersViaturas.push(marker);
+        });
+      }
+    }
 
     // Ajusta o enquadramento do mapa se houver marcadores; senão mantém a visão padrão da Zona Sul
-    if (mapaLeafletMarkers.length > 0) {
-      const grupo = L.featureGroup(mapaLeafletMarkers);
+    const todosMarcadores = [...mapaLeafletMarkersEventos, ...mapaLeafletMarkersViaturas];
+    if (todosMarcadores.length > 0) {
+      const grupo = L.featureGroup(todosMarcadores);
       mapaLeafletInstancia.fitBounds(grupo.getBounds().pad(0.3));
     }
 
@@ -1322,6 +1448,15 @@ async function renderMapaTab() {
     console.error('Erro ao carregar o Mapa de Eventos:', error);
     showToast('Falha ao carregar o Mapa de Eventos.', 'danger');
   }
+}
+
+function handleMudarPrefsMapa() {
+  salvarPrefsMapa({
+    mostrarEventos: document.getElementById('mapa-toggle-eventos').checked,
+    mostrarViaturas: document.getElementById('mapa-toggle-viaturas').checked,
+    estilo: document.getElementById('mapa-select-estilo').value
+  });
+  renderMapaTab();
 }
 
 // -------------------------------------------------------------

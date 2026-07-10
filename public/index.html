@@ -472,6 +472,23 @@
               </button>
             </div>
           </div>
+          <div class="mapa-controles">
+            <label class="mapa-toggle">
+              <input type="checkbox" id="mapa-toggle-eventos" checked>
+              <span>Eventos</span>
+            </label>
+            <label class="mapa-toggle">
+              <input type="checkbox" id="mapa-toggle-viaturas" checked>
+              <span>Viaturas (Cartão Programa de hoje)</span>
+            </label>
+            <div class="filter-group" style="margin-left:auto;">
+              <label for="mapa-select-estilo">Estilo do Mapa</label>
+              <select id="mapa-select-estilo">
+                <option value="dark">Escuro</option>
+                <option value="voyager">Colorido</option>
+              </select>
+            </div>
+          </div>
           <div id="mapa-aviso-sem-coordenada" class="mapa-aviso hidden"></div>
           <div id="mapa-eventos-semana" class="mapa-container"></div>
         </div>
