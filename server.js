@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
@@ -16,7 +18,74 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-app.use(cors());
+// -------------------------------------------------------------
+// SEGURANÇA: CORS restrito, CSP (helmet) e rate limiting no login
+// -------------------------------------------------------------
+
+// Allowlist de origens: produção fixa + qualquer preview do projeto na Vercel + localhost de desenvolvimento
+const ORIGENS_PERMITIDAS = [
+  'https://sgo-5bpm.vercel.app',
+  'http://localhost:3005'
+];
+function origemPermitida(origin) {
+  if (!origin) return true; // requisições sem Origin (ex: curl, apps nativos) — não é o caso de browsers
+  if (ORIGENS_PERMITIDAS.includes(origin)) return true;
+  // Deploys de preview da Vercel para este projeto: sgo-5bpm-<hash>-alexandre-alves.vercel.app
+  return /^https:\/\/sgo-5bpm-[a-z0-9]+-alexandre-alves\.vercel\.app$/.test(origin);
+}
+app.use(cors({
+  origin(origin, callback) {
+    if (origemPermitida(origin)) return callback(null, true);
+    callback(new Error('Origem não permitida pelo CORS.'));
+  }
+}));
+
+// CSP liberando só os CDNs que o index.html realmente usa
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", 'https://unpkg.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'https://unpkg.com', 'https://*.basemaps.cartocdn.com', 'https://basemaps.cartocdn.com'],
+      connectSrc: ["'self'", 'https://*.supabase.co', 'https://*.basemaps.cartocdn.com', 'https://basemaps.cartocdn.com', 'https://unpkg.com'],
+    }
+  }
+}));
+
+// Rate limit por IP: no máximo 5 tentativas de login a cada 15 minutos
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de login. Tente novamente em alguns minutos.' }
+});
+
+// Bloqueio progressivo por usuário (complementa o rate limit por IP — protege contra tentativas
+// vindas de IPs diferentes contra o mesmo login). Estado em memória: reinicia a cada cold start
+// da função serverless, o que é uma limitação aceita nesta fase (ver plano — sem Redis por ora).
+const tentativasLoginPorUsuario = new Map();
+function verificarBloqueioProgressivo(usuario) {
+  const chave = String(usuario || '').toLowerCase().trim();
+  const registro = tentativasLoginPorUsuario.get(chave);
+  if (!registro || registro.falhas < 3) return null;
+  const esperaMs = Math.pow(2, registro.falhas - 2) * 1000;
+  const restanteMs = (registro.ultimaFalha + esperaMs) - Date.now();
+  return restanteMs > 0 ? Math.ceil(restanteMs / 1000) : null;
+}
+function registrarFalhaLogin(usuario) {
+  const chave = String(usuario || '').toLowerCase().trim();
+  const registro = tentativasLoginPorUsuario.get(chave) || { falhas: 0, ultimaFalha: 0 };
+  registro.falhas += 1;
+  registro.ultimaFalha = Date.now();
+  tentativasLoginPorUsuario.set(chave, registro);
+}
+function limparFalhasLogin(usuario) {
+  tentativasLoginPorUsuario.delete(String(usuario || '').toLowerCase().trim());
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -248,18 +317,26 @@ function exigirP3(req, res, next) {
 // -------------------------------------------------------------
 // ROTA DE AUTENTICAÇÃO (LOGIN)
 // -------------------------------------------------------------
-app.post('/api/login', asyncRoute(async (req, res) => {
+app.post('/api/login', loginRateLimiter, asyncRoute(async (req, res) => {
   const { usuario, senha } = req.body;
 
   if (!usuario || !senha) {
     return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
   }
 
+  const esperaSegundos = verificarBloqueioProgressivo(usuario);
+  if (esperaSegundos) {
+    return res.status(429).json({ error: `Muitas tentativas para este usuário. Tente novamente em ${esperaSegundos} segundo(s).` });
+  }
+
   const user = await buscarUsuarioPorLogin(usuario);
 
   if (!user || !verificarSenha(senha, user.senha)) {
+    registrarFalhaLogin(usuario);
     return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
   }
+
+  limparFalhasLogin(usuario);
 
   // Migra senha em texto puro para scrypt, se for o caso
   if (!String(user.senha).startsWith('scrypt:')) {

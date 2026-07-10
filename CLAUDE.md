@@ -4,22 +4,26 @@ Aplicativo full-stack para a Seção de Planejamento (P3) do 5º Batalhão de Po
 
 ## Stack e arquitetura
 
-- **Backend:** Node.js + Express, arquivo único `server.js` (~1400 linhas). Sem TypeScript, sem framework de rotas além do Express puro.
+- **Backend:** Node.js + Express, arquivo único `server.js`. Sem TypeScript, sem framework de rotas além do Express puro.
 - **Frontend:** HTML/CSS/JS vanilla, sem build step, sem framework (nada de React/Vue). SPA por abas: todo o HTML das telas fica em `public/index.html` dentro de `<section class="tab-content">`, escondido/mostrado via classe `active`.
-- **"Banco de dados":** um único arquivo JSON, `data/db.json`, lido e reescrito por completo a cada operação (`readDB()`/`writeDB()` em `server.js`). Não há SQL, não há migrations reais — mudanças de schema são feitas por funções de migração aditivas (IIFEs) que rodam no boot do servidor e normalizam registros antigos sem apagar dados.
+- **Banco de dados:** Supabase (Postgres). `server.js` acessa via `@supabase/supabase-js` com a chave `service_role` (bypassa RLS; a autorização é toda feita pelo próprio app — `autenticar`/`exigirP3`). Para preservar a lógica de negócio já escrita em JS puro (filter/map/reduce) sem reescrever tudo em SQL, existe um shim `readDB()`/`writeDB()` em `server.js` que busca/grava cada tabela inteira e monta o mesmo formato de objeto que o código já esperava do antigo `data/db.json`. `writeDB(db, tabelas)` recebe a lista explícita de tabelas alteradas por aquela escrita — nunca sincroniza as 8 tabelas inteiras à toa. Rotas quentes (`autenticar`, `/api/login`) usam consultas pontuais (`buscarSessaoPorToken`, `buscarUsuarioPorLogin`) em vez do shim. Schema completo em `supabase/schema.sql` — mudanças de schema são SQL aditivo (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`) rodado manualmente pelo usuário no SQL Editor do Supabase (não há migration runner automático), e a tabela nova/coluna nova entra em `TABELAS`/`CHAVE_PRIMARIA` no topo do `server.js`.
 - **Sem dependências de frontend via bundler** (npm só serve o backend). CDNs usados: Lucide (ícones), Google Fonts, **Leaflet** (mapa, aba Mapa).
-- **Não é monorepo.** Só existe este projeto neste diretório — não há mais nenhuma outra pasta de projeto aqui dentro (uma pasta `espaco-ingrid-soares/` de outro sistema existiu neste diretório e foi removida; se reaparecer alguma referência a ela em código ou config, é lixo a limpar).
+- **Deploy:** Vercel, função serverless única (`server.js` via `@vercel/node`, ver `vercel.json`). Projeto conectado ao repositório GitHub `alexandre-aao/sgo-5bpm` — todo `git push` na branch `main` dispara deploy automático em produção (`https://sgo-5bpm.vercel.app`). Variáveis de ambiente `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` configuradas no painel da Vercel (Project Settings → Environment Variables), **não** commitadas — localmente ficam em `.env.local` (git-ignorado) e são carregadas também via `.claude/launch.json` pro preview server.
+- **Não é monorepo.** Só existe este projeto neste diretório.
 
 ### Arquivos principais
 
 | Arquivo | Papel |
 |---|---|
-| `server.js` | API REST completa (Express) |
+| `server.js` | API REST completa (Express) + camada de acesso ao Supabase |
 | `public/index.html` | Todo o markup de todas as abas |
 | `public/app.js` | Toda a lógica client-side (fetch, render, handlers) |
 | `public/style.css` | Design system (variáveis CSS, dark theme) |
-| `data/db.json` | Dados (não versionar segredos reais aqui) |
-| `.claude/launch.json` | Config do preview server (porta 3005, `autoPort: true`) |
+| `supabase/schema.sql` | Schema Postgres de referência (rodar manualmente no Supabase) |
+| `data/db.json` | **Legado** — arquivo do antigo "banco" em JSON, não é mais lido pelo servidor. Preservado como histórico, não apagar sem avisar o usuário. |
+| `.env.local` | Credenciais do Supabase para rodar localmente (git-ignorado) |
+| `.claude/launch.json` | Config do preview server (porta 3005, `autoPort: true`, env vars do Supabase) |
+| `vercel.json` | Config de build/rotas da Vercel |
 
 ## Rodando o projeto
 
@@ -28,11 +32,11 @@ npm install
 npm start        # ou: node server.js
 ```
 
-Sobe em `http://localhost:3005` por padrão (ver `.claude/launch.json`; `autoPort: true` deixa o harness de preview escolher outra porta livre se a 3005 já estiver em uso por outra sessão).
+Sobe em `http://localhost:3005` por padrão (ver `.claude/launch.json`; `autoPort: true` deixa o harness de preview escolher outra porta livre se a 3005 já estiver em uso por outra sessão). Precisa de `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` no ambiente — já configuradas em `.claude/launch.json` para o preview server.
 
 **Sempre reiniciar o servidor** depois de editar `server.js` — não há hot reload. Se o usuário reportar "erro no servidor" em algo que você acabou de mudar, o primeiro suspeito é sempre um servidor real (`npm start` do próprio usuário, fora do preview do Claude Code) rodando código antigo sem reiniciar.
 
-## Modelo de dados (`data/db.json`)
+## Modelo de dados (Supabase / Postgres)
 
 - **`eventos`** — Eventos_Pauta: eventos/operações policiais (Show, Futebol, Ato Público, Religioso, Cultural, **Missão Avulsa**, Outros). Campos-chave: `data_inicio`/`data_termino`, `bairro` (select alimentado por `bairros_coordenadas` + opção "Outro" com texto livre), `num_os_manual` e `num_sei` (texto livre, preenchidos manualmente — **não existe mais geração automática de código de OS nem status de OS/Kanban, foram removidos deliberadamente**).
 - **`alocacoes`** — Alocacao_Policiamento: efetivo/viaturas alocados por evento (modalidade, qtd_policiais, qtd_viaturas).
@@ -101,13 +105,14 @@ Botão "Gerar Relatório para SEI" (Listar Eventos, por período filtrado) e na 
 2. Depois de editar `.js`, rodar `node --check <arquivo>` antes de testar no navegador.
 3. Reiniciar o preview server (`server.js` não tem hot reload).
 4. Testar de ponta a ponta no navegador (login, ação, verificação visual) — não declarar "pronto" sem isso. Testar com clique real (preview_click/preview_fill), não só chamando a função handler direto por `preview_eval` — já aconteceu de um fluxo funcionar via chamada direta e mascarar um problema de timing no clique real.
-5. **Sempre limpar dados de teste** criados durante a verificação (eventos, cartões, templates, pessoal, bairros fictícios) antes de encerrar — o `db.json` é o banco real de produção do usuário, não um ambiente descartável. Exceção: quando o próprio usuário pede explicitamente para popular dados fictícios/demo — aí é pra manter.
+5. **Sempre limpar dados de teste** criados durante a verificação (eventos, cartões, templates, pessoal, bairros fictícios) antes de encerrar — o preview local aponta pro mesmo Supabase de produção (mesmas credenciais em `.env.local`/`.claude/launch.json`), não é um ambiente descartável. Exceção: quando o próprio usuário pede explicitamente para popular dados fictícios/demo — aí é pra manter.
 6. Testar nos dois perfis relevantes quando a mudança afeta permissões (P3 e Adjunto).
-7. Antes de mexer ou apagar qualquer coisa em `db.json`, checar se os dados batem com o que você mesmo criou nesta sessão — pode haver uso real do app em paralelo (outro servidor do usuário rodando). Se encontrar registro que você não reconhece ter criado, não delete: avise o usuário.
+7. Antes de mexer ou apagar qualquer registro no Supabase, checar se os dados batem com o que você mesmo criou nesta sessão — pode haver uso real do app em paralelo (outro servidor do usuário rodando, ou a própria produção na Vercel). Se encontrar registro que você não reconhece ter criado, não delete: avise o usuário.
+8. Depois de validar localmente, `git add`/`commit`/`push` para `main` — a Vercel publica automaticamente via integração Git (ver seção "Stack e arquitetura"). Não fazer push sem o usuário saber que aquilo vai pra produção.
 
 ## Estado do projeto
 
-Não é um repositório git (`git status` retorna "not a git repository"). Se for necessário versionar, perguntar ao usuário antes de rodar `git init` — não é dado como certo.
+Repositório Git local, remoto `alexandre-aao/sgo-5bpm` no GitHub, conectado à Vercel (deploy automático a cada push em `main`). Mudanças em arquivos versionados só chegam à produção depois de commit + push — editar o arquivo local não é suficiente.
 
 ## Pendências em aberto
 
