@@ -47,6 +47,21 @@ create table if not exists escalas (
 );
 create index if not exists idx_escalas_evento on escalas(evento_id);
 
+-- Missões planejadas: entidade independente de "eventos", usada só no Planejador de Diárias
+-- para reservar diárias no mês antes de um evento existir de fato (ou sem nunca virar evento).
+create table if not exists missoes_planejadas (
+  id text primary key,
+  nome text not null,
+  tipo_recorrencia text not null check (tipo_recorrencia in ('diaria', 'fim_de_semana', 'dia_unico')),
+  data_inicio date not null,
+  data_fim date not null,
+  qtd_diarias_por_ocorrencia int not null,
+  mes text not null,
+  ano text not null,
+  convertida_em_evento_id text default null references eventos(id) on delete set null
+);
+create index if not exists idx_missoes_planejadas_mes_ano on missoes_planejadas(ano, mes);
+
 create table if not exists usuarios (
   usuario text primary key,
   senha text not null,

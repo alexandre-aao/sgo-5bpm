@@ -644,6 +644,38 @@
           </p>
         </div>
 
+        <!-- Missões Planejadas do Mês -->
+        <div class="panel missoes-planejadas-panel">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="clipboard-list"></i>
+              <h2>Missões Planejadas do Mês</h2>
+            </div>
+            <button id="btn-nova-missao-planejada" class="btn btn-primary btn-sm admin-only">
+              <i data-lucide="plus"></i> Nova Missão Planejada
+            </button>
+          </div>
+          <p style="padding:12px 20px 0;font-size:0.75rem;color:var(--text-muted);">
+            Reserve diárias no planejamento do mês antes de existir um evento (ex: "Operação Saturação"). Não aparece em Listar Eventos, Cartão Programa ou Mapa até ser convertida.
+          </p>
+          <div class="table-responsive">
+            <table class="styled-table" id="table-missoes-planejadas">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Recorrência</th>
+                  <th>Período</th>
+                  <th class="text-right">Diárias por Ocorrência</th>
+                  <th class="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="table-missoes-planejadas-body">
+                <!-- Injetado dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-header flex-column-mobile">
             <div class="panel-title">
@@ -692,6 +724,11 @@
             </div>
             <div class="budget-bar">
               <div class="budget-bar-fill" id="budget-bar-fill"></div>
+              <div class="budget-bar-fill-planejado" id="budget-bar-fill-planejado"></div>
+            </div>
+            <div class="budget-bar-legenda">
+              <span><i class="legenda-dot legenda-consumido"></i> Consumido (efetivo já escalado)</span>
+              <span><i class="legenda-dot legenda-planejado-cota"></i> Planejado (missões ainda não escaladas)</span>
             </div>
             <p class="budget-alert hidden" id="budget-alert">
               <i data-lucide="alert-triangle"></i>
@@ -1555,6 +1592,57 @@
           <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-missao">Cancelar</button>
           <button type="submit" class="btn btn-primary">
             <i data-lucide="check"></i> Criar e Escalar Militares
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Nova Missão Planejada (Planejador Diárias) -->
+  <div id="modal-missao-planejada" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3><i data-lucide="clipboard-list"></i> Nova Missão Planejada</h3>
+        <button class="btn-close" id="btn-fechar-modal-missao-planejada">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">
+        Reserva diárias no planejamento do mês (ex: "Operação Saturação"). A quantidade de diárias é definida manualmente por você, não segue a fórmula de aparições. Depois pode ser convertida num evento real.
+      </p>
+      <form id="form-missao-planejada">
+        <div class="form-group">
+          <label for="missao-planejada-nome">Nome da Missão *</label>
+          <input type="text" id="missao-planejada-nome" required placeholder="Ex: Operação Saturação">
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="missao-planejada-recorrencia">Recorrência *</label>
+            <select id="missao-planejada-recorrencia" required>
+              <option value="dia_unico">Dia Único</option>
+              <option value="diaria">Diária (vários dias seguidos)</option>
+              <option value="fim_de_semana">Fim de Semana</option>
+            </select>
+          </div>
+          <div class="form-group col-md-6">
+            <label for="missao-planejada-diarias">Diárias por Ocorrência *</label>
+            <input type="number" id="missao-planejada-diarias" min="0" required placeholder="Ex: 10">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="missao-planejada-inicio">Data de Início *</label>
+            <input type="date" id="missao-planejada-inicio" required>
+          </div>
+          <div class="form-group col-md-6">
+            <label for="missao-planejada-fim">Data de Término</label>
+            <input type="date" id="missao-planejada-fim" placeholder="Deixe em branco se for 1 dia só">
+          </div>
+        </div>
+        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-missao-planejada">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Salvar Missão Planejada
           </button>
         </div>
       </form>

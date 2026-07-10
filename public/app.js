@@ -434,6 +434,13 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-missao').addEventListener('click', fecharModalMissao);
   document.getElementById('form-missao-avulsa').addEventListener('submit', handleCriarMissaoAvulsa);
 
+  // Modal de Nova Missão Planejada (Planejador de Diárias)
+  document.getElementById('btn-nova-missao-planejada').addEventListener('click', abrirModalMissaoPlanejada);
+  const fecharModalMissaoPlanejada = () => document.getElementById('modal-missao-planejada').classList.add('hidden');
+  document.getElementById('btn-fechar-modal-missao-planejada').addEventListener('click', fecharModalMissaoPlanejada);
+  document.getElementById('btn-cancelar-modal-missao-planejada').addEventListener('click', fecharModalMissaoPlanejada);
+  document.getElementById('form-missao-planejada').addEventListener('submit', handleCriarMissaoPlanejada);
+
   // Filtro de ano do Painel de Estatísticas
   document.getElementById('stats-filter-ano').addEventListener('change', renderEstatisticasTab);
 
@@ -1795,33 +1802,45 @@ async function renderPlanejadorTab() {
       cotaInput.value = data.cota_mensal;
     }
 
-    // Barra de consumo
-    const pct = data.cota_mensal > 0
+    // Barra de consumo: segmento sólido = consumido de fato (escalas reais), segmento
+    // translúcido = planejado (missões planejadas ainda não convertidas/escaladas)
+    const totalPlanejado = data.total_planejado || 0;
+    const pctConsumido = data.cota_mensal > 0
       ? (data.total_consumido / data.cota_mensal) * 100
       : (data.total_consumido > 0 ? 101 : 0);
+    const pctPlanejado = data.cota_mensal > 0
+      ? (totalPlanejado / data.cota_mensal) * 100
+      : (totalPlanejado > 0 ? 101 : 0);
+    const pctTotal = pctConsumido + pctPlanejado;
 
     const fill = document.getElementById('budget-bar-fill');
-    fill.style.width = `${Math.min(pct, 100)}%`;
+    fill.style.width = `${Math.min(pctConsumido, 100)}%`;
     fill.classList.remove('warning', 'danger');
-    if (pct > 100) {
+    if (pctTotal > 100) {
       fill.classList.add('danger');
-    } else if (pct >= 75) {
+    } else if (pctTotal >= 75) {
       fill.classList.add('warning');
     }
 
-    document.getElementById('budget-label-text').textContent =
-      `${data.total_consumido} de ${data.cota_mensal} diárias planejadas no mês`;
-    document.getElementById('budget-label-pct').textContent = `${Math.round(pct)}%`;
+    const fillPlanejado = document.getElementById('budget-bar-fill-planejado');
+    fillPlanejado.style.width = `${Math.max(0, Math.min(pctPlanejado, 100 - Math.min(pctConsumido, 100)))}%`;
 
-    // Alerta de estouro da cota
+    document.getElementById('budget-label-text').textContent = totalPlanejado > 0
+      ? `${data.total_consumido} consumidas + ${totalPlanejado} planejadas de ${data.cota_mensal} diárias`
+      : `${data.total_consumido} de ${data.cota_mensal} diárias planejadas no mês`;
+    document.getElementById('budget-label-pct').textContent = `${Math.round(pctTotal)}%`;
+
+    // Alerta de estouro da cota (considera consumido + planejado)
     const alertEl = document.getElementById('budget-alert');
     if (data.saldo < 0) {
       document.getElementById('budget-alert-text').textContent =
-        `Cota mensal excedida em ${Math.abs(data.saldo)} diária(s). Revise as escalas dos eventos abaixo.`;
+        `Cota mensal excedida em ${Math.abs(data.saldo)} diária(s), somando consumido e planejado.`;
       alertEl.classList.remove('hidden');
     } else {
       alertEl.classList.add('hidden');
     }
+
+    renderMissoesPlanejadasTab(data.missoes_planejadas || []);
 
     // Tabela de eventos do mês
     tableBody.innerHTML = '';
@@ -1858,6 +1877,135 @@ async function renderPlanejadorTab() {
     tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--danger);">Falha ao carregar o planejador de diárias.</td></tr>`;
   }
 }
+
+// -------------------------------------------------------------
+// MISSÕES PLANEJADAS (PLANEJADOR DE DIÁRIAS)
+// -------------------------------------------------------------
+const ROTULOS_RECORRENCIA = {
+  diaria: 'Diária',
+  fim_de_semana: 'Fim de Semana',
+  dia_unico: 'Dia Único'
+};
+
+function renderMissoesPlanejadasTab(missoes) {
+  const tbody = document.getElementById('table-missoes-planejadas-body');
+  if (!tbody) return;
+
+  if (missoes.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhuma missão planejada para este mês.</td></tr>`;
+    lucide.createIcons();
+    return;
+  }
+
+  const isAdmin = state.user && state.user.role === 'P3';
+
+  tbody.innerHTML = missoes.map(m => {
+    const inicioBr = m.data_inicio.split('-').reverse().join('/');
+    const fimBr = m.data_fim.split('-').reverse().join('/');
+    const periodo = m.data_inicio === m.data_fim ? inicioBr : `${inicioBr} a ${fimBr}`;
+    const convertida = !!m.convertida_em_evento_id;
+
+    return `
+      <tr>
+        <td><strong>${esc(m.nome)}</strong></td>
+        <td>${esc(ROTULOS_RECORRENCIA[m.tipo_recorrencia] || m.tipo_recorrencia)}</td>
+        <td>${periodo}</td>
+        <td class="text-right" style="color:#f59e0b;font-weight:600;">${m.qtd_diarias_por_ocorrencia}</td>
+        <td class="text-right">
+          <div style="display:flex;gap:6px;justify-content:flex-end;">
+            ${convertida
+              ? `<span class="badge outros" title="Já convertida em evento">Convertida</span>`
+              : `<button class="btn btn-secondary btn-sm admin-only" onclick="handleConverterMissaoPlanejada('${m.id}')">
+                   <i data-lucide="arrow-right-circle" style="width:12px;height:12px;"></i> Converter em Evento
+                 </button>`}
+            ${isAdmin ? `
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" onclick="handleExcluirMissaoPlanejada('${m.id}')">
+              <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+            </button>` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  lucide.createIcons();
+}
+
+window.abrirModalMissaoPlanejada = function() {
+  document.getElementById('form-missao-planejada').reset();
+  document.getElementById('modal-missao-planejada').classList.remove('hidden');
+};
+
+async function handleCriarMissaoPlanejada(e) {
+  e.preventDefault();
+
+  const payload = {
+    nome: document.getElementById('missao-planejada-nome').value.trim(),
+    tipo_recorrencia: document.getElementById('missao-planejada-recorrencia').value,
+    data_inicio: document.getElementById('missao-planejada-inicio').value,
+    data_fim: document.getElementById('missao-planejada-fim').value || document.getElementById('missao-planejada-inicio').value,
+    qtd_diarias_por_ocorrencia: document.getElementById('missao-planejada-diarias').value
+  };
+
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/missoes-planejadas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const dados = await res.json();
+
+    if (res.ok) {
+      document.getElementById('modal-missao-planejada').classList.add('hidden');
+      showToast('Missão planejada criada com sucesso.', 'success');
+      renderPlanejadorTab();
+    } else {
+      showToast(esc(dados.error) || 'Falha ao criar a missão planejada.', 'danger');
+    }
+  } catch (error) {
+    console.error('Erro ao criar missão planejada:', error);
+    showToast('Falha na comunicação com o servidor.', 'danger');
+  }
+}
+
+window.handleExcluirMissaoPlanejada = async function(id) {
+  if (!confirm('Excluir permanentemente esta missão planejada?')) return;
+
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/missoes-planejadas/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast('Missão planejada excluída.', 'info');
+      renderPlanejadorTab();
+    } else {
+      const dados = await res.json();
+      showToast(esc(dados.error) || 'Falha ao excluir a missão planejada.', 'danger');
+    }
+  } catch (error) {
+    console.error('Erro ao excluir missão planejada:', error);
+    showToast('Falha na comunicação com o servidor.', 'danger');
+  }
+};
+
+window.handleConverterMissaoPlanejada = async function(id) {
+  if (!confirm('Converter esta missão planejada num evento real? Depois disso você poderá escalar o efetivo normalmente na gaveta do evento.')) return;
+
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/missoes-planejadas/${id}/converter`, { method: 'POST' });
+    const dados = await res.json();
+
+    if (res.ok) {
+      showToast(`Evento "${esc(dados.nome_evento)}" criado a partir da missão planejada.`, 'success');
+      await fetchData();
+      renderPlanejadorTab();
+      openDrawer(dados.id);
+    } else {
+      showToast(esc(dados.error) || 'Falha ao converter a missão planejada.', 'danger');
+    }
+  } catch (error) {
+    console.error('Erro ao converter missão planejada:', error);
+    showToast('Falha na comunicação com o servidor.', 'danger');
+  }
+};
 
 // -------------------------------------------------------------
 // CALENDÁRIO DE DIÁRIAS + LANÇAMENTO RÁPIDO DE MISSÃO AVULSA

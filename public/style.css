@@ -1449,18 +1449,46 @@ button, input, select, textarea {
   border: 1px solid var(--border-color);
   border-radius: 999px;
   overflow: hidden;
+  display: flex;
 }
 
 .budget-bar-fill {
   height: 100%;
   width: 0%;
-  border-radius: 999px;
+  flex: 0 0 auto;
   background-color: var(--success);
   transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
 }
 
 .budget-bar-fill.warning { background-color: var(--warning); }
 .budget-bar-fill.danger { background-color: var(--danger); }
+
+/* Segmento planejado (missões planejadas ainda não escaladas), encostado no segmento consumido */
+.budget-bar-fill-planejado {
+  height: 100%;
+  width: 0%;
+  flex: 0 0 auto;
+  background-color: #818cf8;
+  opacity: 0.55;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.budget-bar-legenda {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.budget-bar-legenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legenda-consumido { background-color: var(--success); }
+.legenda-planejado-cota { background-color: #818cf8; opacity: 0.7; }
 
 .budget-alert {
   display: flex;

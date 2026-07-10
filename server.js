@@ -102,7 +102,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // concorrência. `autenticar` e `/api/login`, que rodam a cada requisição, usam
 // consultas pontuais em vez desse shim, por serem o caminho mais quente.
 const CHAVE_PRIMARIA = { usuarios: 'usuario', sessoes: 'token' };
-const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'alocacoes', 'escalas', 'cartoes'];
+const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'alocacoes', 'escalas', 'cartoes', 'missoes_planejadas'];
 const TABELAS_E_CONFIG = [...TABELAS, 'config'];
 
 function chavePrimariaDe(tabela) {
@@ -855,12 +855,144 @@ app.get('/api/planejador-diarias', asyncRoute(async (req, res) => {
   const totalConsumido = eventos.reduce((sum, e) => sum + e.total_diarias, 0);
   const cota = (db.config && db.config.cota_mensal_diarias) || 0;
 
+  // Missões planejadas do mesmo mês/ano — reservam diárias no planejamento sem precisar
+  // de um evento real ainda (ver ROTAS DE MISSÕES PLANEJADAS logo abaixo).
+  const missoesPlanejadas = (db.missoes_planejadas || [])
+    .filter(m => m.ano === anoFiltro && m.mes === mesFiltro)
+    .sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
+  const totalPlanejado = missoesPlanejadas.reduce((sum, m) => sum + (m.qtd_diarias_por_ocorrencia || 0), 0);
+
   res.json({
     cota_mensal: cota,
     total_consumido: totalConsumido,
-    saldo: cota - totalConsumido,
-    eventos
+    total_planejado: totalPlanejado,
+    saldo: cota - totalConsumido - totalPlanejado,
+    eventos,
+    missoes_planejadas: missoesPlanejadas
   });
+}));
+
+// -------------------------------------------------------------
+// ROTAS DE MISSÕES PLANEJADAS (PLANEJADOR DE DIÁRIAS)
+// -------------------------------------------------------------
+// Entidade independente de "eventos": reserva diárias no planejamento mensal antes de um
+// evento real existir (ou sem nunca virar evento). Não aparece em Listar Eventos, Cartão
+// Programa ou Mapa.
+app.get('/api/missoes-planejadas', asyncRoute(async (req, res) => {
+  const db = await readDB();
+  const mesFiltro = req.query.mes;
+  const anoFiltro = req.query.ano || String(new Date().getFullYear());
+
+  let missoes = db.missoes_planejadas || [];
+  if (mesFiltro) missoes = missoes.filter(m => m.mes === mesFiltro);
+  missoes = missoes.filter(m => m.ano === anoFiltro);
+
+  res.json(missoes.sort((a, b) => a.data_inicio.localeCompare(b.data_inicio)));
+}));
+
+app.post('/api/missoes-planejadas', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  const { nome, tipo_recorrencia, data_inicio, data_fim, qtd_diarias_por_ocorrencia } = req.body;
+
+  if (!nome || !data_inicio) {
+    return res.status(400).json({ error: 'Nome e data de início são obrigatórios.' });
+  }
+  if (!['diaria', 'fim_de_semana', 'dia_unico'].includes(tipo_recorrencia)) {
+    return res.status(400).json({ error: "tipo_recorrencia deve ser 'diaria', 'fim_de_semana' ou 'dia_unico'." });
+  }
+  const qtdDiarias = parseInt(qtd_diarias_por_ocorrencia, 10);
+  if (isNaN(qtdDiarias) || qtdDiarias < 0) {
+    return res.status(400).json({ error: 'Quantidade de diárias por ocorrência inválida.' });
+  }
+
+  const dataFimFinal = data_fim || data_inicio;
+  const [ano, mes] = data_inicio.split('-');
+
+  const novaMissao = {
+    id: generateId('mpl'),
+    nome: String(nome).trim(),
+    tipo_recorrencia,
+    data_inicio,
+    data_fim: dataFimFinal,
+    qtd_diarias_por_ocorrencia: qtdDiarias,
+    mes,
+    ano,
+    convertida_em_evento_id: null
+  };
+
+  db.missoes_planejadas.push(novaMissao);
+  await writeDB(db, ['missoes_planejadas']);
+  res.status(201).json(novaMissao);
+}));
+
+app.put('/api/missoes-planejadas/:id', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  const missao = db.missoes_planejadas.find(m => m.id === req.params.id);
+  if (!missao) return res.status(404).json({ error: 'Missão planejada não encontrada.' });
+
+  if (req.body.nome !== undefined) missao.nome = String(req.body.nome).trim();
+  if (req.body.tipo_recorrencia !== undefined) {
+    if (!['diaria', 'fim_de_semana', 'dia_unico'].includes(req.body.tipo_recorrencia)) {
+      return res.status(400).json({ error: "tipo_recorrencia deve ser 'diaria', 'fim_de_semana' ou 'dia_unico'." });
+    }
+    missao.tipo_recorrencia = req.body.tipo_recorrencia;
+  }
+  if (req.body.data_inicio !== undefined) {
+    missao.data_inicio = req.body.data_inicio;
+    const [ano, mes] = req.body.data_inicio.split('-');
+    missao.mes = mes;
+    missao.ano = ano;
+  }
+  if (req.body.data_fim !== undefined) missao.data_fim = req.body.data_fim || missao.data_inicio;
+  if (req.body.qtd_diarias_por_ocorrencia !== undefined) {
+    const qtdDiarias = parseInt(req.body.qtd_diarias_por_ocorrencia, 10);
+    if (isNaN(qtdDiarias) || qtdDiarias < 0) {
+      return res.status(400).json({ error: 'Quantidade de diárias por ocorrência inválida.' });
+    }
+    missao.qtd_diarias_por_ocorrencia = qtdDiarias;
+  }
+
+  await writeDB(db, ['missoes_planejadas']);
+  res.json(missao);
+}));
+
+app.delete('/api/missoes-planejadas/:id', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  db.missoes_planejadas = (db.missoes_planejadas || []).filter(m => m.id !== req.params.id);
+  await writeDB(db, ['missoes_planejadas']);
+  res.json({ message: 'Missão planejada excluída.' });
+}));
+
+// Converte a missão planejada num evento real (Novo Evento) — a missão não desaparece,
+// só passa a apontar pro evento criado via convertida_em_evento_id. Não escala efetivo
+// automaticamente: quem faz isso é o fluxo normal da gaveta, depois de aberto o evento.
+app.post('/api/missoes-planejadas/:id/converter', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  const missao = db.missoes_planejadas.find(m => m.id === req.params.id);
+  if (!missao) return res.status(404).json({ error: 'Missão planejada não encontrada.' });
+  if (missao.convertida_em_evento_id) {
+    return res.status(409).json({ error: 'Esta missão já foi convertida em evento.' });
+  }
+
+  const novoEvento = {
+    id: generateId('evt'),
+    num_oficio: '',
+    num_os_manual: '',
+    num_sei: '',
+    nome_evento: missao.nome,
+    tipo_evento: 'Missão Avulsa',
+    demandante: 'Interno / Missão Planejada',
+    data_inicio: missao.data_inicio,
+    data_termino: missao.data_fim,
+    horario_inicio: '',
+    local_itinerario: 'Não informado',
+    bairro: ''
+  };
+
+  db.eventos.push(novoEvento);
+  missao.convertida_em_evento_id = novoEvento.id;
+  await writeDB(db, ['eventos', 'missoes_planejadas']);
+  res.status(201).json(novoEvento);
 }));
 
 
