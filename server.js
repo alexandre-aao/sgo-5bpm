@@ -1135,6 +1135,22 @@ function duracaoHoras(inicio, fim) {
   return minutos / 60;
 }
 
+// Ordena os itens de roteiro de uma viatura pela distância circular do horário de início do
+// turno (07h por padrão), não em ordem alfabética simples — itens como "Alvorada" às 05h30
+// pertencem ao fim do turno (do dia anterior), não ao início.
+function ordenarPorTurno(itens, inicioTurno = '07:00') {
+  const minutos = (hhmm) => {
+    const [h, m] = String(hhmm || '00:00').split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+  const refMin = minutos(inicioTurno);
+  return itens.slice().sort((a, b) => {
+    const diffA = ((minutos(a.inicio) - refMin) + 1440) % 1440;
+    const diffB = ((minutos(b.inicio) - refMin) + 1440) % 1440;
+    return diffA - diffB;
+  });
+}
+
 // -------------------------------------------------------------
 // ROTA DE ESTATÍSTICAS DO CARTÃO PROGRAMA (PATRULHAMENTO)
 // -------------------------------------------------------------
@@ -1283,7 +1299,14 @@ app.get('/api/cartoes/:id', asyncRoute(async (req, res) => {
   const db = await readDB();
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
-  res.json(cartao);
+
+  // Reordena os itens por turno na leitura — cartões salvos antes desta mudança ainda estão
+  // em ordem alfabética simples; isso corrige a exibição sem exigir migração de dados.
+  const cartaoOrdenado = {
+    ...cartao,
+    viaturas: (cartao.viaturas || []).map(v => ({ ...v, itens: ordenarPorTurno(v.itens || []) }))
+  };
+  res.json(cartaoOrdenado);
 }));
 
 // Criar cartão de um dia (com opção de copiar as viaturas/roteiros do cartão mais recente),
@@ -1546,7 +1569,7 @@ app.post('/api/cartoes/:id/viaturas/:vid/itens', asyncRoute(async (req, res) => 
   };
 
   viatura.itens.push(novoItem);
-  viatura.itens.sort((a, b) => a.inicio.localeCompare(b.inicio));
+  viatura.itens = ordenarPorTurno(viatura.itens);
   await writeDB(db, ['cartoes']);
   res.status(201).json(novoItem);
 }));
@@ -1567,7 +1590,7 @@ app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res)
     if (req.body[campo] !== undefined) item[campo] = req.body[campo];
   });
 
-  viatura.itens.sort((a, b) => a.inicio.localeCompare(b.inicio));
+  viatura.itens = ordenarPorTurno(viatura.itens);
   await writeDB(db, ['cartoes']);
   res.json(item);
 }));
