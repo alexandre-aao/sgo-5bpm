@@ -118,6 +118,7 @@ function applyRolePermissions(user) {
   const btnUsuarios = document.getElementById('nav-btn-usuarios');
   const btnPessoal = document.getElementById('nav-btn-pessoal');
   const btnViaturas = document.getElementById('nav-btn-viaturas');
+  const btnAuditoria = document.getElementById('nav-btn-auditoria');
   const btnTurno = document.getElementById('nav-btn-turno');
   const btnEventos = document.getElementById('nav-btn-eventos');
 
@@ -136,6 +137,7 @@ function applyRolePermissions(user) {
     btnUsuarios.classList.remove('hidden-role');
     btnPessoal.classList.remove('hidden-role');
     btnViaturas.classList.remove('hidden-role');
+    btnAuditoria.classList.remove('hidden-role');
     btnTurno.classList.add('hidden-role'); // P3 foca no Dashboard Geral
     secoesSomenteP3.forEach(el => el.classList.remove('hidden-role'));
 
@@ -154,6 +156,7 @@ function applyRolePermissions(user) {
     btnUsuarios.classList.add('hidden-role');
     btnPessoal.classList.add('hidden-role');
     btnViaturas.classList.add('hidden-role');
+    btnAuditoria.classList.add('hidden-role');
     btnTurno.classList.remove('hidden-role');
     secoesSomenteP3.forEach(el => el.classList.add('hidden-role'));
 
@@ -186,7 +189,8 @@ function setupNavigation() {
     'tab-cartao': { title: 'Cartão Programa', subtitle: 'Roteiro diário de patrulhamento das viaturas: locais, horários e atividades.' },
     'tab-usuarios': { title: 'Usuários do Sistema', subtitle: 'Gestão de perfis de acesso e redefinição de senhas.' },
     'tab-pessoal': { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' },
-    'tab-viaturas': { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' }
+    'tab-viaturas': { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' },
+    'tab-auditoria': { title: 'Trilha de Auditoria', subtitle: 'Registro de criação, edição e exclusão de dados no sistema.' }
   };
 
   navButtons.forEach(btn => {
@@ -227,6 +231,8 @@ function setupNavigation() {
         renderPessoalTab();
       } else if (targetId === 'tab-viaturas') {
         renderViaturasTab();
+      } else if (targetId === 'tab-auditoria') {
+        renderAuditoriaTab();
       }
     });
   });
@@ -256,6 +262,7 @@ function setupEventListeners() {
 
   // Gestão de Usuários (P3)
   document.getElementById('btn-novo-usuario').addEventListener('click', () => abrirModalUsuario());
+  document.getElementById('btn-exportar-backup').addEventListener('click', handleExportarBackup);
   const fecharModalUsuario = () => document.getElementById('modal-usuario').classList.add('hidden');
   document.getElementById('btn-fechar-modal-usuario').addEventListener('click', fecharModalUsuario);
   document.getElementById('btn-cancelar-modal-usuario').addEventListener('click', fecharModalUsuario);
@@ -289,6 +296,24 @@ function setupEventListeners() {
       viaturasFiltroStatus = btn.getAttribute('data-status');
       renderViaturasTab();
     });
+  });
+
+  // Auditoria (P3)
+  document.getElementById('btn-filtrar-auditoria').addEventListener('click', renderAuditoriaTab);
+
+  // Modal de confirmação forte de exclusão (reaproveitável)
+  document.getElementById('confirmar-exclusao-input').addEventListener('input', (e) => {
+    const normalizado = normalizarTexto(e.target.value);
+    const esperado = normalizarTexto(confirmacaoExclusaoForteValorEsperado || '');
+    document.getElementById('btn-confirmar-exclusao-forte').disabled = !esperado || normalizado !== esperado;
+  });
+  const fecharModalConfirmarExclusao = () => document.getElementById('modal-confirmar-exclusao-forte').classList.add('hidden');
+  document.getElementById('btn-fechar-modal-confirmar-exclusao').addEventListener('click', fecharModalConfirmarExclusao);
+  document.getElementById('btn-cancelar-modal-confirmar-exclusao').addEventListener('click', fecharModalConfirmarExclusao);
+  document.getElementById('btn-confirmar-exclusao-forte').addEventListener('click', () => {
+    const callback = confirmacaoExclusaoForteCallback;
+    fecharModalConfirmarExclusao();
+    if (callback) callback();
   });
 
   // Bairro em Novo Evento: alterna o campo de texto livre quando "Outro" é selecionado
@@ -1404,7 +1429,8 @@ async function renderMapaTab() {
     }
 
     // Camada de viaturas: cartão de hoje, uma por viatura, na coordenada do bairro do item
-    // de roteiro ativo agora (fallback pro setor da viatura se nada estiver ativo no momento)
+    // de roteiro ativo agora. Fallback, em ordem: setor cadastrado no registro central da
+    // viatura (Cadastro de Viaturas) > setor informado no cartão do dia.
     if (prefs.mostrarViaturas) {
       const hojeStr = getLocalDateStr();
       const resCartoes = await apiFetch(`${API_BASE_URL}/api/cartoes?data=${hojeStr}`);
@@ -1416,11 +1442,13 @@ async function renderMapaTab() {
 
         (cartaoHoje.viaturas || []).forEach(vtr => {
           const itemAtivo = itemAtivoAgora(vtr);
-          const localReferencia = itemAtivo ? itemAtivo.local : vtr.setor;
+          const viaturaCadastro = (state.viaturas || []).find(vc => normalizarTexto(vc.prefixo) === normalizarTexto(vtr.prefixo));
+          const setorReferencia = (viaturaCadastro && viaturaCadastro.setor) || vtr.setor;
+          const localReferencia = itemAtivo ? itemAtivo.local : setorReferencia;
           const localNorm = normalizarTexto(localReferencia);
-          const setorNorm = normalizarTexto(vtr.setor);
+          const setorNorm = normalizarTexto(setorReferencia);
 
-          // Tenta casar pelo local do item ativo primeiro; se não achar, cai pro setor da viatura
+          // Tenta casar pelo local do item ativo primeiro; se não achar, cai pro setor de referência
           const coordenada = bairrosCoordenadas.find(b => {
             const bNorm = normalizarTexto(b.nome_bairro);
             return bNorm === localNorm || localNorm.includes(bNorm) || bNorm.includes(localNorm);
@@ -1439,7 +1467,7 @@ async function renderMapaTab() {
             <div class="mapa-popup">
               <h4>VTR ${esc(vtr.prefixo)}</h4>
               <div class="mapa-popup-evento">
-                <strong>Setor:</strong> ${esc(vtr.setor)}<br>
+                <strong>Setor:</strong> ${esc(setorReferencia)}<br>
                 <strong>Comandante:</strong> ${esc(vtr.comandante) || 'Não informado'}<br>
                 ${itemAtivo
                   ? `<strong>Atividade agora:</strong> ${esc(itemAtivo.atividade)} — ${esc(itemAtivo.local)} (${esc(itemAtivo.inicio)} às ${esc(itemAtivo.fim)})`
@@ -1839,18 +1867,26 @@ window.handleDeleteEscala = async function(id) {
 };
 
 async function handleDeleteEvento() {
-  if (confirm("ATENÇÃO: Isso excluirá permanentemente o evento, todas as suas alocações de policiamento e as escalas de diárias associadas. Confirmar exclusão?")) {
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/api/eventos/${state.currentEventId}`, { method: 'DELETE' });
-      if (res.ok) {
-        showToast('Evento excluído com sucesso.', 'success');
-        closeDrawer();
-        fetchData();
+  const evt = state.eventos.find(e => e.id === state.currentEventId);
+  const nomeEvento = evt ? evt.nome_evento : '';
+  abrirConfirmacaoExclusaoForte({
+    titulo: 'Excluir Evento',
+    aviso: 'Isso excluirá permanentemente o evento, todas as suas alocações de policiamento e as escalas de diárias associadas.',
+    label: `Digite "${nomeEvento}" para confirmar`,
+    valorEsperado: nomeEvento,
+    onConfirmar: async () => {
+      try {
+        const res = await apiFetch(`${API_BASE_URL}/api/eventos/${state.currentEventId}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('Evento excluído com sucesso.', 'success');
+          closeDrawer();
+          fetchData();
+        }
+      } catch (error) {
+        console.error("Erro ao excluir evento:", error);
       }
-    } catch (error) {
-      console.error("Erro ao excluir evento:", error);
     }
-  }
+  });
 }
 
 // -------------------------------------------------------------
@@ -1923,6 +1959,36 @@ function exportRelatorioToCSV() {
   document.body.removeChild(link);
   
   showToast('Planilha CSV gerada e baixada.', 'success');
+}
+
+// Baixa um backup JSON com todas as tabelas de negócio (não inclui a trilha de auditoria).
+// Usa Blob + URL.createObjectURL em vez do esquema data: do CSV acima — mais robusto para
+// payloads maiores, que têm limite de tamanho em alguns navegadores com data:.
+async function handleExportarBackup() {
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/backup`);
+    const dados = await res.json();
+
+    if (!res.ok) {
+      showToast(esc(dados.error) || 'Falha ao gerar o backup.', 'danger');
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `sgo-backup-${getLocalDateStr()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('Backup gerado e baixado.', 'success');
+  } catch (error) {
+    console.error('Erro ao exportar backup:', error);
+    showToast('Falha na comunicação com o servidor.', 'danger');
+  }
 }
 
 // -------------------------------------------------------------
@@ -3298,17 +3364,24 @@ async function handleExcluirCartao() {
     showToast('Não há Cartão Programa nesta data para excluir.', 'warning');
     return;
   }
-  if (!confirm('Excluir permanentemente o Cartão Programa desta data, com todas as viaturas e roteiros?')) return;
-
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/cartoes/${state.cartaoAtual.id}`, { method: 'DELETE' });
-    if (res.ok) {
-      showToast('Cartão Programa excluído.', 'info');
-      renderCartaoTab();
+  const dataBr = state.cartaoAtual.data.split('-').reverse().join('/');
+  abrirConfirmacaoExclusaoForte({
+    titulo: 'Excluir Cartão Programa',
+    aviso: 'Isso excluirá permanentemente o Cartão Programa desta data, com todas as viaturas e roteiros associados.',
+    label: `Digite "${dataBr}" para confirmar`,
+    valorEsperado: dataBr,
+    onConfirmar: async () => {
+      try {
+        const res = await apiFetch(`${API_BASE_URL}/api/cartoes/${state.cartaoAtual.id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('Cartão Programa excluído.', 'info');
+          renderCartaoTab();
+        }
+      } catch (error) {
+        console.error(error);
+      }
     }
-  } catch (error) {
-    console.error(error);
-  }
+  });
 }
 
 // Recarrega o cartão (do dia ou template) atualmente aberto no editor pelo próprio id — ao
@@ -3883,6 +3956,7 @@ window.abrirModalViatura = function(id) {
     document.getElementById('vtrcad-companhia').value = viatura.companhia || '';
     document.getElementById('vtrcad-categoria').value = viatura.categoria;
     document.getElementById('vtrcad-status').value = viatura.status;
+    document.getElementById('vtrcad-setor').value = viatura.setor || '';
     document.getElementById('vtrcad-observacao').value = viatura.observacao || '';
   } else {
     titulo.innerHTML = `<i data-lucide="plus"></i> Nova Viatura`;
@@ -3900,6 +3974,7 @@ async function handleSalvarViatura(e) {
     companhia: document.getElementById('vtrcad-companhia').value,
     categoria: document.getElementById('vtrcad-categoria').value,
     status: document.getElementById('vtrcad-status').value,
+    setor: document.getElementById('vtrcad-setor').value.trim(),
     observacao: document.getElementById('vtrcad-observacao').value.trim()
   };
 
@@ -3958,6 +4033,86 @@ function popularDatalistViaturas() {
   const datalist = document.getElementById('lista-prefixos-viaturas');
   if (!datalist) return;
   datalist.innerHTML = (state.viaturas || []).map(v => `<option value="${esc(v.prefixo)}"></option>`).join('');
+}
+
+// -------------------------------------------------------------
+// TRILHA DE AUDITORIA (P3) — só leitura, sem edição/exclusão pela interface
+// -------------------------------------------------------------
+const ENTIDADE_LABELS_AUDITORIA = {
+  evento: 'Evento', alocacao: 'Alocação', escala: 'Escala', pessoal: 'Pessoal',
+  usuario: 'Usuário', viatura: 'Viatura', missao_planejada: 'Missão Planejada',
+  cartao: 'Cartão Programa', bairro: 'Bairro', config: 'Configuração'
+};
+const ACAO_LABELS_AUDITORIA = { criar: 'Criar', editar: 'Editar', excluir: 'Excluir' };
+
+async function renderAuditoriaTab() {
+  const tableBody = document.getElementById('table-auditoria-body');
+  tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Carregando...</td></tr>`;
+
+  const params = new URLSearchParams();
+  const usuario = document.getElementById('aud-filtro-usuario').value.trim();
+  const entidade = document.getElementById('aud-filtro-entidade').value;
+  const dataInicio = document.getElementById('aud-filtro-data-inicio').value;
+  const dataFim = document.getElementById('aud-filtro-data-fim').value;
+  if (usuario) params.set('usuario', usuario);
+  if (entidade) params.set('entidade', entidade);
+  if (dataInicio) params.set('data_inicio', dataInicio);
+  if (dataFim) params.set('data_fim', dataFim);
+
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/auditoria?${params.toString()}`);
+    const registros = await res.json();
+
+    if (!res.ok) {
+      tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:24px;">${esc(registros.error) || 'Falha ao carregar a auditoria.'}</td></tr>`;
+      return;
+    }
+
+    if (registros.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhum registro encontrado.</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = registros.map(r => `
+      <tr>
+        <td>${esc(new Date(r.criado_em).toLocaleString('pt-BR'))}</td>
+        <td>${esc(r.usuario)}</td>
+        <td><span class="badge acao-${esc(r.acao)}">${esc(ACAO_LABELS_AUDITORIA[r.acao] || r.acao)}</span></td>
+        <td>${esc(ENTIDADE_LABELS_AUDITORIA[r.entidade] || r.entidade)}</td>
+        <td>${esc(r.descricao_resumida) || '-'}</td>
+      </tr>
+    `).join('');
+
+    lucide.createIcons();
+  } catch (error) {
+    console.error('Erro ao carregar auditoria:', error);
+    tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:24px;">Falha ao carregar a auditoria.</td></tr>`;
+  }
+}
+
+// -------------------------------------------------------------
+// CONFIRMAÇÃO FORTE DE EXCLUSÃO (genérico, reaproveitável) — usado nas exclusões em cascata
+// (evento e cartão), onde digitar errado ou em branco mantém o botão "Excluir" desabilitado.
+// -------------------------------------------------------------
+let confirmacaoExclusaoForteCallback = null;
+let confirmacaoExclusaoForteValorEsperado = '';
+
+function abrirConfirmacaoExclusaoForte({ titulo, aviso, label, valorEsperado, onConfirmar }) {
+  document.getElementById('confirmar-exclusao-titulo').innerHTML = `<i data-lucide="alert-triangle"></i> ${esc(titulo)}`;
+  document.getElementById('confirmar-exclusao-aviso').textContent = aviso;
+  document.getElementById('confirmar-exclusao-label').textContent = label;
+
+  const input = document.getElementById('confirmar-exclusao-input');
+  input.value = '';
+  input.placeholder = valorEsperado;
+
+  document.getElementById('btn-confirmar-exclusao-forte').disabled = true;
+  confirmacaoExclusaoForteCallback = onConfirmar;
+  confirmacaoExclusaoForteValorEsperado = valorEsperado;
+
+  document.getElementById('modal-confirmar-exclusao-forte').classList.remove('hidden');
+  lucide.createIcons();
+  input.focus();
 }
 
 // -------------------------------------------------------------

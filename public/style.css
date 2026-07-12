@@ -518,6 +518,11 @@ button, input, select, textarea {
 .badge.status-ativa { background-color: var(--success); color: #fff; }
 .badge.status-manutencao { background-color: var(--warning); color: #000; }
 
+/* Badges de ação (Auditoria) */
+.badge.acao-criar { background-color: var(--success); color: #fff; }
+.badge.acao-editar { background-color: var(--info); color: #fff; }
+.badge.acao-excluir { background-color: var(--danger); color: #fff; }
+
 /* -------------------------------------------------------------
    PAINÉIS COM GLASSMORPHISM
    ------------------------------------------------------------- */

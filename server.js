@@ -170,6 +170,63 @@ async function deleteRow(tabela, id) {
   if (error) throw new Error(`Falha ao apagar "${tabela}" no Supabase: ${error.message}`);
 }
 
+// Registra uma entrada na trilha de auditoria. Chamado explicitamente ao final de cada rota
+// de escrita de dado de negócio, depois da operação principal já ter sido confirmada com
+// sucesso — uma falha aqui nunca deve derrubar a operação que estava sendo auditada.
+async function registrarAuditoria(req, { acao, entidade, entidade_id, descricao }) {
+  try {
+    await supabase.from('auditoria').insert({
+      id: generateId('aud'),
+      usuario: req.user ? req.user.usuario : 'sistema',
+      acao,
+      entidade,
+      entidade_id: entidade_id || null,
+      descricao_resumida: descricao || '',
+      criado_em: Date.now()
+    });
+  } catch (err) {
+    console.error('Falha ao registrar auditoria:', err.message);
+  }
+}
+
+// Valida e normaliza um payload contra um schema simples, sem biblioteca externa.
+// schema: { campo: { obrigatorio, tipo: 'string'|'number'|'boolean', max, valores: [...], label } }
+// Campo ausente/vazio e não obrigatório recebe `padrao` (ou fica undefined). Strings já
+// voltam com trim aplicado. Campo ausente e sem `padrao` não entra em `valores` (permite
+// espalhar o resultado sobre um registro existente sem apagar campos não enviados — updates
+// parciais em PUT). Retorna { ok:true, valores } ou { ok:false, erro }.
+function validarCampos(body, schema) {
+  const valores = {};
+  for (const [campo, regra] of Object.entries(schema)) {
+    let valor = body[campo];
+    if (valor === undefined || valor === null || valor === '') {
+      if (regra.obrigatorio) {
+        return { ok: false, erro: `O campo "${regra.label || campo}" é obrigatório.` };
+      }
+      if (regra.padrao !== undefined) valores[campo] = regra.padrao;
+      continue;
+    }
+    if (regra.tipo === 'string') {
+      valor = String(valor).trim();
+      if (regra.max && valor.length > regra.max) {
+        return { ok: false, erro: `O campo "${regra.label || campo}" deve ter no máximo ${regra.max} caracteres.` };
+      }
+    } else if (regra.tipo === 'number') {
+      valor = Number(valor);
+      if (isNaN(valor)) {
+        return { ok: false, erro: `O campo "${regra.label || campo}" deve ser um número válido.` };
+      }
+    } else if (regra.tipo === 'boolean') {
+      valor = !!valor;
+    }
+    if (regra.valores && !regra.valores.includes(valor)) {
+      return { ok: false, erro: `Valor inválido para "${regra.label || campo}".` };
+    }
+    valores[campo] = valor;
+  }
+  return { ok: true, valores };
+}
+
 // Consultas pontuais para o caminho mais quente (autenticação em toda requisição),
 // evitando pagar o custo de um readDB() completo a cada chamada autenticada.
 async function buscarSessaoPorToken(token) {
@@ -424,26 +481,28 @@ app.get('/api/usuarios', exigirP3, asyncRoute(async (req, res) => {
 
 // Criar novo usuário
 app.post('/api/usuarios', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const { usuario, senha, nome, role } = req.body;
-
-  if (!usuario || !senha || !nome || !role) {
-    return res.status(400).json({ error: 'Usuário, senha, nome e perfil são obrigatórios.' });
-  }
-  if (!['P3', 'Adjunto', 'Oficial'].includes(role)) {
-    return res.status(400).json({ error: 'Perfil inválido.' });
-  }
-  if (String(senha).length < 3) {
+  const v = validarCampos(req.body, {
+    usuario: { obrigatorio: true, tipo: 'string', max: 60, label: 'Usuário' },
+    nome: { obrigatorio: true, tipo: 'string', max: 150, label: 'Nome de Exibição' },
+    role: { obrigatorio: true, tipo: 'string', valores: ['P3', 'Adjunto', 'Oficial'], label: 'Perfil' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+  // Senha não passa por validarCampos: não deve ser trimada (espaços podem ser intencionais)
+  // e a regra é comprimento mínimo, não máximo.
+  const senha = req.body.senha;
+  if (!senha || String(senha).length < 3) {
     return res.status(400).json({ error: 'A senha deve ter pelo menos 3 caracteres.' });
   }
 
-  if (db.usuarios.some(u => u.usuario.toLowerCase() === String(usuario).toLowerCase())) {
+  const db = await readDB();
+  if (db.usuarios.some(u => u.usuario.toLowerCase() === v.valores.usuario.toLowerCase())) {
     return res.status(409).json({ error: 'Já existe um usuário com esse login.' });
   }
 
-  const novoUsuario = { usuario: String(usuario).trim(), senha: hashSenha(senha), nome: String(nome).trim(), role };
+  const novoUsuario = { usuario: v.valores.usuario, senha: hashSenha(senha), nome: v.valores.nome, role: v.valores.role };
   db.usuarios.push(novoUsuario);
   await writeDB(db, ['usuarios']);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'usuario', entidade_id: novoUsuario.usuario, descricao: `Usuário "${novoUsuario.usuario}" criado (perfil ${novoUsuario.role}).` });
   res.status(201).json(usuarioPublico(novoUsuario));
 }));
 
@@ -470,6 +529,7 @@ app.put('/api/usuarios/:usuario', exigirP3, asyncRoute(async (req, res) => {
   if (req.body.nome !== undefined) alvo.nome = String(req.body.nome).trim();
 
   await writeDB(db, ['usuarios']);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'usuario', entidade_id: alvo.usuario, descricao: `Usuário "${alvo.usuario}" atualizado.` });
   res.json(usuarioPublico(alvo));
 }));
 
@@ -491,6 +551,7 @@ app.post('/api/usuarios/:usuario/resetar-senha', exigirP3, asyncRoute(async (req
   db.sessoes = (db.sessoes || []).filter(s => s.usuario !== alvo.usuario);
 
   await writeDB(db, ['usuarios','sessoes']);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'usuario', entidade_id: alvo.usuario, descricao: `Senha de "${alvo.usuario}" redefinida (sessões ativas encerradas).` });
   res.json({ message: `Senha de ${alvo.usuario} redefinida com sucesso.` });
 }));
 
@@ -510,6 +571,7 @@ app.delete('/api/usuarios/:usuario', exigirP3, asyncRoute(async (req, res) => {
   db.usuarios = db.usuarios.filter(u => u.usuario !== alvo.usuario);
   db.sessoes = (db.sessoes || []).filter(s => s.usuario !== alvo.usuario);
   await writeDB(db, ['usuarios','sessoes']);
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'usuario', entidade_id: alvo.usuario, descricao: `Usuário "${alvo.usuario}" excluído.` });
   res.json({ message: 'Usuário excluído.' });
 }));
 
@@ -529,12 +591,15 @@ app.get('/api/pessoal', asyncRoute(async (req, res) => {
 
 // Criar novo cadastro de pessoal (P3)
 app.post('/api/pessoal', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
+  const v = validarCampos(req.body, {
+    nome: { obrigatorio: true, tipo: 'string', max: 150, label: 'Nome' },
+    posto_graduacao: { obrigatorio: true, tipo: 'string', max: 50, label: 'Posto/Graduação' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
 
-  const { nome, posto_graduacao, categorias } = req.body;
-  if (!nome || !posto_graduacao) {
-    return res.status(400).json({ error: 'Nome e posto/graduação são obrigatórios.' });
-  }
+  const db = await readDB();
+  const { nome, posto_graduacao } = v.valores;
+  const { categorias } = req.body;
   const postoInfo = POSTOS_GRADUACAO.find(p => p.posto === posto_graduacao);
   if (!postoInfo) {
     return res.status(400).json({ error: 'Posto/graduação inválido.' });
@@ -554,6 +619,7 @@ app.post('/api/pessoal', exigirP3, asyncRoute(async (req, res) => {
   };
   db.pessoal.push(novaPessoa);
   await writeDB(db, ['pessoal']);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'pessoal', entidade_id: novaPessoa.id, descricao: `Cadastro de pessoal "${novaPessoa.nome}" criado.` });
   res.status(201).json(novaPessoa);
 }));
 
@@ -578,14 +644,17 @@ app.put('/api/pessoal/:id', exigirP3, asyncRoute(async (req, res) => {
   if (req.body.ativo !== undefined) pessoa.ativo = !!req.body.ativo;
 
   await writeDB(db, ['pessoal']);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'pessoal', entidade_id: pessoa.id, descricao: `Cadastro de pessoal "${pessoa.nome}" atualizado.` });
   res.json(pessoa);
 }));
 
 // Excluir cadastro de pessoal (P3)
 app.delete('/api/pessoal/:id', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
+  const pessoa = db.pessoal.find(p => p.id === req.params.id);
   db.pessoal = (db.pessoal || []).filter(p => p.id !== req.params.id);
   await writeDB(db, ['pessoal']);
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'pessoal', entidade_id: req.params.id, descricao: `Cadastro de pessoal "${pessoa ? pessoa.nome : req.params.id}" excluído.` });
   res.json({ message: 'Cadastro excluído.' });
 }));
 
@@ -601,24 +670,40 @@ app.get('/api/eventos', asyncRoute(async (req, res) => {
 
 // Criar novo evento
 app.post('/api/eventos', exigirP3, asyncRoute(async (req, res) => {
+  const v = validarCampos(req.body, {
+    nome_evento: { obrigatorio: true, tipo: 'string', max: 200, label: 'Nome do Evento' },
+    tipo_evento: { obrigatorio: true, tipo: 'string', max: 50, label: 'Tipo de Evento' },
+    local_itinerario: { obrigatorio: true, tipo: 'string', max: 300, label: 'Local/Itinerário' },
+    data_inicio: { obrigatorio: true, tipo: 'string', max: 10, label: 'Data de Início' },
+    data_termino: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Término' },
+    horario_inicio: { obrigatorio: false, tipo: 'string', max: 5, padrao: '', label: 'Horário de Início' },
+    num_oficio: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Número do Ofício' },
+    num_os_manual: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Número da OS' },
+    num_sei: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Número SEI' },
+    demandante: { obrigatorio: false, tipo: 'string', max: 200, padrao: 'Não Informado', label: 'Demandante' },
+    bairro: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Bairro' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
   const db = await readDB();
   const novoEvento = {
     id: generateId('evt'),
-    num_oficio: req.body.num_oficio || '',
-    num_os_manual: req.body.num_os_manual || '',
-    num_sei: req.body.num_sei || '',
-    nome_evento: req.body.nome_evento,
-    tipo_evento: req.body.tipo_evento,
-    demandante: req.body.demandante || 'Não Informado',
-    data_inicio: req.body.data_inicio,
-    data_termino: req.body.data_termino || req.body.data_inicio,
-    horario_inicio: req.body.horario_inicio || '',
-    local_itinerario: req.body.local_itinerario,
-    bairro: req.body.bairro || ''
+    num_oficio: v.valores.num_oficio,
+    num_os_manual: v.valores.num_os_manual,
+    num_sei: v.valores.num_sei,
+    nome_evento: v.valores.nome_evento,
+    tipo_evento: v.valores.tipo_evento,
+    demandante: v.valores.demandante,
+    data_inicio: v.valores.data_inicio,
+    data_termino: v.valores.data_termino || v.valores.data_inicio,
+    horario_inicio: v.valores.horario_inicio,
+    local_itinerario: v.valores.local_itinerario,
+    bairro: v.valores.bairro
   };
 
   db.eventos.push(novoEvento);
   await writeRow('eventos', novoEvento);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'evento', entidade_id: novoEvento.id, descricao: `Evento "${novoEvento.nome_evento}" criado.` });
   res.status(201).json(novoEvento);
 }));
 
@@ -631,20 +716,38 @@ app.put('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
     return res.status(404).json({ error: 'Evento não encontrado' });
   }
 
-  const eventoAtualizado = { ...db.eventos[index], ...req.body };
+  const v = validarCampos(req.body, {
+    nome_evento: { obrigatorio: false, tipo: 'string', max: 200, label: 'Nome do Evento' },
+    tipo_evento: { obrigatorio: false, tipo: 'string', max: 50, label: 'Tipo de Evento' },
+    local_itinerario: { obrigatorio: false, tipo: 'string', max: 300, label: 'Local/Itinerário' },
+    data_inicio: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Início' },
+    data_termino: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Término' },
+    horario_inicio: { obrigatorio: false, tipo: 'string', max: 5, label: 'Horário de Início' },
+    num_oficio: { obrigatorio: false, tipo: 'string', max: 100, label: 'Número do Ofício' },
+    num_os_manual: { obrigatorio: false, tipo: 'string', max: 100, label: 'Número da OS' },
+    num_sei: { obrigatorio: false, tipo: 'string', max: 100, label: 'Número SEI' },
+    demandante: { obrigatorio: false, tipo: 'string', max: 200, label: 'Demandante' },
+    bairro: { obrigatorio: false, tipo: 'string', max: 100, label: 'Bairro' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
+  const eventoAtualizado = { ...db.eventos[index], ...v.valores };
   db.eventos[index] = eventoAtualizado;
   await writeRow('eventos', eventoAtualizado);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'evento', entidade_id: eventoAtualizado.id, descricao: `Evento "${eventoAtualizado.nome_evento}" atualizado.` });
   res.json(eventoAtualizado);
 }));
 
 // Excluir evento (e alocações/escalas órfãs, apagadas diretamente por evento_id em vez de
 // reescrever as tabelas inteiras)
 app.delete('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
+  const { data: eventoAlvo } = await supabase.from('eventos').select('nome_evento').eq('id', req.params.id).maybeSingle();
   await deleteRow('eventos', req.params.id);
   const { error: erroAlocacoes } = await supabase.from('alocacoes').delete().eq('evento_id', req.params.id);
   if (erroAlocacoes) throw new Error(`Falha ao limpar "alocacoes" no Supabase: ${erroAlocacoes.message}`);
   const { error: erroEscalas } = await supabase.from('escalas').delete().eq('evento_id', req.params.id);
   if (erroEscalas) throw new Error(`Falha ao limpar "escalas" no Supabase: ${erroEscalas.message}`);
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'evento', entidade_id: req.params.id, descricao: `Evento "${eventoAlvo ? eventoAlvo.nome_evento : req.params.id}" excluído, com alocações e escalas associadas.` });
   res.json({ message: 'Evento e registros relacionados excluídos' });
 }));
 
@@ -665,19 +768,28 @@ app.get('/api/alocacoes', asyncRoute(async (req, res) => {
 
 // Adicionar alocação
 app.post('/api/alocacoes', exigirP3, asyncRoute(async (req, res) => {
+  const v = validarCampos(req.body, {
+    evento_id: { obrigatorio: true, tipo: 'string', max: 50, label: 'Evento' },
+    modalidade: { obrigatorio: true, tipo: 'string', max: 50, label: 'Modalidade' },
+    prefixos_vtr: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Prefixos das Viaturas' },
+    comando_servico: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Comando do Serviço' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
   const db = await readDB();
   const novaAlocacao = {
     id: generateId('aloc'),
-    evento_id: req.body.evento_id,
-    modalidade: req.body.modalidade,
+    evento_id: v.valores.evento_id,
+    modalidade: v.valores.modalidade,
     qtd_policiais: parseInt(req.body.qtd_policiais, 10) || 0,
     qtd_viaturas: parseInt(req.body.qtd_viaturas, 10) || 0,
-    prefixos_vtr: req.body.prefixos_vtr || '',
-    comando_servico: req.body.comando_servico || ''
+    prefixos_vtr: v.valores.prefixos_vtr,
+    comando_servico: v.valores.comando_servico
   };
 
   db.alocacoes.push(novaAlocacao);
   await writeDB(db, ['alocacoes']);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'alocacao', entidade_id: novaAlocacao.id, descricao: `Alocação de ${novaAlocacao.modalidade} criada para o evento ${novaAlocacao.evento_id}.` });
   res.status(201).json(novaAlocacao);
 }));
 
@@ -686,6 +798,7 @@ app.delete('/api/alocacoes/:id', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
   db.alocacoes = db.alocacoes.filter(a => a.id !== req.params.id);
   await writeDB(db, ['alocacoes']);
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'alocacao', entidade_id: req.params.id, descricao: 'Alocação de policiamento excluída.' });
   res.json({ message: 'Alocação excluída' });
 }));
 
@@ -706,22 +819,30 @@ app.get('/api/escalas', asyncRoute(async (req, res) => {
 
 // Adicionar militar na escala (trata a automação de diárias: qtd_aparicoes * 2)
 app.post('/api/escalas', exigirP3, asyncRoute(async (req, res) => {
+  const v = validarCampos(req.body, {
+    evento_id: { obrigatorio: true, tipo: 'string', max: 50, label: 'Evento' },
+    militar_nome: { obrigatorio: true, tipo: 'string', max: 150, label: 'Nome Completo' },
+    militar_id: { obrigatorio: true, tipo: 'string', max: 50, label: 'Matrícula/ID' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
   const db = await readDB();
 
   const qtd_aparicoes = parseInt(req.body.qtd_aparicoes, 10) || 1;
-  const total_diarias = qtd_aparicoes * 2; // Automação: Regra de 2 diárias por aparição
+  const total_diarias = qtd_aparicoes * 2; // Automação: Regra de 2 diárias por aparição — não alterar
 
   const novaEscala = {
     id: generateId('esc'),
-    evento_id: req.body.evento_id,
-    militar_nome: req.body.militar_nome,
-    militar_id: req.body.militar_id,
+    evento_id: v.valores.evento_id,
+    militar_nome: v.valores.militar_nome,
+    militar_id: v.valores.militar_id,
     qtd_aparicoes: qtd_aparicoes,
     total_diarias: total_diarias
   };
 
   db.escalas.push(novaEscala);
   await writeRow('escalas', novaEscala);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'escala', entidade_id: novaEscala.id, descricao: `"${novaEscala.militar_nome}" escalado (${novaEscala.total_diarias} diária(s)).` });
   res.status(201).json(novaEscala);
 }));
 
@@ -746,12 +867,14 @@ app.put('/api/escalas/:id', exigirP3, asyncRoute(async (req, res) => {
   };
 
   await writeRow('escalas', db.escalas[index]);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'escala', entidade_id: db.escalas[index].id, descricao: `Escala de "${db.escalas[index].militar_nome}" atualizada.` });
   res.json(db.escalas[index]);
 }));
 
 // Remover militar da escala
 app.delete('/api/escalas/:id', exigirP3, asyncRoute(async (req, res) => {
   await deleteRow('escalas', req.params.id);
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'escala', entidade_id: req.params.id, descricao: 'Militar removido da escala de diárias.' });
   res.json({ message: 'Militar removido da escala' });
 }));
 
@@ -766,24 +889,26 @@ app.get('/api/bairros-coordenadas', asyncRoute(async (req, res) => {
 
 // Criar bairro (P3)
 app.post('/api/bairros-coordenadas', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
+  const v = validarCampos(req.body, {
+    nome_bairro: { obrigatorio: true, tipo: 'string', max: 100, label: 'Nome do Bairro' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
 
-  const { nome_bairro, latitude, longitude } = req.body;
-  if (!nome_bairro) {
-    return res.status(400).json({ error: 'O nome do bairro é obrigatório.' });
-  }
+  const db = await readDB();
+  const { latitude, longitude } = req.body;
   const lat = parseFloat(latitude);
   const lon = parseFloat(longitude);
   if (isNaN(lat) || isNaN(lon)) {
     return res.status(400).json({ error: 'Latitude e longitude devem ser números válidos.' });
   }
-  if (db.bairros_coordenadas.some(b => normalizarTextoServer(b.nome_bairro) === normalizarTextoServer(nome_bairro))) {
+  if (db.bairros_coordenadas.some(b => normalizarTextoServer(b.nome_bairro) === normalizarTextoServer(v.valores.nome_bairro))) {
     return res.status(409).json({ error: 'Já existe um bairro cadastrado com esse nome.' });
   }
 
-  const novoBairro = { id: generateId('bco'), nome_bairro: String(nome_bairro).trim(), latitude: lat, longitude: lon };
+  const novoBairro = { id: generateId('bco'), nome_bairro: v.valores.nome_bairro, latitude: lat, longitude: lon };
   db.bairros_coordenadas.push(novoBairro);
   await writeDB(db, ['bairros_coordenadas']);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'bairro', entidade_id: novoBairro.id, descricao: `Bairro "${novoBairro.nome_bairro}" cadastrado.` });
   res.status(201).json(novoBairro);
 }));
 
@@ -806,14 +931,17 @@ app.put('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res) =>
   }
 
   await writeDB(db, ['bairros_coordenadas']);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'bairro', entidade_id: bairro.id, descricao: `Bairro "${bairro.nome_bairro}" atualizado.` });
   res.json(bairro);
 }));
 
 // Excluir bairro (P3)
 app.delete('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
+  const bairro = db.bairros_coordenadas.find(b => b.id === req.params.id);
   db.bairros_coordenadas = (db.bairros_coordenadas || []).filter(b => b.id !== req.params.id);
   await writeDB(db, ['bairros_coordenadas']);
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'bairro', entidade_id: req.params.id, descricao: `Bairro "${bairro ? bairro.nome_bairro : req.params.id}" excluído.` });
   res.json({ message: 'Bairro excluído.' });
 }));
 
@@ -828,35 +956,33 @@ app.get('/api/viaturas', asyncRoute(async (req, res) => {
 
 // Criar viatura (P3)
 app.post('/api/viaturas', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
+  const valid = validarCampos(req.body, {
+    prefixo: { obrigatorio: true, tipo: 'string', max: 30, label: 'Prefixo' },
+    companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VALIDAS, padrao: '', label: 'Companhia' },
+    categoria: { obrigatorio: false, tipo: 'string', valores: CATEGORIAS_VIATURA, padrao: 'Ordinária', label: 'Categoria' },
+    status: { obrigatorio: false, tipo: 'string', valores: STATUS_VIATURA, padrao: 'Ativa', label: 'Status' },
+    setor: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Setor' },
+    observacao: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Observação' }
+  });
+  if (!valid.ok) return res.status(400).json({ error: valid.erro });
 
-  const { prefixo, companhia, categoria, status, observacao } = req.body;
-  if (!prefixo) {
-    return res.status(400).json({ error: 'O prefixo da viatura é obrigatório.' });
-  }
-  if (companhia && !COMPANHIAS_VALIDAS.includes(companhia)) {
-    return res.status(400).json({ error: 'Companhia inválida.' });
-  }
-  if (categoria && !CATEGORIAS_VIATURA.includes(categoria)) {
-    return res.status(400).json({ error: 'Categoria de viatura inválida.' });
-  }
-  if (status && !STATUS_VIATURA.includes(status)) {
-    return res.status(400).json({ error: 'Status de viatura inválido.' });
-  }
-  if (db.viaturas.some(v => normalizarTextoServer(v.prefixo) === normalizarTextoServer(prefixo))) {
+  const db = await readDB();
+  if (db.viaturas.some(x => normalizarTextoServer(x.prefixo) === normalizarTextoServer(valid.valores.prefixo))) {
     return res.status(409).json({ error: 'Já existe uma viatura cadastrada com esse prefixo.' });
   }
 
   const novaViatura = {
     id: generateId('vtr'),
-    prefixo: String(prefixo).trim(),
-    companhia: companhia || '',
-    categoria: categoria || 'Ordinária',
-    status: status || 'Ativa',
-    observacao: observacao || ''
+    prefixo: valid.valores.prefixo,
+    companhia: valid.valores.companhia,
+    categoria: valid.valores.categoria,
+    status: valid.valores.status,
+    observacao: valid.valores.observacao,
+    setor: valid.valores.setor
   };
   db.viaturas.push(novaViatura);
   await writeDB(db, ['viaturas']);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'viatura', entidade_id: novaViatura.id, descricao: `Viatura "${novaViatura.prefixo}" cadastrada.` });
   res.status(201).json(novaViatura);
 }));
 
@@ -892,16 +1018,20 @@ app.put('/api/viaturas/:id', exigirP3, asyncRoute(async (req, res) => {
     viatura.status = req.body.status;
   }
   if (req.body.observacao !== undefined) viatura.observacao = req.body.observacao;
+  if (req.body.setor !== undefined) viatura.setor = String(req.body.setor).trim();
 
   await writeDB(db, ['viaturas']);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'viatura', entidade_id: viatura.id, descricao: `Viatura "${viatura.prefixo}" atualizada.` });
   res.json(viatura);
 }));
 
 // Excluir viatura (P3)
 app.delete('/api/viaturas/:id', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
+  const viatura = db.viaturas.find(v => v.id === req.params.id);
   db.viaturas = (db.viaturas || []).filter(v => v.id !== req.params.id);
   await writeDB(db, ['viaturas']);
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'viatura', entidade_id: req.params.id, descricao: `Viatura "${viatura ? viatura.prefixo : req.params.id}" excluída.` });
   res.json({ message: 'Viatura excluída.' });
 }));
 
@@ -924,6 +1054,7 @@ app.put('/api/config', exigirP3, asyncRoute(async (req, res) => {
   db.config = db.config || {};
   db.config.cota_mensal_diarias = cota;
   await writeDB(db, ['config']);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'config', entidade_id: null, descricao: `Cota mensal de diárias alterada para ${cota}.` });
   res.json(db.config);
 }));
 
@@ -997,12 +1128,17 @@ app.get('/api/missoes-planejadas', asyncRoute(async (req, res) => {
 }));
 
 app.post('/api/missoes-planejadas', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const { nome, tipo_recorrencia, data_inicio, data_fim, qtd_diarias_por_ocorrencia } = req.body;
+  const vNome = validarCampos(req.body, {
+    nome: { obrigatorio: true, tipo: 'string', max: 200, label: 'Nome da Missão' },
+    data_inicio: { obrigatorio: true, tipo: 'string', max: 10, label: 'Data de Início' }
+  });
+  if (!vNome.ok) return res.status(400).json({ error: vNome.erro });
 
-  if (!nome || !data_inicio) {
-    return res.status(400).json({ error: 'Nome e data de início são obrigatórios.' });
-  }
+  const db = await readDB();
+  const nome = vNome.valores.nome;
+  const data_inicio = vNome.valores.data_inicio;
+  const { tipo_recorrencia, data_fim, qtd_diarias_por_ocorrencia } = req.body;
+
   if (!['diaria', 'fim_de_semana', 'dia_unico'].includes(tipo_recorrencia)) {
     return res.status(400).json({ error: "tipo_recorrencia deve ser 'diaria', 'fim_de_semana' ou 'dia_unico'." });
   }
@@ -1028,6 +1164,7 @@ app.post('/api/missoes-planejadas', exigirP3, asyncRoute(async (req, res) => {
 
   db.missoes_planejadas.push(novaMissao);
   await writeDB(db, ['missoes_planejadas']);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'missao_planejada', entidade_id: novaMissao.id, descricao: `Missão planejada "${novaMissao.nome}" criada.` });
   res.status(201).json(novaMissao);
 }));
 
@@ -1059,13 +1196,16 @@ app.put('/api/missoes-planejadas/:id', exigirP3, asyncRoute(async (req, res) => 
   }
 
   await writeDB(db, ['missoes_planejadas']);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'missao_planejada', entidade_id: missao.id, descricao: `Missão planejada "${missao.nome}" atualizada.` });
   res.json(missao);
 }));
 
 app.delete('/api/missoes-planejadas/:id', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
+  const missao = db.missoes_planejadas.find(m => m.id === req.params.id);
   db.missoes_planejadas = (db.missoes_planejadas || []).filter(m => m.id !== req.params.id);
   await writeDB(db, ['missoes_planejadas']);
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'missao_planejada', entidade_id: req.params.id, descricao: `Missão planejada "${missao ? missao.nome : req.params.id}" excluída.` });
   res.json({ message: 'Missão planejada excluída.' });
 }));
 
@@ -1102,6 +1242,8 @@ app.post('/api/missoes-planejadas/:id/converter', exigirP3, asyncRoute(async (re
   // corria a condição de gravar a missão antes do evento existir, violando a constraint.
   await writeDB(db, ['eventos']);
   await writeDB(db, ['missoes_planejadas']);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'evento', entidade_id: novoEvento.id, descricao: `Evento "${novoEvento.nome_evento}" criado a partir da missão planejada "${missao.nome}".` });
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'missao_planejada', entidade_id: missao.id, descricao: `Missão planejada "${missao.nome}" convertida em evento.` });
   res.status(201).json(novoEvento);
 }));
 
@@ -1586,6 +1728,7 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
     };
     db.cartoes.push(novoTemplate);
     await writeRow('cartoes', novoTemplate);
+    await registrarAuditoria(req, { acao: 'criar', entidade: 'cartao', entidade_id: novoTemplate.id, descricao: `Template "${novoTemplate.nome_template}" criado.` });
     return res.status(201).json(novoTemplate);
   }
 
@@ -1642,6 +1785,7 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
 
   db.cartoes.push(novoCartao);
   await writeRow('cartoes', novoCartao);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'cartao', entidade_id: novoCartao.id, descricao: `Cartão Programa de ${novoCartao.data} criado.` });
   res.status(201).json(novoCartao);
 }));
 
@@ -1692,6 +1836,7 @@ app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
 
   db.cartoes.push(novoCartao);
   await writeRow('cartoes', novoCartao);
+  await registrarAuditoria(req, { acao: 'criar', entidade: 'cartao', entidade_id: novoCartao.id, descricao: `Cartão Programa de ${novoCartao.data} criado a partir do template "${template.nome_template}".` });
   res.status(201).json(novoCartao);
 }));
 
@@ -1701,17 +1846,32 @@ app.put('/api/cartoes/:id', asyncRoute(async (req, res) => {
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
 
-  if (req.body.fiscal !== undefined) cartao.fiscal = req.body.fiscal;
-  if (req.body.adjunto !== undefined) cartao.adjunto = req.body.adjunto;
-  if (req.body.oficial_sobreaviso !== undefined) cartao.oficial_sobreaviso = req.body.oficial_sobreaviso;
+  // padrao:'' de propósito nos três — o frontend manda string vazia para "limpar" a seleção
+  // (voltar para "Selecione..."), e isso precisa continuar entrando em valores explicitamente.
+  const v = validarCampos(req.body, {
+    fiscal: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Fiscal de Operações' },
+    adjunto: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Adjunto' },
+    oficial_sobreaviso: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Oficial de Sobreaviso' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
+  if (req.body.fiscal !== undefined) cartao.fiscal = v.valores.fiscal;
+  if (req.body.adjunto !== undefined) cartao.adjunto = v.valores.adjunto;
+  if (req.body.oficial_sobreaviso !== undefined) cartao.oficial_sobreaviso = v.valores.oficial_sobreaviso;
 
   await writeRow('cartoes', cartao);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'cartao', entidade_id: cartao.id, descricao: `Cabeçalho do Cartão Programa de ${cartao.data} atualizado.` });
   res.json(cartao);
 }));
 
 // Excluir cartão — só o P3 pode excluir, seja template ou o roteiro operacional de um dia
 app.delete('/api/cartoes/:id', exigirP3, asyncRoute(async (req, res) => {
+  const { data: cartaoAlvo } = await supabase.from('cartoes').select('data, is_template, nome_template').eq('id', req.params.id).maybeSingle();
   await deleteRow('cartoes', req.params.id);
+  const descricaoAlvo = cartaoAlvo && cartaoAlvo.is_template
+    ? `Template "${cartaoAlvo.nome_template}" excluído.`
+    : `Cartão Programa de ${cartaoAlvo ? cartaoAlvo.data : req.params.id} excluído, com viaturas e itens de roteiro associados.`;
+  await registrarAuditoria(req, { acao: 'excluir', entidade: 'cartao', entidade_id: req.params.id, descricao: descricaoAlvo });
   res.json({ message: 'Cartão Programa excluído' });
 }));
 
@@ -1721,30 +1881,30 @@ app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
 
-  if (!req.body.prefixo || !req.body.setor) {
-    return res.status(400).json({ error: 'Prefixo da VTR e setor são obrigatórios.' });
-  }
-  if (req.body.companhia && !COMPANHIAS_VALIDAS.includes(req.body.companhia)) {
-    return res.status(400).json({ error: 'Companhia inválida.' });
-  }
-  const categoria = req.body.categoria || 'Ordinária';
-  if (!CATEGORIAS_VIATURA.includes(categoria)) {
-    return res.status(400).json({ error: 'Categoria de viatura inválida.' });
-  }
+  const v = validarCampos(req.body, {
+    prefixo: { obrigatorio: true, tipo: 'string', max: 30, label: 'Prefixo da VTR' },
+    setor: { obrigatorio: true, tipo: 'string', max: 100, label: 'Setor / Bairro' },
+    companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VALIDAS, padrao: '', label: 'Companhia' },
+    categoria: { obrigatorio: false, tipo: 'string', valores: CATEGORIAS_VIATURA, padrao: 'Ordinária', label: 'Categoria' },
+    comandante: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Comandante' },
+    observacao: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Observação' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
 
   const novaViatura = {
     id: generateId('cpv'),
-    prefixo: req.body.prefixo,
-    setor: req.body.setor,
-    companhia: req.body.companhia || '',
-    categoria,
-    comandante: req.body.comandante || '',
-    observacao: req.body.observacao || '',
+    prefixo: v.valores.prefixo,
+    setor: v.valores.setor,
+    companhia: v.valores.companhia,
+    categoria: v.valores.categoria,
+    comandante: v.valores.comandante,
+    observacao: v.valores.observacao,
     itens: []
   };
 
   cartao.viaturas.push(novaViatura);
   await writeRow('cartoes', cartao);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'cartao', entidade_id: cartao.id, descricao: `VTR "${novaViatura.prefixo}" adicionada ao Cartão Programa de ${cartao.data}.` });
   res.status(201).json(novaViatura);
 }));
 
@@ -1769,6 +1929,7 @@ app.put('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
   });
 
   await writeRow('cartoes', cartao);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'cartao', entidade_id: cartao.id, descricao: `VTR "${viatura.prefixo}" atualizada no Cartão Programa de ${cartao.data}.` });
   res.json(viatura);
 }));
 
@@ -1778,8 +1939,10 @@ app.delete('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
 
+  const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   cartao.viaturas = cartao.viaturas.filter(v => v.id !== req.params.vid);
   await writeRow('cartoes', cartao);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'cartao', entidade_id: cartao.id, descricao: `VTR "${viatura ? viatura.prefixo : req.params.vid}" removida do Cartão Programa de ${cartao.data}, com itens de roteiro associados.` });
   res.json({ message: 'Viatura removida do cartão' });
 }));
 
@@ -1792,21 +1955,26 @@ app.post('/api/cartoes/:id/viaturas/:vid/itens', asyncRoute(async (req, res) => 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
 
-  if (!req.body.inicio || !req.body.local) {
-    return res.status(400).json({ error: 'Horário de início e local são obrigatórios.' });
-  }
+  const valid = validarCampos(req.body, {
+    inicio: { obrigatorio: true, tipo: 'string', max: 5, label: 'Horário de Início' },
+    local: { obrigatorio: true, tipo: 'string', max: 150, label: 'Local' },
+    fim: { obrigatorio: false, tipo: 'string', max: 5, padrao: '', label: 'Horário de Fim' },
+    atividade: { obrigatorio: false, tipo: 'string', max: 100, padrao: 'Patrulhamento', label: 'Atividade' }
+  });
+  if (!valid.ok) return res.status(400).json({ error: valid.erro });
 
   const novoItem = {
     id: generateId('cpi'),
-    inicio: req.body.inicio,
-    fim: req.body.fim || '',
-    local: req.body.local,
-    atividade: req.body.atividade || 'Patrulhamento'
+    inicio: valid.valores.inicio,
+    fim: valid.valores.fim,
+    local: valid.valores.local,
+    atividade: valid.valores.atividade
   };
 
   viatura.itens.push(novoItem);
   viatura.itens = ordenarPorTurno(viatura.itens);
   await writeRow('cartoes', cartao);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'cartao', entidade_id: cartao.id, descricao: `Item de roteiro adicionado à VTR "${viatura.prefixo}" (${cartao.data}): ${novoItem.atividade} em ${novoItem.local}.` });
   res.status(201).json(novoItem);
 }));
 
@@ -1828,6 +1996,7 @@ app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res)
 
   viatura.itens = ordenarPorTurno(viatura.itens);
   await writeRow('cartoes', cartao);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'cartao', entidade_id: cartao.id, descricao: `Item de roteiro da VTR "${viatura.prefixo}" (${cartao.data}) atualizado.` });
   res.json(item);
 }));
 
@@ -1842,7 +2011,33 @@ app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, r
 
   viatura.itens = viatura.itens.filter(i => i.id !== req.params.iid);
   await writeRow('cartoes', cartao);
+  await registrarAuditoria(req, { acao: 'editar', entidade: 'cartao', entidade_id: cartao.id, descricao: `Item de roteiro removido da VTR "${viatura.prefixo}" (${cartao.data}).` });
   res.json({ message: 'Item de roteiro removido' });
+}));
+
+
+// -------------------------------------------------------------
+// ROTA DE CONSULTA DA TRILHA DE AUDITORIA (P3)
+// -------------------------------------------------------------
+app.get('/api/auditoria', exigirP3, asyncRoute(async (req, res) => {
+  let query = supabase.from('auditoria').select('*').order('criado_em', { ascending: false }).limit(500);
+  if (req.query.usuario) query = query.eq('usuario', req.query.usuario);
+  if (req.query.entidade) query = query.eq('entidade', req.query.entidade);
+  if (req.query.data_inicio) query = query.gte('criado_em', new Date(`${req.query.data_inicio}T00:00:00`).getTime());
+  if (req.query.data_fim) query = query.lte('criado_em', new Date(`${req.query.data_fim}T23:59:59`).getTime());
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Falha ao consultar auditoria: ${error.message}`);
+  res.json(data || []);
+}));
+
+// -------------------------------------------------------------
+// ROTA DE BACKUP (P3) — exporta todas as tabelas de TABELAS + config num único JSON.
+// Não inclui "auditoria": é log operacional, não dado de negócio a restaurar.
+// -------------------------------------------------------------
+app.get('/api/backup', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  res.json(db);
 }));
 
 
