@@ -159,10 +159,6 @@
           <p id="tab-subtitle">Visão geral do policiamento e pautas do batalhão.</p>
         </div>
         <div class="header-actions">
-          <button id="btn-refresh" class="btn btn-secondary">
-            <i data-lucide="refresh-cw"></i>
-            <span>Sincronizar</span>
-          </button>
           <div class="profile">
             <div class="profile-avatar" id="avatar-display">P3</div>
           </div>
@@ -1089,9 +1085,6 @@
               <button id="btn-excluir-cartao" class="btn btn-danger btn-sm">
                 <i data-lucide="trash-2"></i> Excluir
               </button>
-              <button id="btn-toggle-historico" class="btn btn-secondary btn-sm">
-                <i data-lucide="history"></i> Histórico
-              </button>
               <button id="btn-toggle-templates" class="btn btn-secondary btn-sm admin-only">
                 <i data-lucide="layout-template"></i> Templates
               </button>
@@ -1127,40 +1120,16 @@
           </div>
         </div>
 
-        <!-- Histórico de Cartões Já Lançados -->
-        <div id="cartao-historico-panel" class="panel cartao-historico-panel hidden">
+        <!-- Cartões Recentes: sempre visível, últimos 5 anteriores à data selecionada -->
+        <div id="cartao-historico-recente" class="panel cartao-historico-panel">
           <div class="panel-header flex-column-mobile">
             <div class="panel-title">
               <i data-lucide="history"></i>
-              <h2>Histórico de Cartões Programa</h2>
-            </div>
-            <div class="report-filters">
-              <div class="filter-group">
-                <label for="cartao-hist-mes">Mês</label>
-                <select id="cartao-hist-mes">
-                  <option value="">Todos</option>
-                  <option value="01">Janeiro</option>
-                  <option value="02">Fevereiro</option>
-                  <option value="03">Março</option>
-                  <option value="04">Abril</option>
-                  <option value="05">Maio</option>
-                  <option value="06">Junho</option>
-                  <option value="07">Julho</option>
-                  <option value="08">Agosto</option>
-                  <option value="09">Setembro</option>
-                  <option value="10">Outubro</option>
-                  <option value="11">Novembro</option>
-                  <option value="12">Dezembro</option>
-                </select>
-              </div>
-              <div class="filter-group">
-                <label for="cartao-hist-ano">Ano</label>
-                <select id="cartao-hist-ano"></select>
-              </div>
+              <h2>Cartões Recentes</h2>
             </div>
           </div>
           <div class="table-responsive">
-            <table class="styled-table" id="table-cartao-historico">
+            <table class="styled-table" id="table-historico-recente">
               <thead>
                 <tr>
                   <th>Data</th>
@@ -1170,7 +1139,7 @@
                   <th class="text-right">Ação</th>
                 </tr>
               </thead>
-              <tbody id="table-cartao-historico-body"></tbody>
+              <tbody id="table-historico-recente-body"></tbody>
             </table>
           </div>
         </div>
@@ -1232,11 +1201,15 @@
                   <option value="">Selecione...</option>
                 </select>
               </div>
-              <div class="form-group">
+              <div class="form-group" id="cartao-sobreaviso-grupo">
                 <label for="cartao-sobreaviso">Oficial de Sobreaviso</label>
                 <select id="cartao-sobreaviso">
                   <option value="">Selecione...</option>
                 </select>
+              </div>
+              <div class="form-group cartao-sobreaviso-print-only" id="cartao-sobreaviso-print">
+                <label id="cartao-sobreaviso-print-label">Sobreaviso</label>
+                <span id="cartao-sobreaviso-print-valor"></span>
               </div>
             </div>
           </div>

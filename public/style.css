@@ -1875,6 +1875,10 @@ button, input, select, textarea {
 
 .cartao-header-fields .form-group { min-width: 220px; }
 
+/* Só aparece na impressão — ver rótulo/valor dinâmicos calculados em app.js
+   (atualizarCampoSobreavisoPrint) conforme o Fiscal de Operações é Praça ou Oficial. */
+.cartao-sobreaviso-print-only { display: none; }
+
 .cartao-vtr-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -2201,6 +2205,10 @@ button, input, select, textarea {
   }
 
   .cartao-header-fields label { color: #444 !important; }
+
+  #cartao-sobreaviso-grupo { display: none !important; }
+  .cartao-sobreaviso-print-only { display: flex !important; }
+  .cartao-sobreaviso-print-only span { font-weight: 600; }
 
   .badge { border: 1px solid #333; background: #fff !important; color: #000 !important; }
 

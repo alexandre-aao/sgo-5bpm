@@ -293,11 +293,6 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-reset').addEventListener('click', fecharModalReset);
   document.getElementById('form-reset-senha').addEventListener('submit', handleResetarSenha);
 
-  // Botão Sincronizar manual
-  document.getElementById('btn-refresh').addEventListener('click', () => {
-    fetchData();
-    showToast('Dados sincronizados com o servidor.', 'success');
-  });
 
   // Navegação do Calendário
   document.getElementById('btn-prev-month').addEventListener('click', () => {
@@ -462,15 +457,6 @@ function setupEventListeners() {
   });
   document.getElementById('btn-excluir-cartao').addEventListener('click', handleExcluirCartao);
 
-  // Histórico navegável de Cartões Programa
-  document.getElementById('btn-toggle-historico').addEventListener('click', () => {
-    const painel = document.getElementById('cartao-historico-panel');
-    painel.classList.toggle('hidden');
-    if (!painel.classList.contains('hidden')) renderHistoricoCartoes();
-  });
-  document.getElementById('cartao-hist-mes').addEventListener('change', renderHistoricoCartoes);
-  document.getElementById('cartao-hist-ano').addEventListener('change', renderHistoricoCartoes);
-
   // Templates de Cartão Programa (P3)
   document.getElementById('btn-toggle-templates').addEventListener('click', () => {
     const painel = document.getElementById('cartao-templates-panel');
@@ -487,9 +473,15 @@ function setupEventListeners() {
   document.getElementById('form-novo-template').addEventListener('submit', handleCriarTemplate);
   document.getElementById('btn-buscar-template').addEventListener('click', handleBuscarTemplateSugerido);
   document.getElementById('form-cartao-vtr').addEventListener('submit', handleAddCartaoVtr);
-  document.getElementById('cartao-fiscal').addEventListener('change', handleSalvarCabecalhoCartao);
+  document.getElementById('cartao-fiscal').addEventListener('change', () => {
+    atualizarCampoSobreavisoPrint();
+    handleSalvarCabecalhoCartao();
+  });
   document.getElementById('cartao-adjunto').addEventListener('change', handleSalvarCabecalhoCartao);
-  document.getElementById('cartao-sobreaviso').addEventListener('change', handleSalvarCabecalhoCartao);
+  document.getElementById('cartao-sobreaviso').addEventListener('change', () => {
+    atualizarCampoSobreavisoPrint();
+    handleSalvarCabecalhoCartao();
+  });
 
   // Modal de Edição de Viatura do Cartão Programa
   const fecharModalEditarVtr = () => document.getElementById('modal-editar-vtr').classList.add('hidden');
@@ -505,7 +497,7 @@ function initPeriodFilters() {
   const mesAtual = String(agora.getMonth() + 1).padStart(2, '0');
   const anoAtual = agora.getFullYear();
 
-  ['filter-ano', 'plan-filter-ano', 'stats-filter-ano', 'cartao-hist-ano'].forEach(id => {
+  ['filter-ano', 'plan-filter-ano', 'stats-filter-ano'].forEach(id => {
     const sel = document.getElementById(id);
     sel.innerHTML = '';
     for (let ano = anoAtual - 1; ano <= anoAtual + 2; ano++) {
@@ -2750,14 +2742,14 @@ async function renderCartaoTab() {
       conteudoEl.classList.add('hidden');
       atualizarSugestaoTemplateUI();
       lucide.createIcons();
-      refreshHistoricoSeVisivel();
+      renderHistoricoRecente();
       return;
     }
 
     const resDetalhe = await apiFetch(`${API_BASE_URL}/api/cartoes/${lista[0].id}`);
     const cartao = await resDetalhe.json();
     exibirCartaoNoEditor(cartao);
-    refreshHistoricoSeVisivel();
+    renderHistoricoRecente();
   } catch (error) {
     console.error("Erro ao carregar Cartão Programa:", error);
     showToast('Falha ao carregar o Cartão Programa.', 'danger');
@@ -2804,12 +2796,34 @@ function exibirCartaoNoEditor(cartao) {
     popularSelectPessoal('cartao-adjunto', 'Adjunto', cartao.adjunto);
     popularSelectPessoal('cartao-sobreaviso', 'Oficial de Sobreaviso', cartao.oficial_sobreaviso);
     if (headerFieldsEl) headerFieldsEl.classList.remove('hidden');
+    atualizarCampoSobreavisoPrint();
   }
 
   renderCartaoVtrGrid();
   renderQuadroResumo();
   renderAlertasCartao();
   lucide.createIcons();
+}
+
+// Na impressão, o campo "Oficial de Sobreaviso" vira um único rótulo dinâmico: se o Fiscal do
+// dia já é Oficial, imprime "Oficial de Serviço: [fiscal]" (o sobreaviso é redundante); se o
+// Fiscal é Praça, imprime "Sobreaviso: [oficial de sobreaviso]" normalmente.
+function atualizarCampoSobreavisoPrint() {
+  const labelEl = document.getElementById('cartao-sobreaviso-print-label');
+  const valorEl = document.getElementById('cartao-sobreaviso-print-valor');
+  if (!labelEl || !valorEl) return;
+
+  const fiscalNome = document.getElementById('cartao-fiscal').value;
+  const sobreavisoNome = document.getElementById('cartao-sobreaviso').value;
+  const fiscalPessoa = (state.pessoal || []).find(p => p.nome === fiscalNome);
+
+  if (fiscalPessoa && fiscalPessoa.tipo === 'Oficial') {
+    labelEl.textContent = 'Oficial de Serviço';
+    valorEl.textContent = fiscalNome || '-';
+  } else {
+    labelEl.textContent = 'Sobreaviso';
+    valorEl.textContent = sobreavisoNome || '-';
+  }
 }
 
 // Atualiza o badge Dia Útil / Fim de Semana e limpa o resultado da busca de template anterior
@@ -3010,24 +3024,17 @@ async function handleCriarTemplate(e) {
   }
 }
 
-// Atualiza a lista de histórico apenas se o painel estiver aberto (evita chamadas desnecessárias)
-function refreshHistoricoSeVisivel() {
-  const painel = document.getElementById('cartao-historico-panel');
-  if (painel && !painel.classList.contains('hidden')) renderHistoricoCartoes();
-}
-
-// Lista os cartões já lançados no período selecionado, com atalho para abrir cada um
-async function renderHistoricoCartoes() {
-  const mes = document.getElementById('cartao-hist-mes').value;
-  const ano = document.getElementById('cartao-hist-ano').value;
-  const tbody = document.getElementById('table-cartao-historico-body');
+// Lista os 5 cartões mais recentes anteriores à data selecionada (ou, se nenhuma data
+// estiver selecionada, os 5 mais recentes no geral), com atalho para abrir cada um.
+// Não há filtro/paginação aqui de propósito — datas mais antigas continuam acessíveis
+// pelo seletor de data no topo da tela.
+async function renderHistoricoRecente() {
+  const tbody = document.getElementById('table-historico-recente-body');
+  if (!tbody) return;
+  const dataSelecionada = document.getElementById('cartao-data').value;
 
   try {
-    const params = new URLSearchParams();
-    if (ano) params.set('ano', ano);
-    if (mes) params.set('mes', mes);
-
-    const res = await apiFetch(`${API_BASE_URL}/api/cartoes?${params.toString()}`);
+    const res = await apiFetch(`${API_BASE_URL}/api/cartoes`);
     const lista = await res.json();
 
     if (!res.ok) {
@@ -3035,18 +3042,17 @@ async function renderHistoricoCartoes() {
       return;
     }
 
-    if (lista.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhum Cartão Programa lançado neste período.</td></tr>`;
+    const recentes = (dataSelecionada ? lista.filter(c => c.data < dataSelecionada) : lista).slice(0, 5);
+
+    if (recentes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhum Cartão Programa anterior lançado.</td></tr>`;
       return;
     }
 
-    const dataAtual = document.getElementById('cartao-data').value;
-
-    tbody.innerHTML = lista.map(c => {
+    tbody.innerHTML = recentes.map(c => {
       const dataBr = c.data.split('-').reverse().join('/');
-      const ehAtual = c.data === dataAtual;
       return `
-        <tr class="${ehAtual ? 'historico-row-atual' : ''}">
+        <tr>
           <td><strong>${dataBr}</strong></td>
           <td>${esc(c.fiscal) || '-'}</td>
           <td>${esc(c.adjunto) || '-'}</td>

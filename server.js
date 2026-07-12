@@ -155,6 +155,21 @@ async function writeDB(db, tabelas = TABELAS_E_CONFIG) {
   }
 }
 
+// Grava/exclui uma única linha, sem o upsert+diff da tabela inteira que writeDB faz.
+// Usado nas tabelas de maior escrita concorrente (cartoes, escalas, eventos) para reduzir
+// a janela de "lost update" entre duas requisições simultâneas na mesma tabela.
+async function writeRow(tabela, row) {
+  const chave = chavePrimariaDe(tabela);
+  const { error } = await supabase.from(tabela).upsert(row, { onConflict: chave });
+  if (error) throw new Error(`Falha ao gravar "${tabela}" no Supabase: ${error.message}`);
+}
+
+async function deleteRow(tabela, id) {
+  const chave = chavePrimariaDe(tabela);
+  const { error } = await supabase.from(tabela).delete().eq(chave, id);
+  if (error) throw new Error(`Falha ao apagar "${tabela}" no Supabase: ${error.message}`);
+}
+
 // Consultas pontuais para o caminho mais quente (autenticação em toda requisição),
 // evitando pagar o custo de um readDB() completo a cada chamada autenticada.
 async function buscarSessaoPorToken(token) {
@@ -279,6 +294,10 @@ function verificarSenha(senha, armazenada) {
       ]);
       console.log('Coordenadas de bairros (Zona Sul de Natal) semeadas no Supabase.');
     }
+
+    // Limpa sessões expiradas de qualquer usuário — antes só as do próprio usuário eram
+    // removidas, e só no momento do login dele; sessões velhas de outras contas ficavam para sempre.
+    await supabase.from('sessoes').delete().lt('expira', Date.now());
   } catch (err) {
     console.error('Falha na inicialização (seed) do Supabase:', err.message);
   }
@@ -598,7 +617,7 @@ app.post('/api/eventos', exigirP3, asyncRoute(async (req, res) => {
   };
 
   db.eventos.push(novoEvento);
-  await writeDB(db, ['eventos']);
+  await writeRow('eventos', novoEvento);
   res.status(201).json(novoEvento);
 }));
 
@@ -613,18 +632,18 @@ app.put('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
 
   const eventoAtualizado = { ...db.eventos[index], ...req.body };
   db.eventos[index] = eventoAtualizado;
-  await writeDB(db, ['eventos']);
+  await writeRow('eventos', eventoAtualizado);
   res.json(eventoAtualizado);
 }));
 
-// Excluir evento
+// Excluir evento (e alocações/escalas órfãs, apagadas diretamente por evento_id em vez de
+// reescrever as tabelas inteiras)
 app.delete('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  db.eventos = db.eventos.filter(e => e.id !== req.params.id);
-  // Remove alocações e escalas órfãs
-  db.alocacoes = db.alocacoes.filter(a => a.evento_id !== req.params.id);
-  db.escalas = db.escalas.filter(s => s.evento_id !== req.params.id);
-  await writeDB(db, ['eventos','alocacoes','escalas']);
+  await deleteRow('eventos', req.params.id);
+  const { error: erroAlocacoes } = await supabase.from('alocacoes').delete().eq('evento_id', req.params.id);
+  if (erroAlocacoes) throw new Error(`Falha ao limpar "alocacoes" no Supabase: ${erroAlocacoes.message}`);
+  const { error: erroEscalas } = await supabase.from('escalas').delete().eq('evento_id', req.params.id);
+  if (erroEscalas) throw new Error(`Falha ao limpar "escalas" no Supabase: ${erroEscalas.message}`);
   res.json({ message: 'Evento e registros relacionados excluídos' });
 }));
 
@@ -701,7 +720,7 @@ app.post('/api/escalas', exigirP3, asyncRoute(async (req, res) => {
   };
 
   db.escalas.push(novaEscala);
-  await writeDB(db, ['escalas']);
+  await writeRow('escalas', novaEscala);
   res.status(201).json(novaEscala);
 }));
 
@@ -725,15 +744,13 @@ app.put('/api/escalas/:id', exigirP3, asyncRoute(async (req, res) => {
     total_diarias: total_diarias
   };
 
-  await writeDB(db, ['escalas']);
+  await writeRow('escalas', db.escalas[index]);
   res.json(db.escalas[index]);
 }));
 
 // Remover militar da escala
 app.delete('/api/escalas/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  db.escalas = db.escalas.filter(s => s.id !== req.params.id);
-  await writeDB(db, ['escalas']);
+  await deleteRow('escalas', req.params.id);
   res.json({ message: 'Militar removido da escala' });
 }));
 
@@ -1475,7 +1492,7 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
       viaturas: []
     };
     db.cartoes.push(novoTemplate);
-    await writeDB(db, ['cartoes']);
+    await writeRow('cartoes', novoTemplate);
     return res.status(201).json(novoTemplate);
   }
 
@@ -1531,7 +1548,7 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
   }
 
   db.cartoes.push(novoCartao);
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', novoCartao);
   res.status(201).json(novoCartao);
 }));
 
@@ -1581,7 +1598,7 @@ app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
   };
 
   db.cartoes.push(novoCartao);
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', novoCartao);
   res.status(201).json(novoCartao);
 }));
 
@@ -1595,19 +1612,13 @@ app.put('/api/cartoes/:id', asyncRoute(async (req, res) => {
   if (req.body.adjunto !== undefined) cartao.adjunto = req.body.adjunto;
   if (req.body.oficial_sobreaviso !== undefined) cartao.oficial_sobreaviso = req.body.oficial_sobreaviso;
 
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', cartao);
   res.json(cartao);
 }));
 
-// Excluir cartão (templates só podem ser excluídos pelo P3)
-app.delete('/api/cartoes/:id', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
-  if (cartao && cartao.is_template && (!req.user || req.user.role !== 'P3')) {
-    return res.status(403).json({ error: 'Apenas o perfil P3 tem permissão para excluir templates.' });
-  }
-  db.cartoes = (db.cartoes || []).filter(c => c.id !== req.params.id);
-  await writeDB(db, ['cartoes']);
+// Excluir cartão — só o P3 pode excluir, seja template ou o roteiro operacional de um dia
+app.delete('/api/cartoes/:id', exigirP3, asyncRoute(async (req, res) => {
+  await deleteRow('cartoes', req.params.id);
   res.json({ message: 'Cartão Programa excluído' });
 }));
 
@@ -1640,7 +1651,7 @@ app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
   };
 
   cartao.viaturas.push(novaViatura);
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', cartao);
   res.status(201).json(novaViatura);
 }));
 
@@ -1664,7 +1675,7 @@ app.put('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
     if (req.body[campo] !== undefined) viatura[campo] = req.body[campo];
   });
 
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', cartao);
   res.json(viatura);
 }));
 
@@ -1675,7 +1686,7 @@ app.delete('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
 
   cartao.viaturas = cartao.viaturas.filter(v => v.id !== req.params.vid);
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', cartao);
   res.json({ message: 'Viatura removida do cartão' });
 }));
 
@@ -1702,7 +1713,7 @@ app.post('/api/cartoes/:id/viaturas/:vid/itens', asyncRoute(async (req, res) => 
 
   viatura.itens.push(novoItem);
   viatura.itens = ordenarPorTurno(viatura.itens);
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', cartao);
   res.status(201).json(novoItem);
 }));
 
@@ -1723,7 +1734,7 @@ app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res)
   });
 
   viatura.itens = ordenarPorTurno(viatura.itens);
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', cartao);
   res.json(item);
 }));
 
@@ -1737,7 +1748,7 @@ app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, r
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
 
   viatura.itens = viatura.itens.filter(i => i.id !== req.params.iid);
-  await writeDB(db, ['cartoes']);
+  await writeRow('cartoes', cartao);
   res.json({ message: 'Item de roteiro removido' });
 }));
 
