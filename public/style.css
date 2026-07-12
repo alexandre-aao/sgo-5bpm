@@ -514,6 +514,10 @@ button, input, select, textarea {
 .badge.tipo-praca { background-color: var(--info); color: #fff; }
 .badge.tipo-oficial { background-color: #8b5cf6; color: #fff; }
 
+/* Badges de status (Cadastro de Viaturas) */
+.badge.status-ativa { background-color: var(--success); color: #fff; }
+.badge.status-manutencao { background-color: var(--warning); color: #000; }
+
 /* -------------------------------------------------------------
    PAINÉIS COM GLASSMORPHISM
    ------------------------------------------------------------- */

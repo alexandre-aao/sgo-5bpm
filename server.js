@@ -102,7 +102,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // concorrência. `autenticar` e `/api/login`, que rodam a cada requisição, usam
 // consultas pontuais em vez desse shim, por serem o caminho mais quente.
 const CHAVE_PRIMARIA = { usuarios: 'usuario', sessoes: 'token' };
-const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'alocacoes', 'escalas', 'cartoes', 'missoes_planejadas'];
+const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'alocacoes', 'escalas', 'cartoes', 'missoes_planejadas', 'viaturas'];
 const TABELAS_E_CONFIG = [...TABELAS, 'config'];
 
 function chavePrimariaDe(tabela) {
@@ -216,6 +216,7 @@ function getLocalDateStrServer(date = new Date()) {
 // Categorias válidas para viaturas do Cartão Programa
 const CATEGORIAS_VIATURA = ['Ordinária', 'Força Tática', 'Suplementar'];
 const COMPANHIAS_VALIDAS = ['1ª Companhia', '2ª Companhia', '3ª Companhia'];
+const STATUS_VIATURA = ['Ativa', 'Manutenção'];
 
 // Hierarquia da PMRN: cada posto/graduação já vem classificado como Praça ou Oficial —
 // usado para decidir automaticamente quando o Oficial de Sobreaviso é necessário no Cartão Programa
@@ -234,7 +235,7 @@ const POSTOS_GRADUACAO = [
   { posto: 'Tenente-Coronel PM', tipo: 'Oficial' },
   { posto: 'Coronel PM', tipo: 'Oficial' }
 ];
-const CATEGORIAS_PESSOAL = ['Adjunto', 'Fiscal de Operações', 'Oficial de Operações', 'Oficial de Sobreaviso'];
+const CATEGORIAS_PESSOAL = ['Adjunto', 'Fiscal de Operações', 'Oficial de Operações', 'Oficial de Sobreaviso', 'Executor'];
 
 // -------------------------------------------------------------
 // SEGURANÇA: HASH DE SENHAS (scrypt) E SESSÕES COM EXPIRAÇÃO
@@ -817,6 +818,94 @@ app.delete('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res)
 }));
 
 // -------------------------------------------------------------
+// ROTAS DE CADASTRO DE VIATURAS (ALIMENTA O AUTOCOMPLETE DE PREFIXO NO CARTÃO PROGRAMA —
+// que continua aceitando texto livre para reservas rotativas não cadastradas aqui)
+// -------------------------------------------------------------
+app.get('/api/viaturas', asyncRoute(async (req, res) => {
+  const db = await readDB();
+  res.json((db.viaturas || []).sort((a, b) => a.prefixo.localeCompare(b.prefixo)));
+}));
+
+// Criar viatura (P3)
+app.post('/api/viaturas', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+
+  const { prefixo, companhia, categoria, status, observacao } = req.body;
+  if (!prefixo) {
+    return res.status(400).json({ error: 'O prefixo da viatura é obrigatório.' });
+  }
+  if (companhia && !COMPANHIAS_VALIDAS.includes(companhia)) {
+    return res.status(400).json({ error: 'Companhia inválida.' });
+  }
+  if (categoria && !CATEGORIAS_VIATURA.includes(categoria)) {
+    return res.status(400).json({ error: 'Categoria de viatura inválida.' });
+  }
+  if (status && !STATUS_VIATURA.includes(status)) {
+    return res.status(400).json({ error: 'Status de viatura inválido.' });
+  }
+  if (db.viaturas.some(v => normalizarTextoServer(v.prefixo) === normalizarTextoServer(prefixo))) {
+    return res.status(409).json({ error: 'Já existe uma viatura cadastrada com esse prefixo.' });
+  }
+
+  const novaViatura = {
+    id: generateId('vtr'),
+    prefixo: String(prefixo).trim(),
+    companhia: companhia || '',
+    categoria: categoria || 'Ordinária',
+    status: status || 'Ativa',
+    observacao: observacao || ''
+  };
+  db.viaturas.push(novaViatura);
+  await writeDB(db, ['viaturas']);
+  res.status(201).json(novaViatura);
+}));
+
+// Atualizar viatura (P3)
+app.put('/api/viaturas/:id', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  const viatura = db.viaturas.find(v => v.id === req.params.id);
+  if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada.' });
+
+  if (req.body.prefixo !== undefined) {
+    if (!req.body.prefixo) return res.status(400).json({ error: 'O prefixo da viatura é obrigatório.' });
+    if (db.viaturas.some(v => v.id !== viatura.id && normalizarTextoServer(v.prefixo) === normalizarTextoServer(req.body.prefixo))) {
+      return res.status(409).json({ error: 'Já existe uma viatura cadastrada com esse prefixo.' });
+    }
+    viatura.prefixo = String(req.body.prefixo).trim();
+  }
+  if (req.body.companhia !== undefined) {
+    if (req.body.companhia && !COMPANHIAS_VALIDAS.includes(req.body.companhia)) {
+      return res.status(400).json({ error: 'Companhia inválida.' });
+    }
+    viatura.companhia = req.body.companhia || '';
+  }
+  if (req.body.categoria !== undefined) {
+    if (!CATEGORIAS_VIATURA.includes(req.body.categoria)) {
+      return res.status(400).json({ error: 'Categoria de viatura inválida.' });
+    }
+    viatura.categoria = req.body.categoria;
+  }
+  if (req.body.status !== undefined) {
+    if (!STATUS_VIATURA.includes(req.body.status)) {
+      return res.status(400).json({ error: 'Status de viatura inválido.' });
+    }
+    viatura.status = req.body.status;
+  }
+  if (req.body.observacao !== undefined) viatura.observacao = req.body.observacao;
+
+  await writeDB(db, ['viaturas']);
+  res.json(viatura);
+}));
+
+// Excluir viatura (P3)
+app.delete('/api/viaturas/:id', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  db.viaturas = (db.viaturas || []).filter(v => v.id !== req.params.id);
+  await writeDB(db, ['viaturas']);
+  res.json({ message: 'Viatura excluída.' });
+}));
+
+// -------------------------------------------------------------
 // ROTAS DE CONFIGURAÇÃO (COTA MENSAL DE DIÁRIAS)
 // -------------------------------------------------------------
 app.get('/api/config', asyncRoute(async (req, res) => {
@@ -1008,7 +1097,11 @@ app.post('/api/missoes-planejadas/:id/converter', exigirP3, asyncRoute(async (re
 
   db.eventos.push(novoEvento);
   missao.convertida_em_evento_id = novoEvento.id;
-  await writeDB(db, ['eventos', 'missoes_planejadas']);
+  // Grava eventos primeiro e só depois missoes_planejadas: writeDB grava as tabelas passadas em
+  // paralelo, e convertida_em_evento_id tem FK para eventos(id) — gravar junto na mesma chamada
+  // corria a condição de gravar a missão antes do evento existir, violando a constraint.
+  await writeDB(db, ['eventos']);
+  await writeDB(db, ['missoes_planejadas']);
   res.status(201).json(novoEvento);
 }));
 

@@ -117,6 +117,7 @@ function applyRolePermissions(user) {
   const btnEstatisticas = document.getElementById('nav-btn-estatisticas');
   const btnUsuarios = document.getElementById('nav-btn-usuarios');
   const btnPessoal = document.getElementById('nav-btn-pessoal');
+  const btnViaturas = document.getElementById('nav-btn-viaturas');
   const btnTurno = document.getElementById('nav-btn-turno');
   const btnEventos = document.getElementById('nav-btn-eventos');
 
@@ -134,6 +135,7 @@ function applyRolePermissions(user) {
     btnEstatisticas.classList.remove('hidden-role');
     btnUsuarios.classList.remove('hidden-role');
     btnPessoal.classList.remove('hidden-role');
+    btnViaturas.classList.remove('hidden-role');
     btnTurno.classList.add('hidden-role'); // P3 foca no Dashboard Geral
     secoesSomenteP3.forEach(el => el.classList.remove('hidden-role'));
 
@@ -151,6 +153,7 @@ function applyRolePermissions(user) {
     btnEstatisticas.classList.add('hidden-role');
     btnUsuarios.classList.add('hidden-role');
     btnPessoal.classList.add('hidden-role');
+    btnViaturas.classList.add('hidden-role');
     btnTurno.classList.remove('hidden-role');
     secoesSomenteP3.forEach(el => el.classList.add('hidden-role'));
 
@@ -182,7 +185,8 @@ function setupNavigation() {
     'tab-estatisticas': { title: 'Painel Analítico de Policiamento', subtitle: 'Cruzamento de dados históricos para apoiar o planejamento de efetivo e recursos.' },
     'tab-cartao': { title: 'Cartão Programa', subtitle: 'Roteiro diário de patrulhamento das viaturas: locais, horários e atividades.' },
     'tab-usuarios': { title: 'Usuários do Sistema', subtitle: 'Gestão de perfis de acesso e redefinição de senhas.' },
-    'tab-pessoal': { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' }
+    'tab-pessoal': { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' },
+    'tab-viaturas': { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' }
   };
 
   navButtons.forEach(btn => {
@@ -221,6 +225,8 @@ function setupNavigation() {
         renderUsuariosTab();
       } else if (targetId === 'tab-pessoal') {
         renderPessoalTab();
+      } else if (targetId === 'tab-viaturas') {
+        renderViaturasTab();
       }
     });
   });
@@ -267,6 +273,21 @@ function setupEventListeners() {
       btn.classList.add('active');
       pessoalFiltroCategoria = btn.getAttribute('data-categoria');
       renderPessoalTab();
+    });
+  });
+
+  // Cadastro de Viaturas (P3)
+  document.getElementById('btn-nova-viatura').addEventListener('click', () => abrirModalViatura());
+  const fecharModalViatura = () => document.getElementById('modal-viatura').classList.add('hidden');
+  document.getElementById('btn-fechar-modal-viatura').addEventListener('click', fecharModalViatura);
+  document.getElementById('btn-cancelar-modal-viatura').addEventListener('click', fecharModalViatura);
+  document.getElementById('form-viatura').addEventListener('submit', handleSalvarViatura);
+  document.querySelectorAll('.viaturas-filtro-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.viaturas-filtro-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      viaturasFiltroStatus = btn.getAttribute('data-status');
+      renderViaturasTab();
     });
   });
 
@@ -637,6 +658,11 @@ async function fetchData() {
     // Cadastro de Pessoal em memória — alimenta os seletores de Fiscal/Adjunto/Sobreaviso do Cartão Programa
     const resPessoal = await apiFetch(`${API_BASE_URL}/api/pessoal`);
     state.pessoal = await resPessoal.json();
+
+    // Cadastro de Viaturas em memória — alimenta a sugestão de prefixo no Cartão Programa
+    const resViaturas = await apiFetch(`${API_BASE_URL}/api/viaturas`);
+    state.viaturas = await resViaturas.json();
+    popularDatalistViaturas();
 
     // Cadastro de Bairros — alimenta o select de Bairro em Novo Evento
     popularSelectBairros();
@@ -2564,6 +2590,11 @@ function categoriaBadgeClass(categoria) {
   return `cat-${slug}`;
 }
 
+function statusViaturaBadgeClass(status) {
+  const slug = (status || 'Ativa').toLowerCase().replace(/ /g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return `status-${slug}`;
+}
+
 function formatHoraCartao(hora) {
   if (!hora) return '';
   return hora.replace(':', 'h');
@@ -3777,6 +3808,157 @@ window.handleExcluirPessoa = async function(id) {
     showToast('Falha na comunicação com o servidor.', 'danger');
   }
 };
+
+// -------------------------------------------------------------
+// CADASTRO DE VIATURAS (P3) — registro central que alimenta a sugestão de prefixo
+// no Cartão Programa; o campo de prefixo lá continua aceitando texto livre.
+// -------------------------------------------------------------
+let viaturaEmEdicao = null; // id da viatura sendo editada (null = criando nova)
+let viaturasFiltroStatus = ''; // status selecionado no filtro ('' = Todas)
+let viaturasListaAtual = []; // última lista carregada na tela, usada para abrir o modal de edição pelo id
+
+async function renderViaturasTab() {
+  const tableBody = document.getElementById('table-viaturas-body');
+  tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">Carregando...</td></tr>`;
+
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/viaturas`);
+    let viaturas = await res.json();
+
+    if (!res.ok) {
+      tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:24px;">${esc(viaturas.error) || 'Falha ao carregar o cadastro de viaturas.'}</td></tr>`;
+      return;
+    }
+
+    // Mantém a lista completa em memória (sem filtro) para alimentar o datalist do Cartão Programa
+    state.viaturas = viaturas;
+    popularDatalistViaturas();
+
+    if (viaturasFiltroStatus) viaturas = viaturas.filter(v => v.status === viaturasFiltroStatus);
+    viaturasListaAtual = viaturas;
+
+    if (viaturas.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhuma viatura cadastrada${viaturasFiltroStatus ? ' com este status' : ''}.</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = viaturas.map(v => `
+      <tr>
+        <td><strong>${esc(v.prefixo)}</strong></td>
+        <td>${esc(v.companhia) || '-'}</td>
+        <td>${esc(v.categoria)}</td>
+        <td><span class="badge ${statusViaturaBadgeClass(v.status)}">${esc(v.status)}</span></td>
+        <td>${esc(v.observacao) || '-'}</td>
+        <td class="text-right">
+          <div style="display:flex;gap:6px;justify-content:flex-end;">
+            <button class="btn-icon btn-sm" title="Editar" onclick="abrirModalViatura('${v.id}')">
+              <i data-lucide="pencil" style="width:14px;height:14px;"></i>
+            </button>
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" onclick="handleExcluirViatura('${v.id}')">
+              <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    lucide.createIcons();
+  } catch (error) {
+    console.error('Erro ao carregar o cadastro de viaturas:', error);
+    tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:24px;">Falha ao carregar o cadastro de viaturas.</td></tr>`;
+  }
+}
+
+// Abre o modal para criar (sem argumentos) ou editar (passando o id, buscado na última lista carregada) uma viatura
+window.abrirModalViatura = function(id) {
+  const viatura = id ? viaturasListaAtual.find(v => v.id === id) : null;
+  viaturaEmEdicao = viatura ? viatura.id : null;
+
+  const titulo = document.getElementById('modal-viatura-titulo');
+  document.getElementById('form-viatura').reset();
+
+  if (viatura) {
+    titulo.innerHTML = `<i data-lucide="pencil"></i> Editar Viatura`;
+    document.getElementById('vtrcad-prefixo').value = viatura.prefixo;
+    document.getElementById('vtrcad-companhia').value = viatura.companhia || '';
+    document.getElementById('vtrcad-categoria').value = viatura.categoria;
+    document.getElementById('vtrcad-status').value = viatura.status;
+    document.getElementById('vtrcad-observacao').value = viatura.observacao || '';
+  } else {
+    titulo.innerHTML = `<i data-lucide="plus"></i> Nova Viatura`;
+  }
+
+  document.getElementById('modal-viatura').classList.remove('hidden');
+  lucide.createIcons();
+};
+
+async function handleSalvarViatura(e) {
+  e.preventDefault();
+
+  const payload = {
+    prefixo: document.getElementById('vtrcad-prefixo').value.trim(),
+    companhia: document.getElementById('vtrcad-companhia').value,
+    categoria: document.getElementById('vtrcad-categoria').value,
+    status: document.getElementById('vtrcad-status').value,
+    observacao: document.getElementById('vtrcad-observacao').value.trim()
+  };
+
+  try {
+    let res;
+    if (viaturaEmEdicao) {
+      res = await apiFetch(`${API_BASE_URL}/api/viaturas/${viaturaEmEdicao}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      res = await apiFetch(`${API_BASE_URL}/api/viaturas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const dados = await res.json();
+
+    if (res.ok) {
+      document.getElementById('modal-viatura').classList.add('hidden');
+      showToast(viaturaEmEdicao ? 'Viatura atualizada com sucesso.' : 'Viatura cadastrada com sucesso.', 'success');
+      renderViaturasTab();
+    } else {
+      showToast(esc(dados.error) || 'Falha ao salvar a viatura.', 'danger');
+    }
+  } catch (error) {
+    console.error('Erro ao salvar cadastro de viatura:', error);
+    showToast('Falha na comunicação com o servidor.', 'danger');
+  }
+}
+
+window.handleExcluirViatura = async function(id) {
+  if (!confirm('Excluir permanentemente esta viatura do cadastro?')) return;
+
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/viaturas/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast('Viatura excluída.', 'info');
+      renderViaturasTab();
+    } else {
+      const dados = await res.json();
+      showToast(esc(dados.error) || 'Falha ao excluir a viatura.', 'danger');
+    }
+  } catch (error) {
+    console.error('Erro ao excluir cadastro de viatura:', error);
+    showToast('Falha na comunicação com o servidor.', 'danger');
+  }
+};
+
+// Preenche o <datalist> de sugestão de prefixo usado nos campos de VTR do Cartão Programa
+// (a lista só sugere — o campo continua sendo texto livre, para reservas rotativas não cadastradas)
+function popularDatalistViaturas() {
+  const datalist = document.getElementById('lista-prefixos-viaturas');
+  if (!datalist) return;
+  datalist.innerHTML = (state.viaturas || []).map(v => `<option value="${esc(v.prefixo)}"></option>`).join('');
+}
 
 // -------------------------------------------------------------
 // SISTEMA DE TOAST NOTIFICATION

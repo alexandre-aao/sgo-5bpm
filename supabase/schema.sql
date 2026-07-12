@@ -101,6 +101,17 @@ create table if not exists pessoal (
   ativo boolean not null default true
 );
 
+-- Cadastro central de viaturas: alimenta o autocomplete de prefixo no Cartão Programa,
+-- mas o campo lá continua aceitando texto livre (reservas rotativas não são cadastradas).
+create table if not exists viaturas (
+  id text primary key,
+  prefixo text not null unique,
+  companhia text,
+  categoria text not null default 'Ordinária' check (categoria in ('Ordinária', 'Força Tática', 'Suplementar')),
+  status text not null default 'Ativa' check (status in ('Ativa', 'Manutenção')),
+  observacao text default ''
+);
+
 -- Cartão Programa: viaturas/itens ficam em JSONB (mesmo formato aninhado que já
 -- existia no db.json) em vez de tabelas filhas — reduz drasticamente a reescrita
 -- das rotas de sub-recurso (adicionar/editar/excluir viatura e item) sem perder
