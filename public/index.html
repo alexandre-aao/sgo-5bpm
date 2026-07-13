@@ -167,6 +167,14 @@
           <p id="tab-subtitle">Visão geral do policiamento e pautas do batalhão.</p>
         </div>
         <div class="header-actions">
+          <div class="filter-group tema-select-group">
+            <label for="tema-select" class="sr-only">Tema</label>
+            <select id="tema-select" aria-label="Tema de cor">
+              <option value="padrao">Padrão</option>
+              <option value="escuro">Escuro</option>
+              <option value="claro">Claro</option>
+            </select>
+          </div>
           <div class="profile">
             <div class="profile-avatar" id="avatar-display">P3</div>
           </div>
@@ -195,6 +203,7 @@
             <div class="stat-info">
               <h3>Eventos na Semana</h3>
               <p id="stat-eventos-semana">0</p>
+              <span class="stat-tendencia" id="stat-eventos-semana-tendencia"></span>
             </div>
           </div>
           <div class="stat-card">
@@ -204,6 +213,7 @@
             <div class="stat-info">
               <h3>Diárias no Mês / Cota</h3>
               <p id="stat-diarias-mes">0 / 0</p>
+              <span class="stat-tendencia" id="stat-diarias-mes-tendencia"></span>
             </div>
           </div>
           <div class="stat-card" id="stat-card-cartao-hoje" style="cursor:pointer;" onclick="handleIrParaCartaoHoje()" title="Ir para o Cartão Programa de hoje">
@@ -227,9 +237,9 @@
                 <h2>Calendário de Eventos</h2>
               </div>
               <div class="calendar-nav">
-                <button id="btn-prev-month" class="btn-icon"><i data-lucide="chevron-left"></i></button>
+                <button id="btn-prev-month" class="btn-icon" aria-label="Mês anterior" title="Mês anterior"><i data-lucide="chevron-left"></i></button>
                 <span id="calendar-month-year">Julho 2026</span>
-                <button id="btn-next-month" class="btn-icon"><i data-lucide="chevron-right"></i></button>
+                <button id="btn-next-month" class="btn-icon" aria-label="Próximo mês" title="Próximo mês"><i data-lucide="chevron-right"></i></button>
               </div>
             </div>
             <div class="calendar-container">
@@ -291,76 +301,81 @@
               </div>
             </div>
             <form id="form-evento" class="styled-form">
-              <div class="form-row">
-                <div class="form-group col-md-6">
-                  <label for="num_oficio">Número do Ofício</label>
-                  <input type="text" id="num_oficio" placeholder="Ex: Of. nº 123/2026-GAB/Prefeitura">
-                </div>
-                <div class="form-group col-md-6">
-                  <label for="tipo_evento">Tipo de Evento *</label>
-                  <select id="tipo_evento" required>
-                    <option value="" disabled selected>Selecione o tipo...</option>
-                    <option value="Show">Show</option>
-                    <option value="Futebol">Futebol</option>
-                    <option value="Ato Público">Ato Público</option>
-                    <option value="Religioso">Religioso</option>
-                    <option value="Cultural">Cultural</option>
-                    <option value="Missão Avulsa">Missão Avulsa</option>
-                    <option value="Outros">Outros</option>
-                  </select>
+              <div class="form-section">
+                <h3 class="form-section-title">Documentação</h3>
+                <div class="form-row">
+                  <div class="form-group col-md-4">
+                    <label for="num_oficio">Número do Ofício</label>
+                    <input type="text" id="num_oficio" placeholder="Ex: Of. nº 123/2026-GAB/Prefeitura">
+                  </div>
+                  <div class="form-group col-md-4">
+                    <label for="num_os_manual">Número da OS (se já conhecido)</label>
+                    <input type="text" id="num_os_manual" placeholder="Ex: OS Nº 045/2026 - P3/5º BPM">
+                  </div>
+                  <div class="form-group col-md-4">
+                    <label for="num_sei">Número SEI</label>
+                    <input type="text" id="num_sei" placeholder="Ex: 23100.000000/2026-00">
+                  </div>
                 </div>
               </div>
 
-              <div class="form-row">
-                <div class="form-group col-md-6">
-                  <label for="num_os_manual">Número da OS (se já conhecido)</label>
-                  <input type="text" id="num_os_manual" placeholder="Ex: OS Nº 045/2026 - P3/5º BPM">
-                </div>
-                <div class="form-group col-md-6">
-                  <label for="num_sei">Número SEI</label>
-                  <input type="text" id="num_sei" placeholder="Ex: 23100.000000/2026-00">
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group col-md-6">
-                  <label for="nome_evento">Nome do Evento *</label>
-                  <input type="text" id="nome_evento" placeholder="Ex: Carnaval de Rua / Bloco da Segurança" required>
-                </div>
-                <div class="form-group col-md-6">
-                  <label for="demandante">Demandante / Solicitante *</label>
-                  <input type="text" id="demandante" placeholder="Ex: Prefeitura Municipal, Paróquia de São Jorge" required>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group col-md-4">
-                  <label for="data_inicio">Data de Início *</label>
-                  <input type="date" id="data_inicio" required>
-                </div>
-                <div class="form-group col-md-4">
-                  <label for="data_termino">Data de Término</label>
-                  <input type="date" id="data_termino">
-                </div>
-                <div class="form-group col-md-4">
-                  <label for="horario_inicio">Horário de Início</label>
-                  <input type="time" id="horario_inicio">
+              <div class="form-section">
+                <h3 class="form-section-title">Identificação</h3>
+                <div class="form-row">
+                  <div class="form-group col-md-4">
+                    <label for="tipo_evento">Tipo de Evento *</label>
+                    <select id="tipo_evento" required>
+                      <option value="" disabled selected>Selecione o tipo...</option>
+                      <option value="Show">Show</option>
+                      <option value="Futebol">Futebol</option>
+                      <option value="Ato Público">Ato Público</option>
+                      <option value="Religioso">Religioso</option>
+                      <option value="Cultural">Cultural</option>
+                      <option value="Missão Avulsa">Missão Avulsa</option>
+                      <option value="Outros">Outros</option>
+                    </select>
+                  </div>
+                  <div class="form-group col-md-4">
+                    <label for="nome_evento">Nome do Evento *</label>
+                    <input type="text" id="nome_evento" placeholder="Ex: Carnaval de Rua / Bloco da Segurança" required>
+                  </div>
+                  <div class="form-group col-md-4">
+                    <label for="demandante">Demandante / Solicitante *</label>
+                    <input type="text" id="demandante" placeholder="Ex: Prefeitura Municipal, Paróquia de São Jorge" required>
+                  </div>
                 </div>
               </div>
 
-              <div class="form-row">
-                <div class="form-group col-md-8">
-                  <label for="local_itinerario">Local / Itinerário *</label>
-                  <input type="text" id="local_itinerario" placeholder="Ex: Avenida Principal, do número 10 ao 500" required>
+              <div class="form-section">
+                <h3 class="form-section-title">Quando e Onde</h3>
+                <div class="form-row">
+                  <div class="form-group col-md-4">
+                    <label for="data_inicio">Data de Início *</label>
+                    <input type="date" id="data_inicio" required>
+                  </div>
+                  <div class="form-group col-md-4">
+                    <label for="data_termino">Data de Término</label>
+                    <input type="date" id="data_termino">
+                  </div>
+                  <div class="form-group col-md-4">
+                    <label for="horario_inicio">Horário de Início</label>
+                    <input type="time" id="horario_inicio">
+                  </div>
                 </div>
-                <div class="form-group col-md-4">
-                  <label for="bairro">Bairro</label>
-                  <select id="bairro">
-                    <option value="">Selecione...</option>
-                    <!-- Injetado dinamicamente a partir do cadastro de bairros -->
-                    <option value="__outro__">Outro (não cadastrado)</option>
-                  </select>
-                  <input type="text" id="bairro_outro" class="hidden" placeholder="Digite o nome do bairro" style="margin-top:8px;">
+                <div class="form-row">
+                  <div class="form-group col-md-8">
+                    <label for="local_itinerario">Local / Itinerário *</label>
+                    <input type="text" id="local_itinerario" placeholder="Ex: Avenida Principal, do número 10 ao 500" required>
+                  </div>
+                  <div class="form-group col-md-4">
+                    <label for="bairro">Bairro</label>
+                    <select id="bairro">
+                      <option value="">Selecione...</option>
+                      <!-- Injetado dinamicamente a partir do cadastro de bairros -->
+                      <option value="__outro__">Outro (não cadastrado)</option>
+                    </select>
+                    <input type="text" id="bairro_outro" class="hidden" placeholder="Digite o nome do bairro" style="margin-top:8px;">
+                  </div>
                 </div>
               </div>
 
@@ -440,7 +455,7 @@
           </div>
 
           <div class="table-responsive">
-            <table class="styled-table" id="table-eventos">
+            <table class="styled-table table-cards-mobile" id="table-eventos">
               <thead>
                 <tr>
                   <th>Data</th>
@@ -588,7 +603,7 @@
           </div>
 
           <div class="table-responsive">
-            <table class="styled-table" id="table-relatorio">
+            <table class="styled-table table-cards-mobile" id="table-relatorio">
               <thead>
                 <tr>
                   <th>Matrícula</th>
@@ -646,9 +661,9 @@
               <h2>Calendário de Diárias</h2>
             </div>
             <div class="calendar-nav">
-              <button id="btn-prev-month-diarias" class="btn-icon"><i data-lucide="chevron-left"></i></button>
+              <button id="btn-prev-month-diarias" class="btn-icon" aria-label="Mês anterior" title="Mês anterior"><i data-lucide="chevron-left"></i></button>
               <span id="calendar-diarias-month-year">Julho 2026</span>
-              <button id="btn-next-month-diarias" class="btn-icon"><i data-lucide="chevron-right"></i></button>
+              <button id="btn-next-month-diarias" class="btn-icon" aria-label="Próximo mês" title="Próximo mês"><i data-lucide="chevron-right"></i></button>
             </div>
           </div>
           <div class="calendar-container">
@@ -798,6 +813,7 @@
             <div class="stat-info">
               <h3>Eventos no Ano</h3>
               <p id="stats-total-eventos">0</p>
+              <svg class="stat-sparkline" id="spark-stats-eventos" preserveAspectRatio="none"></svg>
             </div>
           </div>
           <div class="stat-card">
@@ -807,6 +823,7 @@
             <div class="stat-info">
               <h3>Efetivo Total Empregado</h3>
               <p id="stats-total-policiais">0</p>
+              <svg class="stat-sparkline" id="spark-stats-policiais" preserveAspectRatio="none"></svg>
             </div>
           </div>
           <div class="stat-card">
@@ -816,6 +833,7 @@
             <div class="stat-info">
               <h3>Viaturas Totais Empregadas</h3>
               <p id="stats-total-viaturas">0</p>
+              <svg class="stat-sparkline" id="spark-stats-viaturas" preserveAspectRatio="none"></svg>
             </div>
           </div>
           <div class="stat-card success">
@@ -825,6 +843,7 @@
             <div class="stat-info">
               <h3>Diárias Pagas no Ano</h3>
               <p id="stats-total-diarias">0</p>
+              <svg class="stat-sparkline" id="spark-stats-diarias" preserveAspectRatio="none"></svg>
             </div>
           </div>
         </div>
@@ -1087,18 +1106,28 @@
               <button id="btn-copiar-cartao" class="btn btn-secondary btn-sm">
                 <i data-lucide="copy"></i> Copiar do Dia Anterior
               </button>
-              <button id="btn-imprimir-cartao" class="btn btn-success btn-sm">
+              <button id="btn-imprimir-cartao" class="btn btn-secondary btn-sm">
                 <i data-lucide="printer"></i> Imprimir
               </button>
-              <button id="btn-excluir-cartao" class="btn btn-danger btn-sm">
-                <i data-lucide="trash-2"></i> Excluir
-              </button>
-              <button id="btn-toggle-templates" class="btn btn-secondary btn-sm admin-only">
-                <i data-lucide="layout-template"></i> Templates
-              </button>
-              <button id="btn-novo-template" class="btn btn-secondary btn-sm admin-only">
-                <i data-lucide="file-plus-2"></i> Novo Template
-              </button>
+              <div class="dropdown admin-only" id="cartao-overflow-dropdown">
+                <button type="button" class="btn-icon" id="btn-cartao-overflow-toggle"
+                        aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" title="Mais ações">
+                  <i data-lucide="more-horizontal"></i>
+                </button>
+                <div class="dropdown-menu hidden" id="cartao-overflow-menu">
+                  <button id="btn-toggle-templates" class="dropdown-item">
+                    <i data-lucide="layout-template"></i> Templates
+                  </button>
+                  <button id="btn-novo-template" class="dropdown-item">
+                    <i data-lucide="file-plus-2"></i> Novo Template
+                  </button>
+                </div>
+              </div>
+              <div class="cartao-toolbar-excluir">
+                <button id="btn-excluir-cartao" class="btn btn-danger btn-sm">
+                  <i data-lucide="trash-2"></i> Excluir
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1231,7 +1260,7 @@
               </div>
             </div>
             <div class="table-responsive">
-              <table class="styled-table" id="table-cartao-resumo">
+              <table class="styled-table table-cards-mobile" id="table-cartao-resumo">
                 <thead>
                   <tr>
                     <th>Companhia</th>
@@ -1485,7 +1514,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3 id="modal-usuario-titulo"><i data-lucide="user-plus"></i> Novo Usuário</h3>
-        <button class="btn-close" id="btn-fechar-modal-usuario">
+        <button class="btn-close" id="btn-fechar-modal-usuario" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1525,7 +1554,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3 id="modal-pessoa-titulo"><i data-lucide="user-plus"></i> Nova Pessoa</h3>
-        <button class="btn-close" id="btn-fechar-modal-pessoa">
+        <button class="btn-close" id="btn-fechar-modal-pessoa" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1581,7 +1610,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3 id="modal-viatura-titulo"><i data-lucide="plus"></i> Nova Viatura</h3>
-        <button class="btn-close" id="btn-fechar-modal-viatura">
+        <button class="btn-close" id="btn-fechar-modal-viatura" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1637,7 +1666,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3 id="confirmar-exclusao-titulo"><i data-lucide="alert-triangle"></i> Confirmar Exclusão</h3>
-        <button class="btn-close" id="btn-fechar-modal-confirmar-exclusao">
+        <button class="btn-close" id="btn-fechar-modal-confirmar-exclusao" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1660,7 +1689,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3><i data-lucide="key-round"></i> Resetar Senha</h3>
-        <button class="btn-close" id="btn-fechar-modal-reset">
+        <button class="btn-close" id="btn-fechar-modal-reset" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1687,7 +1716,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3><i data-lucide="car"></i> Editar Viatura</h3>
-        <button class="btn-close" id="btn-fechar-modal-editar-vtr">
+        <button class="btn-close" id="btn-fechar-modal-editar-vtr" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1744,7 +1773,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3><i data-lucide="calendar-plus"></i> Lançar Missão Avulsa</h3>
-        <button class="btn-close" id="btn-fechar-modal-missao">
+        <button class="btn-close" id="btn-fechar-modal-missao" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1786,7 +1815,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3><i data-lucide="clipboard-list"></i> Nova Missão Planejada</h3>
-        <button class="btn-close" id="btn-fechar-modal-missao-planejada">
+        <button class="btn-close" id="btn-fechar-modal-missao-planejada" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1837,7 +1866,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3><i data-lucide="layout-template"></i> Novo Template de Patrulhamento</h3>
-        <button class="btn-close" id="btn-fechar-modal-template">
+        <button class="btn-close" id="btn-fechar-modal-template" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1881,7 +1910,7 @@
     <div class="modal-box modal-box-lg">
       <div class="modal-header">
         <h3><i data-lucide="file-output"></i> Relatório para o SEI</h3>
-        <button class="btn-close" id="btn-fechar-modal-sei">
+        <button class="btn-close" id="btn-fechar-modal-sei" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -1931,7 +1960,7 @@
           <span class="badge" id="drawer-event-badge">Show</span>
           <h2 id="drawer-event-title">Nome do Evento</h2>
         </div>
-        <button class="btn-close" id="btn-close-drawer">
+        <button class="btn-close" id="btn-close-drawer" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -2080,7 +2109,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3><i data-lucide="key-round"></i> Alterar Minha Senha</h3>
-        <button class="btn-close" id="btn-fechar-modal-senha">
+        <button class="btn-close" id="btn-fechar-modal-senha" aria-label="Fechar">
           <i data-lucide="x"></i>
         </button>
       </div>

@@ -1,5 +1,8 @@
 /* -------------------------------------------------------------
    SISTEMA DE DESIGN & VARIÁVEIS
+   Três temas por classe no <body>: sem classe = Padrão (dark, default),
+   .tema-escuro = mais profundo/contrastado, .tema-claro = claro.
+   Ver tema-select em app.js (aplicarTema/carregarPrefsTema).
    ------------------------------------------------------------- */
 :root {
   --bg-app: #090d16;
@@ -8,29 +11,78 @@
   --border-color: #222d41;
   --text-main: #f1f5f9;
   --text-muted: #94a3b8;
-  
+
   --primary: #4f46e5;
   --primary-hover: #4338ca;
-  --success: #10b981;
-  --success-bg: rgba(16, 185, 129, 0.1);
+  /* success/info/danger um tom mais escuros que o Tailwind "500" padrão: o "500"
+     original não passa WCAG AA com texto branco em cima (usado em badges e em
+     .btn-success/.btn-danger) — o "600" abaixo passa, sem mudar a identidade da cor. */
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.1);
   --warning: #f59e0b;
   --warning-bg: rgba(245, 158, 11, 0.1);
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.1);
-  --info: #06b6d4;
-  --info-bg: rgba(6, 182, 212, 0.1);
-  
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --info: #0e7490;
+  --info-bg: rgba(14, 116, 144, 0.1);
+
+  /* Badges: auto-contidos (fundo+texto definidos juntos), não variam por tema —
+     paleta semântica: evento=magenta/roxo, pessoal=azul, resto reaproveita
+     success/warning/danger/info/primary acima. */
+  --badge-evento-1: #4f46e5;
+  --badge-evento-2: #7c3aed;
+  --badge-evento-3: #9333ea;
+  --badge-evento-4: #c026d3;
+  --badge-evento-5: #db2777;
+  --badge-evento-6: #9d174d;
+  --badge-neutro: #64748b;
+  --badge-neutro-escuro: #475569;
+  --badge-pessoal-1: #4f46e5;
+  --badge-pessoal-2: #0284c7;
+  --badge-pessoal-3: #075985;
+
   --font-title: 'Outfit', sans-serif;
   --font-body: 'Inter', sans-serif;
-  
+
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
-  
+
   --transition-fast: 0.15s ease;
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --border-radius: 12px;
+}
+
+/* Tema Escuro: mais profundo/contrastado que o Padrão — mesmos acentos (já
+   contrastam bem contra fundo quase-preto). */
+body.tema-escuro {
+  --bg-app: #030507;
+  --bg-panel: #0a0d14;
+  --bg-sidebar: #020304;
+  --border-color: #2a3650;
+  --text-main: #ffffff;
+  --text-muted: #b4c0d3;
+}
+
+/* Tema Claro. */
+body.tema-claro {
+  --bg-app: #f1f4f9;
+  --bg-panel: #ffffff;
+  --bg-sidebar: #ffffff;
+  --border-color: #dce1ea;
+  --text-main: #10131c;
+  --text-muted: #5b6478;
+  /* tints translúcidos ficam quase invisíveis em fundo branco — opacidade maior */
+  --success-bg: rgba(5, 150, 105, 0.14);
+  --warning-bg: rgba(245, 158, 11, 0.14);
+  --danger-bg: rgba(220, 38, 38, 0.14);
+  --info-bg: rgba(14, 116, 144, 0.14);
+  /* sombra escura "pesada" demais em fundo branco — alpha reduzido */
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -1px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+  --shadow-premium: 0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 10px 10px -5px rgba(15, 23, 42, 0.08);
 }
 
 /* Reset básico */
@@ -367,6 +419,27 @@ button, input, select, textarea {
   gap: 16px;
 }
 
+/* Visível só pra leitor de tela — usado no <label> do seletor de tema */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.tema-select-group select {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
 .profile-avatar {
   width: 38px;
   height: 38px;
@@ -430,6 +503,18 @@ button, input, select, textarea {
   color: var(--text-main);
 }
 
+/* Indicador de foco para navegação por teclado — só dispara em :focus-visible
+   (teclado), não em clique de mouse, então não conflita com os outline:none
+   usados de propósito em cliques de mouse em outros seletores. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .btn-primary {
   background-color: var(--primary);
   color: #fff;
@@ -473,6 +558,61 @@ button, input, select, textarea {
   border-radius: 4px;
 }
 
+/* Estado de carregamento de botão de submit — ver comBotaoCarregando() em app.js.
+   Esconde o texto/ícone e mostra um spinner CSS puro no centro, sem mudar o tamanho do botão. */
+.btn-carregando {
+  color: transparent !important;
+  pointer-events: none;
+  position: relative;
+}
+
+.btn-carregando i {
+  visibility: hidden;
+}
+
+.btn-carregando::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 14px; height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: sgo-spin 0.6s linear infinite;
+}
+
+.btn-secondary.btn-carregando::after {
+  border-color: rgba(255, 255, 255, 0.25);
+  border-top-color: var(--text-main);
+}
+
+@keyframes sgo-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Indicador discreto de sincronização automática (fetchData a cada 15s) — barra fina
+   pulsante no topo da topbar, some assim que a chamada termina. */
+.topbar { position: relative; }
+.topbar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--primary);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+body.sgo-sincronizando .topbar::before {
+  opacity: 1;
+  animation: sgo-pulse 1s ease-in-out infinite;
+}
+
+@keyframes sgo-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
 .badge {
   display: inline-block;
   padding: 2px 8px;
@@ -483,13 +623,14 @@ button, input, select, textarea {
 }
 
 /* Cores de badge por tipo */
-.badge.show { background-color: var(--primary); color: #fff; }
-.badge.futebol { background-color: var(--info); color: #fff; }
-.badge.religioso { background-color: #8b5cf6; color: #fff; }
+/* Tipos de evento: família magenta/roxo (Ato Público fica na família "alerta" abaixo, de propósito) */
+.badge.show { background-color: var(--badge-evento-1); color: #fff; }
+.badge.futebol { background-color: var(--badge-evento-2); color: #fff; }
+.badge.religioso { background-color: var(--badge-evento-3); color: #fff; }
 .badge.ato-publico { background-color: var(--warning); color: #000; }
-.badge.cultural { background-color: #ec4899; color: #fff; }
-.badge.missao-avulsa { background-color: #0d9488; color: #fff; }
-.badge.outros { background-color: #64748b; color: #fff; }
+.badge.cultural { background-color: var(--badge-evento-4); color: #fff; }
+.badge.missao-avulsa { background-color: var(--badge-evento-5); color: #fff; }
+.badge.outros { background-color: var(--badge-neutro); color: #fff; }
 
 /* Badge indicador de diária vinculada (Listar Eventos) */
 .badge-diaria {
@@ -505,14 +646,14 @@ button, input, select, textarea {
 .badge-diaria.sem-diaria { background-color: rgba(255, 255, 255, 0.03); color: var(--text-muted); border: 1px solid var(--border-color); }
 .badge-diaria i { width: 12px; height: 12px; }
 
-/* Badges de perfil (Gestão de Usuários) */
-.badge.perfil-p3 { background-color: var(--primary); color: #fff; }
-.badge.perfil-adjunto { background-color: var(--info); color: #fff; }
-.badge.perfil-oficial { background-color: #8b5cf6; color: #fff; }
+/* Badges de perfil (Gestão de Usuários): família azul */
+.badge.perfil-p3 { background-color: var(--badge-pessoal-1); color: #fff; }
+.badge.perfil-adjunto { background-color: var(--badge-pessoal-2); color: #fff; }
+.badge.perfil-oficial { background-color: var(--badge-pessoal-3); color: #fff; }
 
-/* Badges de tipo (Cadastro de Pessoal): Praça x Oficial */
-.badge.tipo-praca { background-color: var(--info); color: #fff; }
-.badge.tipo-oficial { background-color: #8b5cf6; color: #fff; }
+/* Badges de tipo (Cadastro de Pessoal): Praça x Oficial — mesma família azul */
+.badge.tipo-praca { background-color: var(--badge-pessoal-2); color: #fff; }
+.badge.tipo-oficial { background-color: var(--badge-pessoal-3); color: #fff; }
 
 /* Badges de status (Cadastro de Viaturas) */
 .badge.status-ativa { background-color: var(--success); color: #fff; }
@@ -631,6 +772,28 @@ button, input, select, textarea {
   margin-top: 4px;
 }
 
+/* Selo de tendência vs. período anterior (Dashboard) */
+.stat-tendencia {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.stat-tendencia.tendencia-alta { color: var(--success); }
+.stat-tendencia.tendencia-baixa { color: var(--danger); }
+.stat-tendencia.tendencia-estavel { color: var(--text-muted); }
+.stat-tendencia svg { width: 12px; height: 12px; }
+
+/* Sparkline SVG sob os cards do Painel Analítico */
+.stat-sparkline {
+  display: block;
+  margin-top: 8px;
+  width: 100%;
+  height: 24px;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -736,6 +899,23 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-section-title {
+  font-family: var(--font-title);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
 }
 
 .form-group {
@@ -1774,6 +1954,65 @@ button, input, select, textarea {
   align-items: flex-end;
 }
 
+/* Isola o botão Excluir do grupo principal — reduz toque acidental */
+.cartao-toolbar-excluir {
+  margin-left: auto;
+}
+
+/* Menu overflow (⋯) — componente genérico e reaproveitável, mesmo padrão de
+   toggle de classe .hidden já usado nos modais, só sem overlay de fundo. */
+.dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-menu.hidden {
+  display: none;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-main);
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dropdown-item i {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
 .cartao-toolbar input[type="date"] {
   background-color: var(--bg-app);
   border: 1px solid var(--border-color);
@@ -1965,11 +2204,11 @@ button, input, select, textarea {
 /* Badges por tipo de atividade */
 .badge.atv-pb { background-color: var(--primary); color: #fff; }
 .badge.atv-patrulhamento { background-color: var(--info); color: #fff; }
-.badge.atv-qtl-almoco { background-color: #64748b; color: #fff; }
-.badge.atv-qtl-jantar { background-color: #475569; color: #fff; }
+.badge.atv-qtl-almoco { background-color: var(--badge-neutro); color: #fff; }
+.badge.atv-qtl-jantar { background-color: var(--badge-neutro-escuro); color: #fff; }
 .badge.atv-corredor-seguro { background-color: var(--success); color: #fff; }
 .badge.atv-barreira-itinerante { background-color: var(--warning); color: #000; }
-.badge.atv-outros { background-color: #8b5cf6; color: #fff; }
+.badge.atv-outros { background-color: var(--badge-neutro); color: #fff; }
 
 /* Badges de categoria de viatura (Cartão Programa) */
 .cartao-badge-categoria {
@@ -1979,6 +2218,7 @@ button, input, select, textarea {
 }
 .badge.cat-forca-tatica { background-color: var(--danger); color: #fff; }
 .badge.cat-suplementar { background-color: var(--warning); color: #000; }
+.badge.cat-ordinaria { background-color: var(--primary); color: #fff; }
 
 /* Alerta de evento da pauta dentro do setor da viatura */
 .cartao-evento-alerta {
@@ -2434,4 +2674,47 @@ button, input, select, textarea {
   .nav-btn span {
     display: none;
   }
+
+  /* Tabela -> card em telas pequenas: CSS-only, reaproveita o mesmo <tr>/<td> do
+     desktop, sem duplicar lógica de render em JS. Cada <td> precisa de
+     data-label="Nome da Coluna" (mostrado via ::before). Primeira coluna de
+     destaque (nome/prefixo/etc.) usa .card-title-cell em vez de data-label. */
+  .table-cards-mobile thead { display: none; }
+  .table-cards-mobile, .table-cards-mobile tbody,
+  .table-cards-mobile tr, .table-cards-mobile td { display: block; width: 100%; }
+  .table-cards-mobile tr {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 12px;
+    padding: 12px 16px;
+  }
+  .table-cards-mobile td {
+    border-bottom: none;
+    padding: 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    text-align: right;
+  }
+  .table-cards-mobile td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    text-align: left;
+  }
+  .table-cards-mobile .card-title-cell {
+    display: block;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+  .table-cards-mobile .card-title-cell::before { content: none; }
 }

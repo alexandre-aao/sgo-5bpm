@@ -1476,6 +1476,9 @@ app.get('/api/estatisticas', asyncRoute(async (req, res) => {
     const efetivoMes = db.alocacoes
       .filter(a => idsEventosDoMes.has(a.evento_id))
       .reduce((sum, a) => sum + a.qtd_policiais, 0);
+    const viaturasMes = db.alocacoes
+      .filter(a => idsEventosDoMes.has(a.evento_id))
+      .reduce((sum, a) => sum + a.qtd_viaturas, 0);
     const diariasMes = db.escalas
       .filter(s => idsEventosDoMes.has(s.evento_id))
       .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
@@ -1488,6 +1491,7 @@ app.get('/api/estatisticas', asyncRoute(async (req, res) => {
       eventos_planejados: planejadosMes,
       eventos_realizados: realizadosMes,
       total_policiais: efetivoMes,
+      total_viaturas: viaturasMes,
       total_diarias: diariasMes
     });
   }

@@ -15,6 +15,25 @@ let state = {
   pessoal: [] // Cadastro de Pessoal (Adjunto/Fiscal/Oficial de Operações/Oficial de Sobreaviso)
 };
 
+// -------------------------------------------------------------
+// TEMA DE COR (Padrão / Escuro / Claro) — aplicado o mais cedo possível no boot,
+// antes de qualquer outra coisa, pra minimizar flash do tema errado.
+// -------------------------------------------------------------
+const TEMA_PREFS_KEY = 'sgo_tema';
+
+function carregarPrefsTema() {
+  const salvo = localStorage.getItem(TEMA_PREFS_KEY);
+  return ['padrao', 'escuro', 'claro'].includes(salvo) ? salvo : 'padrao';
+}
+
+function aplicarTema(tema) {
+  document.body.classList.remove('tema-escuro', 'tema-claro');
+  if (tema === 'escuro') document.body.classList.add('tema-escuro');
+  else if (tema === 'claro') document.body.classList.add('tema-claro');
+}
+
+aplicarTema(carregarPrefsTema());
+
 // Configuração do Servidor API
 const API_BASE_URL = window.location.origin;
 
@@ -51,6 +70,21 @@ async function apiFetch(url, options = {}) {
   }
 
   return res;
+}
+
+// Desabilita o botão de submit durante uma operação async, troca o conteúdo por um
+// spinner (classe .btn-carregando) e reabilita ao final — evita duplo envio em
+// conexão lenta. Uso: comBotaoCarregando(e.submitter, async () => { ...lógica... }).
+async function comBotaoCarregando(botao, fn) {
+  if (!botao || botao.disabled) return;
+  botao.disabled = true;
+  botao.classList.add('btn-carregando');
+  try {
+    return await fn();
+  } finally {
+    botao.disabled = false;
+    botao.classList.remove('btn-carregando');
+  }
 }
 
 // Inicialização
@@ -242,6 +276,14 @@ function setupNavigation() {
 // EVENT LISTENERS GERAIS
 // -------------------------------------------------------------
 function setupEventListeners() {
+  // Seletor de tema (aplicado ao body no boot, aqui só sincroniza o <select> e liga a troca)
+  const temaSelect = document.getElementById('tema-select');
+  temaSelect.value = carregarPrefsTema();
+  temaSelect.addEventListener('change', () => {
+    localStorage.setItem(TEMA_PREFS_KEY, temaSelect.value);
+    aplicarTema(temaSelect.value);
+  });
+
   // Login Form Submit
   document.getElementById('form-login').addEventListener('submit', handleLogin);
 
@@ -503,13 +545,34 @@ function setupEventListeners() {
   });
   document.getElementById('btn-excluir-cartao').addEventListener('click', handleExcluirCartao);
 
+  // Menu overflow (⋯) do Cartão Programa — Templates / Novo Template
+  const overflowToggle = document.getElementById('btn-cartao-overflow-toggle');
+  const overflowMenu = document.getElementById('cartao-overflow-menu');
+  const fecharOverflowCartao = () => {
+    overflowMenu.classList.add('hidden');
+    overflowToggle.setAttribute('aria-expanded', 'false');
+  };
+  overflowToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const abrindo = overflowMenu.classList.contains('hidden');
+    overflowMenu.classList.toggle('hidden', !abrindo);
+    overflowToggle.setAttribute('aria-expanded', String(abrindo));
+  });
+  document.addEventListener('click', (e) => {
+    if (!overflowMenu.classList.contains('hidden') && !e.target.closest('#cartao-overflow-dropdown')) {
+      fecharOverflowCartao();
+    }
+  });
+
   // Templates de Cartão Programa (P3)
   document.getElementById('btn-toggle-templates').addEventListener('click', () => {
+    fecharOverflowCartao();
     const painel = document.getElementById('cartao-templates-panel');
     painel.classList.toggle('hidden');
     if (!painel.classList.contains('hidden')) renderTemplatesTab();
   });
   document.getElementById('btn-novo-template').addEventListener('click', () => {
+    fecharOverflowCartao();
     document.getElementById('form-novo-template').reset();
     document.getElementById('modal-novo-template').classList.remove('hidden');
   });
@@ -640,32 +703,35 @@ async function handleAlterarSenha(e) {
     return;
   }
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/alterar-senha`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ senha_atual: senhaAtual, senha_nova: senhaNova })
-    });
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/alterar-senha`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_atual: senhaAtual, senha_nova: senhaNova })
+      });
 
-    const dados = await res.json();
+      const dados = await res.json();
 
-    if (res.ok) {
-      document.getElementById('modal-senha').classList.add('hidden');
-      document.getElementById('form-alterar-senha').reset();
-      showToast('Senha alterada com sucesso!', 'success');
-    } else {
-      showToast(esc(dados.error) || 'Falha ao alterar a senha.', 'danger');
+      if (res.ok) {
+        document.getElementById('modal-senha').classList.add('hidden');
+        document.getElementById('form-alterar-senha').reset();
+        showToast('Senha alterada com sucesso!', 'success');
+      } else {
+        showToast(esc(dados.error) || 'Falha ao alterar a senha.', 'danger');
+      }
+    } catch (error) {
+      console.error("Erro ao alterar senha:", error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error("Erro ao alterar senha:", error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 // -------------------------------------------------------------
 // OBTENÇÃO DE DADOS DO SERVIDOR
 // -------------------------------------------------------------
 async function fetchData() {
+  document.body.classList.add('sgo-sincronizando');
   try {
     const resEventos = await apiFetch(`${API_BASE_URL}/api/eventos`);
     state.eventos = await resEventos.json();
@@ -717,42 +783,98 @@ async function fetchData() {
     }
   } catch (error) {
     console.error("Erro ao buscar dados do servidor:", error);
+  } finally {
+    document.body.classList.remove('sgo-sincronizando');
   }
 }
 
 // -------------------------------------------------------------
 // COMPONENTES DASHBOARD E CALENDÁRIO
 // -------------------------------------------------------------
+// Selo ▲/▼ de tendência vs. período anterior. `atual`/`anterior` já contam eventos/diárias
+// do período correspondente — calculado 100% client-side a partir de state.eventos/state.escalas
+// (já carregados por completo, sem filtro de data no fetch), sem chamada nova ao backend.
+function renderTendencia(elementId, atual, anterior) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  if (anterior === 0) {
+    if (atual === 0) {
+      el.innerHTML = '';
+      el.className = 'stat-tendencia';
+      return;
+    }
+    el.innerHTML = '<i data-lucide="trending-up"></i> novo';
+    el.className = 'stat-tendencia tendencia-alta';
+    lucide.createIcons();
+    return;
+  }
+
+  const variacao = ((atual - anterior) / anterior) * 100;
+  const icone = variacao > 0 ? 'trending-up' : (variacao < 0 ? 'trending-down' : 'minus');
+  const classe = variacao > 0 ? 'tendencia-alta' : (variacao < 0 ? 'tendencia-baixa' : 'tendencia-estavel');
+  const sinal = variacao > 0 ? '+' : '';
+  el.className = `stat-tendencia ${classe}`;
+  el.innerHTML = `<i data-lucide="${icone}"></i> ${sinal}${variacao.toFixed(0)}% vs. período anterior`;
+  lucide.createIcons();
+}
+
 function updateStats() {
-  // 1. Calcular eventos na semana atual (segunda a domingo)
+  // 1. Calcular eventos na semana atual (segunda a domingo) e na semana anterior
   const hoje = new Date();
   const primeiroDiaSemana = new Date(hoje.setDate(hoje.getDate() - hoje.getDay() + (hoje.getDay() === 0 ? -6 : 1))); // Segunda
   primeiroDiaSemana.setHours(0,0,0,0);
-  
+
   const ultimoDiaSemana = new Date(primeiroDiaSemana);
   ultimoDiaSemana.setDate(primeiroDiaSemana.getDate() + 6); // Domingo
   ultimoDiaSemana.setHours(23,59,59,999);
+
+  const primeiroDiaSemanaAnterior = new Date(primeiroDiaSemana);
+  primeiroDiaSemanaAnterior.setDate(primeiroDiaSemana.getDate() - 7);
+  const ultimoDiaSemanaAnterior = new Date(ultimoDiaSemana);
+  ultimoDiaSemanaAnterior.setDate(ultimoDiaSemana.getDate() - 7);
 
   const eventosSemana = state.eventos.filter(e => {
     const dataEvt = new Date(e.data_inicio + 'T00:00:00');
     return dataEvt >= primeiroDiaSemana && dataEvt <= ultimoDiaSemana;
   });
+  const eventosSemanaAnterior = state.eventos.filter(e => {
+    const dataEvt = new Date(e.data_inicio + 'T00:00:00');
+    return dataEvt >= primeiroDiaSemanaAnterior && dataEvt <= ultimoDiaSemanaAnterior;
+  });
 
   document.getElementById('stat-eventos-semana').textContent = eventosSemana.length;
+  renderTendencia('stat-eventos-semana-tendencia', eventosSemana.length, eventosSemanaAnterior.length);
 
-  // 2. Diárias consumidas no mês corrente vs. cota mensal
+  // 2. Diárias consumidas no mês corrente vs. cota mensal, e vs. o mês anterior
   const prefixoMesAtual = getLocalDateStr().slice(0, 7); // "YYYY-MM"
+  // Atenção: "hoje" já foi mutado acima por hoje.setDate(...) (agora é a segunda-feira
+  // desta semana) — usar prefixoMesAtual (derivado de getLocalDateStr(), sempre "hoje" de
+  // verdade) para calcular o mês anterior, não a variável "hoje".
+  const [anoAtualNum, mesAtualNum] = prefixoMesAtual.split('-').map(Number);
+  const dataMesAnterior = new Date(anoAtualNum, mesAtualNum - 2, 1);
+  const prefixoMesAnterior = `${dataMesAnterior.getFullYear()}-${String(dataMesAnterior.getMonth() + 1).padStart(2, '0')}`;
+
   const idsEventosMes = new Set(
     state.eventos.filter(e => e.data_inicio.startsWith(prefixoMesAtual)).map(e => e.id)
   );
   const consumidoMes = state.escalas
     .filter(s => idsEventosMes.has(s.evento_id))
     .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
+
+  const idsEventosMesAnterior = new Set(
+    state.eventos.filter(e => e.data_inicio.startsWith(prefixoMesAnterior)).map(e => e.id)
+  );
+  const consumidoMesAnterior = state.escalas
+    .filter(s => idsEventosMesAnterior.has(s.evento_id))
+    .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
+
   const cota = state.config ? (state.config.cota_mensal_diarias || 0) : 0;
 
   const statDiarias = document.getElementById('stat-diarias-mes');
   statDiarias.textContent = `${consumidoMes} / ${cota}`;
   statDiarias.style.color = (cota > 0 && consumidoMes > cota) ? 'var(--danger)' : '';
+  renderTendencia('stat-diarias-mes-tendencia', consumidoMes, consumidoMesAnterior);
 }
 
 // -------------------------------------------------------------
@@ -965,28 +1087,30 @@ async function handleCreateEvento(e) {
     return;
   }
 
-  try {
-    const response = await apiFetch(`${API_BASE_URL}/api/eventos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    
-    if (response.ok) {
-      showToast('Evento cadastrado com sucesso!', 'success');
-      document.getElementById('form-evento').reset();
-      
-      document.getElementById('data_inicio').value = getLocalDateStr();
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/eventos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-      fetchData();
+      if (response.ok) {
+        showToast('Evento cadastrado com sucesso!', 'success');
+        document.getElementById('form-evento').reset();
 
-      // Redireciona para o Dashboard
-      document.getElementById('nav-btn-dashboard').click();
+        document.getElementById('data_inicio').value = getLocalDateStr();
+
+        fetchData();
+
+        // Redireciona para o Dashboard
+        document.getElementById('nav-btn-dashboard').click();
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('Falha ao cadastrar evento no servidor.', 'danger');
     }
-  } catch (error) {
-    console.error(error);
-    showToast('Falha ao cadastrar evento no servidor.', 'danger');
-  }
+  });
 }
 
 // -------------------------------------------------------------
@@ -1122,14 +1246,14 @@ function renderEventosTab() {
       : `<span class="badge-diaria sem-diaria">Sem diária</span>`;
 
     tr.innerHTML = `
-      <td><strong>${dateBr}</strong></td>
-      <td>${esc(evt.nome_evento)}</td>
-      <td><span class="badge ${typeClass}">${esc(evt.tipo_evento)}</span></td>
-      <td>${esc(evt.demandante)}</td>
-      <td>${esc(evt.bairro) || 'Centro'}</td>
-      <td><code style="color:#a5b4fc;">${esc(evt.num_os_manual) || '-'}</code></td>
-      <td><code style="color:#a5b4fc;">${esc(evt.num_sei) || '-'}</code></td>
-      <td>${badgeDiaria}</td>
+      <td data-label="Data"><strong>${dateBr}</strong></td>
+      <td class="card-title-cell">${esc(evt.nome_evento)}</td>
+      <td data-label="Tipo"><span class="badge ${typeClass}">${esc(evt.tipo_evento)}</span></td>
+      <td data-label="Demandante">${esc(evt.demandante)}</td>
+      <td data-label="Bairro/Local">${esc(evt.bairro) || 'Centro'}</td>
+      <td data-label="Nº OS"><code style="color:#a5b4fc;">${esc(evt.num_os_manual) || '-'}</code></td>
+      <td data-label="Nº SEI"><code style="color:#a5b4fc;">${esc(evt.num_sei) || '-'}</code></td>
+      <td data-label="Diária">${badgeDiaria}</td>
     `;
 
     tableBody.appendChild(tr);
@@ -1274,15 +1398,20 @@ const MAPA_TILES = {
 };
 
 function carregarPrefsMapa() {
+  // Sem preferência de mapa salva ainda: sugere o tile pelo tema global (claro -> colorido,
+  // escuro/padrão -> escuro). Só influencia o padrão da primeira vez — depois que o usuário
+  // mexe manualmente no seletor de estilo do mapa, essa escolha salva sempre prevalece.
+  const semPrefsSalvas = localStorage.getItem(MAPA_PREFS_KEY) === null;
+  const estiloPadrao = semPrefsSalvas && carregarPrefsTema() === 'claro' ? 'voyager' : 'dark';
   try {
     const salvo = JSON.parse(localStorage.getItem(MAPA_PREFS_KEY) || '{}');
     return {
       mostrarEventos: salvo.mostrarEventos !== false,
       mostrarViaturas: salvo.mostrarViaturas !== false,
-      estilo: salvo.estilo === 'voyager' ? 'voyager' : 'dark'
+      estilo: salvo.estilo === 'voyager' ? 'voyager' : (salvo.estilo === 'dark' ? 'dark' : estiloPadrao)
     };
   } catch {
-    return { mostrarEventos: true, mostrarViaturas: true, estilo: 'dark' };
+    return { mostrarEventos: true, mostrarViaturas: true, estilo: estiloPadrao };
   }
 }
 
@@ -1560,10 +1689,10 @@ async function renderGerenciarBairrosTab() {
         <td>${b.longitude}</td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button class="btn-icon btn-sm" title="Editar" onclick="abrirEdicaoBairro('${b.id}', '${esc(b.nome_bairro)}', ${b.latitude}, ${b.longitude})">
+            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirEdicaoBairro('${b.id}', '${esc(b.nome_bairro)}', ${b.latitude}, ${b.longitude})">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" onclick="handleExcluirBairro('${b.id}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirBairro('${b.id}')">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>
           </div>
@@ -1596,38 +1725,40 @@ async function handleSalvarBairro(e) {
     longitude: document.getElementById('bairro-lon').value
   };
 
-  try {
-    let res;
-    if (bairroEmEdicao) {
-      res = await apiFetch(`${API_BASE_URL}/api/bairros-coordenadas/${bairroEmEdicao}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    } else {
-      res = await apiFetch(`${API_BASE_URL}/api/bairros-coordenadas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    }
-    const dados = await res.json();
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      let res;
+      if (bairroEmEdicao) {
+        res = await apiFetch(`${API_BASE_URL}/api/bairros-coordenadas/${bairroEmEdicao}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await apiFetch(`${API_BASE_URL}/api/bairros-coordenadas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+      const dados = await res.json();
 
-    if (res.ok) {
-      showToast(bairroEmEdicao ? 'Bairro atualizado.' : 'Bairro cadastrado.', 'success');
-      bairroEmEdicao = null;
-      document.getElementById('form-bairro').reset();
-      document.getElementById('btn-salvar-bairro').innerHTML = '<i data-lucide="plus"></i>';
-      lucide.createIcons();
-      renderGerenciarBairrosTab();
-      popularSelectBairros();
-    } else {
-      showToast(esc(dados.error) || 'Falha ao salvar o bairro.', 'danger');
+      if (res.ok) {
+        showToast(bairroEmEdicao ? 'Bairro atualizado.' : 'Bairro cadastrado.', 'success');
+        bairroEmEdicao = null;
+        document.getElementById('form-bairro').reset();
+        document.getElementById('btn-salvar-bairro').innerHTML = '<i data-lucide="plus"></i>';
+        lucide.createIcons();
+        renderGerenciarBairrosTab();
+        popularSelectBairros();
+      } else {
+        showToast(esc(dados.error) || 'Falha ao salvar o bairro.', 'danger');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar bairro:', error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error('Erro ao salvar bairro:', error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 window.handleExcluirBairro = async function (id) {
@@ -1732,7 +1863,7 @@ function renderAlocacoesList(list) {
         <p><strong>Comando:</strong> ${esc(item.comando_servico) || '-'} | <strong>Prefixos:</strong> ${esc(item.prefixos_vtr) || '-'}</p>
       </div>
       ${isAdmin ? `
-      <button class="btn-icon btn-danger btn-sm" onclick="handleDeleteAlocacao('${item.id}')">
+      <button class="btn-icon btn-danger btn-sm" title="Remover alocação" aria-label="Remover alocação" onclick="handleDeleteAlocacao('${item.id}')">
         <i data-lucide="trash" style="width:12px;height:12px;"></i>
       </button>` : ''}
     `;
@@ -1763,7 +1894,7 @@ function renderEscalasList(list) {
         <p><strong>Aparições:</strong> ${item.qtd_aparicoes} | <strong>Total de Diárias:</strong> <span style="color:#f59e0b;font-weight:600;">${item.total_diarias} un.</span></p>
       </div>
       ${isAdmin ? `
-      <button class="btn-icon btn-danger btn-sm" onclick="handleDeleteEscala('${item.id}')">
+      <button class="btn-icon btn-danger btn-sm" title="Remover militar da escala" aria-label="Remover militar da escala" onclick="handleDeleteEscala('${item.id}')">
         <i data-lucide="trash" style="width:12px;height:12px;"></i>
       </button>` : ''}
     `;
@@ -1786,23 +1917,25 @@ async function handleCreateAlocacao(e) {
     comando_servico: document.getElementById('aloc_comando').value.trim()
   };
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/alocacoes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      showToast('Modalidade alocada com sucesso!', 'success');
-      document.getElementById('form-alocacao').reset();
-      document.getElementById('form-alocacao-container').classList.add('hidden');
-      
-      await fetchData(); // Atualiza alocações em cache
-      fetchEventDetails(state.currentEventId);
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/alocacoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showToast('Modalidade alocada com sucesso!', 'success');
+        document.getElementById('form-alocacao').reset();
+        document.getElementById('form-alocacao-container').classList.add('hidden');
+
+        await fetchData(); // Atualiza alocações em cache
+        fetchEventDetails(state.currentEventId);
+      }
+    } catch (error) {
+      console.error(error);
     }
-  } catch (error) {
-    console.error(error);
-  }
+  });
 }
 
 async function handleCreateEscala(e) {
@@ -1815,24 +1948,26 @@ async function handleCreateEscala(e) {
     qtd_aparicoes: document.getElementById('esc_qtd_aparicoes').value
   };
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/escalas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      showToast('Policial militar escalado com sucesso!', 'success');
-      document.getElementById('form-escala').reset();
-      document.getElementById('form-escala-container').classList.add('hidden');
-      document.getElementById('diarias-calc-preview').textContent = '2';
-      
-      await fetchData(); // Atualiza escalas em cache
-      fetchEventDetails(state.currentEventId);
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/escalas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showToast('Policial militar escalado com sucesso!', 'success');
+        document.getElementById('form-escala').reset();
+        document.getElementById('form-escala-container').classList.add('hidden');
+        document.getElementById('diarias-calc-preview').textContent = '2';
+
+        await fetchData(); // Atualiza escalas em cache
+        fetchEventDetails(state.currentEventId);
+      }
+    } catch (error) {
+      console.error(error);
     }
-  } catch (error) {
-    console.error(error);
-  }
+  });
 }
 
 // Ações globais de remoção
@@ -1919,11 +2054,11 @@ async function renderRelatorioTable() {
     filteredData.forEach(item => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${esc(item.militar_id)}</strong></td>
-        <td>${esc(item.militar_nome)}</td>
-        <td class="text-center">${item.escalas_count}</td>
-        <td class="text-center">${item.qtd_aparicoes}</td>
-        <td class="text-right" style="color:#f59e0b;font-weight:600;">${item.total_diarias}</td>
+        <td data-label="Matrícula"><strong>${esc(item.militar_id)}</strong></td>
+        <td class="card-title-cell">${esc(item.militar_nome)}</td>
+        <td class="text-center" data-label="Qtd. Escalas">${item.escalas_count}</td>
+        <td class="text-center" data-label="Total Aparições">${item.qtd_aparicoes}</td>
+        <td class="text-right" data-label="Total Diárias" style="color:#f59e0b;font-weight:600;">${item.total_diarias}</td>
       `;
       tableBody.appendChild(tr);
     });
@@ -2138,7 +2273,7 @@ function renderMissoesPlanejadasTab(missoes) {
                    <i data-lucide="arrow-right-circle" style="width:12px;height:12px;"></i> Converter em Evento
                  </button>`}
             ${isAdmin ? `
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" onclick="handleExcluirMissaoPlanejada('${m.id}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirMissaoPlanejada('${m.id}')">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>` : ''}
           </div>
@@ -2166,25 +2301,27 @@ async function handleCriarMissaoPlanejada(e) {
     qtd_diarias_por_ocorrencia: document.getElementById('missao-planejada-diarias').value
   };
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/missoes-planejadas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const dados = await res.json();
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/missoes-planejadas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const dados = await res.json();
 
-    if (res.ok) {
-      document.getElementById('modal-missao-planejada').classList.add('hidden');
-      showToast('Missão planejada criada com sucesso.', 'success');
-      renderPlanejadorTab();
-    } else {
-      showToast(esc(dados.error) || 'Falha ao criar a missão planejada.', 'danger');
+      if (res.ok) {
+        document.getElementById('modal-missao-planejada').classList.add('hidden');
+        showToast('Missão planejada criada com sucesso.', 'success');
+        renderPlanejadorTab();
+      } else {
+        showToast(esc(dados.error) || 'Falha ao criar a missão planejada.', 'danger');
+      }
+    } catch (error) {
+      console.error('Erro ao criar missão planejada:', error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error('Erro ao criar missão planejada:', error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 window.handleExcluirMissaoPlanejada = async function(id) {
@@ -2315,26 +2452,28 @@ async function handleCriarMissaoAvulsa(e) {
     local_itinerario: document.getElementById('missao-local').value.trim() || 'Não informado'
   };
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/eventos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const criado = await res.json();
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/eventos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const criado = await res.json();
 
-    if (res.ok) {
-      document.getElementById('modal-missao-avulsa').classList.add('hidden');
-      showToast('Missão avulsa criada! Agora escale o(s) militar(es) para gerar a diária.', 'success');
-      await fetchData(); // já atualiza o Planejador/Calendário de Diárias, pois esta é a aba ativa
-      openDrawer(criado.id);
-    } else {
-      showToast(esc(criado.error) || 'Falha ao criar a missão avulsa.', 'danger');
+      if (res.ok) {
+        document.getElementById('modal-missao-avulsa').classList.add('hidden');
+        showToast('Missão avulsa criada! Agora escale o(s) militar(es) para gerar a diária.', 'success');
+        await fetchData(); // já atualiza o Planejador/Calendário de Diárias, pois esta é a aba ativa
+        openDrawer(criado.id);
+      } else {
+        showToast(esc(criado.error) || 'Falha ao criar a missão avulsa.', 'danger');
+      }
+    } catch (error) {
+      console.error("Erro ao criar missão avulsa:", error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error("Erro ao criar missão avulsa:", error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 async function handleSaveCota() {
@@ -2466,6 +2605,35 @@ function renderSazonalidadeChart(tendenciaMensal) {
   `;
 }
 
+// Mini-sparkline SVG (12 pontos, um por mês) sob os cards do Painel Analítico —
+// mesma técnica de SVG à mão de renderSazonalidadeChart, só que sem eixos/labels.
+function renderSparkline(elementId, valores) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  if (!valores || valores.length === 0) { el.innerHTML = ''; return; }
+
+  const W = 100, H = 24, pad = 2;
+  const max = Math.max(...valores);
+  const min = Math.min(...valores);
+  const n = valores.length;
+  const x = (i) => pad + ((W - pad * 2) * i) / (n - 1 || 1);
+  const y = (v) => {
+    if (max === min) return H / 2;
+    return pad + (H - pad * 2) * (1 - (v - min) / (max - min));
+  };
+
+  const pontos = valores.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+  const ultimo = valores[n - 1];
+  const penultimo = n > 1 ? valores[n - 2] : ultimo;
+  const cor = ultimo > penultimo ? 'var(--success)' : (ultimo < penultimo ? 'var(--danger)' : 'var(--text-muted)');
+
+  el.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  el.innerHTML = `
+    <polyline points="${pontos}" style="fill:none;stroke:${cor};stroke-width:1.5;"></polyline>
+    <circle cx="${x(n - 1)}" cy="${y(ultimo)}" r="2" style="fill:${cor};"></circle>
+  `;
+}
+
 async function renderEstatisticasTab() {
   const ano = document.getElementById('stats-filter-ano').value;
 
@@ -2529,6 +2697,12 @@ async function renderEstatisticasTab() {
 
     // Gráfico de Sazonalidade: Planejados x Realizados por mês, com pico de diárias destacado
     renderSazonalidadeChart(data.tendencia_mensal);
+
+    // Mini-sparklines dos cards de resumo (evolução mensal no ano filtrado)
+    renderSparkline('spark-stats-eventos', data.tendencia_mensal.map(m => m.total_eventos));
+    renderSparkline('spark-stats-policiais', data.tendencia_mensal.map(m => m.total_policiais));
+    renderSparkline('spark-stats-viaturas', data.tendencia_mensal.map(m => m.total_viaturas));
+    renderSparkline('spark-stats-diarias', data.tendencia_mensal.map(m => m.total_diarias));
 
     // Tabela: Tendência Mensal (com mini-barra proporcional ao maior mês)
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -3097,28 +3271,30 @@ async function handleCriarTemplate(e) {
     qtd_viaturas_base: document.getElementById('template-qtd-viaturas').value
   };
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/cartoes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/cartoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    if (res.ok) {
-      const criado = await res.json();
-      document.getElementById('modal-novo-template').classList.add('hidden');
-      document.getElementById('form-novo-template').reset();
-      showToast('Template criado. Adicione as viaturas e roteiros abaixo.', 'success');
-      document.getElementById('cartao-data').value = '';
-      exibirCartaoNoEditor(criado);
-    } else {
-      const err = await res.json();
-      showToast(err.error || 'Falha ao criar o template.', 'danger');
+      if (res.ok) {
+        const criado = await res.json();
+        document.getElementById('modal-novo-template').classList.add('hidden');
+        document.getElementById('form-novo-template').reset();
+        showToast('Template criado. Adicione as viaturas e roteiros abaixo.', 'success');
+        document.getElementById('cartao-data').value = '';
+        exibirCartaoNoEditor(criado);
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Falha ao criar o template.', 'danger');
+      }
+    } catch (error) {
+      console.error('Erro ao criar template:', error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error('Erro ao criar template:', error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 // Lista os 5 cartões mais recentes anteriores à data selecionada (ou, se nenhuma data
@@ -3204,12 +3380,12 @@ function renderQuadroResumo() {
 
     return `
       <tr>
-        <td>${esc(vtr.companhia) || '-'}</td>
-        <td><strong>${esc(vtr.prefixo)}</strong></td>
-        <td>${esc(vtr.setor)}</td>
-        <td>${esc(horarioQtl(qtlAlmoco))}</td>
-        <td>${esc(horarioQtl(qtlJantar))}</td>
-        <td>${esc(vtr.observacao) || '-'}</td>
+        <td data-label="Companhia">${esc(vtr.companhia) || '-'}</td>
+        <td class="card-title-cell">${esc(vtr.prefixo)}</td>
+        <td data-label="Setor">${esc(vtr.setor)}</td>
+        <td data-label="QTL Almoço">${esc(horarioQtl(qtlAlmoco))}</td>
+        <td data-label="QTL Jantar">${esc(horarioQtl(qtlJantar))}</td>
+        <td data-label="Observação">${esc(vtr.observacao) || '-'}</td>
       </tr>
     `;
   }).join('');
@@ -3252,7 +3428,7 @@ function renderCartaoVtrGrid() {
         <td>${esc(item.local)}</td>
         <td><span class="badge ${atividadeBadgeClass(item.atividade)}">${esc(item.atividade)}</span></td>
         <td style="width:30px;">
-          <button class="btn-icon btn-sm" title="Remover item" onclick="handleDeleteCartaoItem('${vtr.id}', '${item.id}')">
+          <button class="btn-icon btn-sm" title="Remover item" aria-label="Remover item" onclick="handleDeleteCartaoItem('${vtr.id}', '${item.id}')">
             <i data-lucide="x" style="width:12px;height:12px;"></i>
           </button>
         </td>
@@ -3276,10 +3452,10 @@ function renderCartaoVtrGrid() {
           </div>
         </div>
         <div style="display:flex;gap:6px;">
-          <button class="btn-icon btn-sm" title="Editar viatura" onclick="abrirModalEditarVtr('${vtr.id}')">
+          <button class="btn-icon btn-sm" title="Editar viatura" aria-label="Editar viatura" onclick="abrirModalEditarVtr('${vtr.id}')">
             <i data-lucide="pencil" style="width:14px;height:14px;"></i>
           </button>
-          <button class="btn-icon btn-sm" title="Remover viatura" onclick="handleDeleteCartaoVtr('${vtr.id}')">
+          <button class="btn-icon btn-sm" title="Remover viatura" aria-label="Remover viatura" onclick="handleDeleteCartaoVtr('${vtr.id}')">
             <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
           </button>
         </div>
@@ -3436,20 +3612,22 @@ async function handleAddCartaoVtr(e) {
     observacao: document.getElementById('vtr_observacao').value.trim()
   };
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/cartoes/${state.cartaoAtual.id}/viaturas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      showToast(`VTR ${esc(payload.prefixo)} adicionada ao cartão.`, 'success');
-      document.getElementById('form-cartao-vtr').reset();
-      recarregarCartaoAtual();
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/cartoes/${state.cartaoAtual.id}/viaturas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showToast(`VTR ${esc(payload.prefixo)} adicionada ao cartão.`, 'success');
+        document.getElementById('form-cartao-vtr').reset();
+        recarregarCartaoAtual();
+      }
+    } catch (error) {
+      console.error(error);
     }
-  } catch (error) {
-    console.error(error);
-  }
+  });
 }
 
 let vtrEmEdicaoId = null;
@@ -3482,25 +3660,27 @@ async function handleSalvarEdicaoVtr(e) {
     observacao: document.getElementById('edit-vtr-observacao').value.trim()
   };
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/cartoes/${state.cartaoAtual.id}/viaturas/${vtrEmEdicaoId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const dados = await res.json();
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/cartoes/${state.cartaoAtual.id}/viaturas/${vtrEmEdicaoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const dados = await res.json();
 
-    if (res.ok) {
-      document.getElementById('modal-editar-vtr').classList.add('hidden');
-      showToast('Viatura atualizada com sucesso.', 'success');
-      recarregarCartaoAtual();
-    } else {
-      showToast(esc(dados.error) || 'Falha ao atualizar a viatura.', 'danger');
+      if (res.ok) {
+        document.getElementById('modal-editar-vtr').classList.add('hidden');
+        showToast('Viatura atualizada com sucesso.', 'success');
+        recarregarCartaoAtual();
+      } else {
+        showToast(esc(dados.error) || 'Falha ao atualizar a viatura.', 'danger');
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar viatura:", error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error("Erro ao atualizar viatura:", error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 window.handleAddCartaoItem = async function(vtrId) {
@@ -3600,13 +3780,13 @@ async function renderUsuariosTab() {
         <td><span class="badge ${roleBadgeClass(u.role)}">${esc(u.role)}</span></td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button class="btn-icon btn-sm" title="Editar" onclick="abrirModalUsuario('${esc(u.usuario)}', '${esc(u.nome)}', '${esc(u.role)}')">
+            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirModalUsuario('${esc(u.usuario)}', '${esc(u.nome)}', '${esc(u.role)}')">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-sm" title="Resetar Senha" onclick="abrirModalResetSenha('${esc(u.usuario)}', '${esc(u.nome)}')">
+            <button class="btn-icon btn-sm" title="Resetar Senha" aria-label="Resetar Senha" onclick="abrirModalResetSenha('${esc(u.usuario)}', '${esc(u.nome)}')">
               <i data-lucide="key-round" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" onclick="handleExcluirUsuario('${esc(u.usuario)}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirUsuario('${esc(u.usuario)}')">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>
           </div>
@@ -3659,35 +3839,37 @@ async function handleSalvarUsuario(e) {
   const role = document.getElementById('usr-role').value;
   const senha = document.getElementById('usr-senha').value;
 
-  try {
-    let res;
-    if (usuarioEmEdicao) {
-      res = await apiFetch(`${API_BASE_URL}/api/usuarios/${encodeURIComponent(usuarioEmEdicao)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, role })
-      });
-    } else {
-      res = await apiFetch(`${API_BASE_URL}/api/usuarios`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario: login, senha, nome, role })
-      });
-    }
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      let res;
+      if (usuarioEmEdicao) {
+        res = await apiFetch(`${API_BASE_URL}/api/usuarios/${encodeURIComponent(usuarioEmEdicao)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, role })
+        });
+      } else {
+        res = await apiFetch(`${API_BASE_URL}/api/usuarios`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario: login, senha, nome, role })
+        });
+      }
 
-    const dados = await res.json();
+      const dados = await res.json();
 
-    if (res.ok) {
-      document.getElementById('modal-usuario').classList.add('hidden');
-      showToast(usuarioEmEdicao ? 'Usuário atualizado com sucesso.' : 'Usuário criado com sucesso.', 'success');
-      renderUsuariosTab();
-    } else {
-      showToast(esc(dados.error) || 'Falha ao salvar o usuário.', 'danger');
+      if (res.ok) {
+        document.getElementById('modal-usuario').classList.add('hidden');
+        showToast(usuarioEmEdicao ? 'Usuário atualizado com sucesso.' : 'Usuário criado com sucesso.', 'success');
+        renderUsuariosTab();
+      } else {
+        showToast(esc(dados.error) || 'Falha ao salvar o usuário.', 'danger');
+      }
+    } catch (error) {
+      console.error("Erro ao salvar usuário:", error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error("Erro ao salvar usuário:", error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 window.abrirModalResetSenha = function(usuario, nome) {
@@ -3701,24 +3883,26 @@ async function handleResetarSenha(e) {
   e.preventDefault();
   const novaSenha = document.getElementById('reset-senha-nova').value;
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/usuarios/${encodeURIComponent(usuarioParaReset)}/resetar-senha`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ senha_nova: novaSenha })
-    });
-    const dados = await res.json();
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/usuarios/${encodeURIComponent(usuarioParaReset)}/resetar-senha`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha_nova: novaSenha })
+      });
+      const dados = await res.json();
 
-    if (res.ok) {
-      document.getElementById('modal-reset-senha').classList.add('hidden');
-      showToast(esc(dados.message) || 'Senha redefinida com sucesso.', 'success');
-    } else {
-      showToast(esc(dados.error) || 'Falha ao redefinir a senha.', 'danger');
+      if (res.ok) {
+        document.getElementById('modal-reset-senha').classList.add('hidden');
+        showToast(esc(dados.message) || 'Senha redefinida com sucesso.', 'success');
+      } else {
+        showToast(esc(dados.error) || 'Falha ao redefinir a senha.', 'danger');
+      }
+    } catch (error) {
+      console.error("Erro ao resetar senha:", error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error("Erro ao resetar senha:", error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 window.handleExcluirUsuario = async function(usuario) {
@@ -3778,10 +3962,10 @@ async function renderPessoalTab() {
         <td>${p.categorias.map(c => `<span class="badge outros" style="margin:2px;">${esc(c)}</span>`).join('')}</td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button class="btn-icon btn-sm" title="Editar" onclick="abrirModalPessoa('${p.id}')">
+            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirModalPessoa('${p.id}')">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" onclick="handleExcluirPessoa('${p.id}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirPessoa('${p.id}')">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>
           </div>
@@ -3832,36 +4016,38 @@ async function handleSalvarPessoa(e) {
     return;
   }
 
-  try {
-    let res;
-    if (pessoaEmEdicao) {
-      res = await apiFetch(`${API_BASE_URL}/api/pessoal/${pessoaEmEdicao}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, posto_graduacao, categorias })
-      });
-    } else {
-      res = await apiFetch(`${API_BASE_URL}/api/pessoal`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, posto_graduacao, categorias })
-      });
-    }
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      let res;
+      if (pessoaEmEdicao) {
+        res = await apiFetch(`${API_BASE_URL}/api/pessoal/${pessoaEmEdicao}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, posto_graduacao, categorias })
+        });
+      } else {
+        res = await apiFetch(`${API_BASE_URL}/api/pessoal`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, posto_graduacao, categorias })
+        });
+      }
 
-    const dados = await res.json();
+      const dados = await res.json();
 
-    if (res.ok) {
-      document.getElementById('modal-pessoa').classList.add('hidden');
-      showToast(pessoaEmEdicao ? 'Cadastro atualizado com sucesso.' : 'Pessoa cadastrada com sucesso.', 'success');
-      pessoalFiltroCategoria = ''; // força recarregar a lista completa em memória
-      renderPessoalTab();
-    } else {
-      showToast(esc(dados.error) || 'Falha ao salvar o cadastro.', 'danger');
+      if (res.ok) {
+        document.getElementById('modal-pessoa').classList.add('hidden');
+        showToast(pessoaEmEdicao ? 'Cadastro atualizado com sucesso.' : 'Pessoa cadastrada com sucesso.', 'success');
+        pessoalFiltroCategoria = ''; // força recarregar a lista completa em memória
+        renderPessoalTab();
+      } else {
+        showToast(esc(dados.error) || 'Falha ao salvar o cadastro.', 'danger');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar cadastro de pessoal:', error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error('Erro ao salvar cadastro de pessoal:', error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 window.handleExcluirPessoa = async function(id) {
@@ -3924,10 +4110,10 @@ async function renderViaturasTab() {
         <td>${esc(v.observacao) || '-'}</td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button class="btn-icon btn-sm" title="Editar" onclick="abrirModalViatura('${v.id}')">
+            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirModalViatura('${v.id}')">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" onclick="handleExcluirViatura('${v.id}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirViatura('${v.id}')">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>
           </div>
@@ -3978,35 +4164,37 @@ async function handleSalvarViatura(e) {
     observacao: document.getElementById('vtrcad-observacao').value.trim()
   };
 
-  try {
-    let res;
-    if (viaturaEmEdicao) {
-      res = await apiFetch(`${API_BASE_URL}/api/viaturas/${viaturaEmEdicao}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    } else {
-      res = await apiFetch(`${API_BASE_URL}/api/viaturas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    }
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      let res;
+      if (viaturaEmEdicao) {
+        res = await apiFetch(`${API_BASE_URL}/api/viaturas/${viaturaEmEdicao}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await apiFetch(`${API_BASE_URL}/api/viaturas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
 
-    const dados = await res.json();
+      const dados = await res.json();
 
-    if (res.ok) {
-      document.getElementById('modal-viatura').classList.add('hidden');
-      showToast(viaturaEmEdicao ? 'Viatura atualizada com sucesso.' : 'Viatura cadastrada com sucesso.', 'success');
-      renderViaturasTab();
-    } else {
-      showToast(esc(dados.error) || 'Falha ao salvar a viatura.', 'danger');
+      if (res.ok) {
+        document.getElementById('modal-viatura').classList.add('hidden');
+        showToast(viaturaEmEdicao ? 'Viatura atualizada com sucesso.' : 'Viatura cadastrada com sucesso.', 'success');
+        renderViaturasTab();
+      } else {
+        showToast(esc(dados.error) || 'Falha ao salvar a viatura.', 'danger');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar cadastro de viatura:', error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
     }
-  } catch (error) {
-    console.error('Erro ao salvar cadastro de viatura:', error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
+  });
 }
 
 window.handleExcluirViatura = async function(id) {
