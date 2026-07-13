@@ -650,6 +650,7 @@ body.sgo-sincronizando .topbar::before {
 .badge.religioso { background-color: var(--badge-evento-3); color: #fff; }
 .badge.ato-publico { background-color: var(--warning); color: #000; }
 .badge.cultural { background-color: var(--badge-evento-4); color: #fff; }
+.badge.evento-junino { background-color: var(--badge-evento-6); color: #fff; }
 .badge.missao-avulsa { background-color: var(--badge-evento-5); color: #fff; }
 .badge.outros { background-color: var(--badge-neutro); color: #fff; }
 

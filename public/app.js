@@ -1009,6 +1009,7 @@ const CORES_TIPO_EVENTO = {
   'Religioso': 'var(--badge-evento-3)',
   'Ato Público': 'var(--warning)',
   'Cultural': 'var(--badge-evento-4)',
+  'Evento Junino': 'var(--badge-evento-6)',
   'Missão Avulsa': 'var(--badge-evento-5)',
   'Outros': 'var(--badge-neutro)'
 };
