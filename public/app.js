@@ -520,21 +520,41 @@ function setupEventListeners() {
   });
   document.getElementById('btn-excluir-cartao').addEventListener('click', handleExcluirCartao);
 
-  // Menu overflow (⋯) do Cartão Programa — Templates / Novo Template
+  // Menu overflow (⋯) do Cartão Programa — Cartões Padrão / Novo Cartão Padrão.
+  // Posiciona o menu com position:fixed calculado do botão, pra escapar do clip dos
+  // containers de scroll (.main-content overflow:hidden, .tab-content overflow-y:auto),
+  // que não podem virar visible sem quebrar a rolagem do app.
   const overflowToggle = document.getElementById('btn-cartao-overflow-toggle');
   const overflowMenu = document.getElementById('cartao-overflow-menu');
+  const posicionarOverflowCartao = () => {
+    const rect = overflowToggle.getBoundingClientRect();
+    overflowMenu.style.position = 'fixed';
+    overflowMenu.style.top = `${rect.bottom + 6}px`;
+    overflowMenu.style.right = `${window.innerWidth - rect.right}px`;
+    overflowMenu.style.left = 'auto';
+  };
   const fecharOverflowCartao = () => {
     overflowMenu.classList.add('hidden');
     overflowToggle.setAttribute('aria-expanded', 'false');
+    window.removeEventListener('scroll', fecharOverflowCartao, true);
+    window.removeEventListener('resize', fecharOverflowCartao);
   };
   overflowToggle.addEventListener('click', (e) => {
     e.stopPropagation();
     const abrindo = overflowMenu.classList.contains('hidden');
-    overflowMenu.classList.toggle('hidden', !abrindo);
-    overflowToggle.setAttribute('aria-expanded', String(abrindo));
+    if (abrindo) {
+      posicionarOverflowCartao();
+      overflowMenu.classList.remove('hidden');
+      overflowToggle.setAttribute('aria-expanded', 'true');
+      // Menu fixo não acompanha scroll — fecha ao rolar/redimensionar (capture pega o scroll do .tab-content)
+      window.addEventListener('scroll', fecharOverflowCartao, true);
+      window.addEventListener('resize', fecharOverflowCartao);
+    } else {
+      fecharOverflowCartao();
+    }
   });
   document.addEventListener('click', (e) => {
-    if (!overflowMenu.classList.contains('hidden') && !e.target.closest('#cartao-overflow-dropdown')) {
+    if (!overflowMenu.classList.contains('hidden') && !e.target.closest('#cartao-overflow-dropdown') && e.target !== overflowMenu && !overflowMenu.contains(e.target)) {
       fecharOverflowCartao();
     }
   });
