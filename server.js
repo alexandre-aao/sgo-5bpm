@@ -241,6 +241,40 @@ async function buscarUsuarioPorLogin(usuario) {
   return data;
 }
 
+// Idem para o Cartão Programa (GET /api/cartoes/:id é chamado o tempo todo pela tela) —
+// evita ler as outras 9 tabelas de TABELAS só para achar um cartão por id.
+async function buscarCartaoPorId(id) {
+  const { data, error } = await supabase.from('cartoes').select('*').eq('id', id).maybeSingle();
+  if (error) throw new Error(`Falha ao buscar cartão: ${error.message}`);
+  return data;
+}
+
+async function buscarCartoesFiltrados({ data: dataFiltro, ano, mes }) {
+  // `data` é coluna `date` no Postgres — LIKE não se aplica (operador de texto), usa faixa
+  // (gte/lt) em vez de prefixo. Exceção: filtro só por mês (sem ano, todo histórico) não dá
+  // pra expressar como faixa contígua — busca só a tabela cartoes (ainda bem mais barato que
+  // readDB() inteiro) e filtra o mês em JS, igual à lógica original.
+  if (!dataFiltro && !ano && mes) {
+    const { data, error } = await supabase.from('cartoes').select('*').eq('is_template', false);
+    if (error) throw new Error(`Falha ao listar cartões: ${error.message}`);
+    return (data || []).filter(c => c.data && c.data.split('-')[1] === mes);
+  }
+
+  let query = supabase.from('cartoes').select('*').eq('is_template', false);
+  if (dataFiltro) {
+    query = query.eq('data', dataFiltro);
+  } else if (ano && mes) {
+    const inicio = `${ano}-${mes}-01`;
+    const proximoMes = mes === '12' ? `${Number(ano) + 1}-01-01` : `${ano}-${String(Number(mes) + 1).padStart(2, '0')}-01`;
+    query = query.gte('data', inicio).lt('data', proximoMes);
+  } else if (ano) {
+    query = query.gte('data', `${ano}-01-01`).lt('data', `${Number(ano) + 1}-01-01`);
+  }
+  const { data, error } = await query;
+  if (error) throw new Error(`Falha ao listar cartões: ${error.message}`);
+  return data || [];
+}
+
 // Envolve um handler assíncrono e converte qualquer erro (inclusive falha de conexão
 // com o Supabase) em 500, sem precisar repetir try/catch em cada rota.
 function asyncRoute(handler) {
@@ -1680,19 +1714,7 @@ app.get('/api/estatisticas-cartao', asyncRoute(async (req, res) => {
 
 // Lista resumida (filtrável por data exata, ou por mês/ano para o histórico) — nunca inclui templates
 app.get('/api/cartoes', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  let cartoes = (db.cartoes || []).filter(c => !c.is_template);
-
-  if (req.query.data) {
-    cartoes = cartoes.filter(c => c.data === req.query.data);
-  } else {
-    if (req.query.ano) {
-      cartoes = cartoes.filter(c => c.data.startsWith(req.query.ano));
-    }
-    if (req.query.mes) {
-      cartoes = cartoes.filter(c => c.data.split('-')[1] === req.query.mes);
-    }
-  }
+  const cartoes = await buscarCartoesFiltrados({ data: req.query.data, ano: req.query.ano, mes: req.query.mes });
 
   const resumo = cartoes
     .sort((a, b) => b.data.localeCompare(a.data))
@@ -1732,8 +1754,7 @@ app.get('/api/cartoes/templates', asyncRoute(async (req, res) => {
 
 // Detalhe completo de um cartão (ou template)
 app.get('/api/cartoes/:id', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
 
   // Reordena os itens por turno na leitura — cartões salvos antes desta mudança ainda estão
