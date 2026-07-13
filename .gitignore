@@ -5,3 +5,7 @@ data/db.json
 .vercel
 .claude/launch.json
 .claude/settings.local.json
+
+# Importador de eventos (utilitário local + dados operacionais reais) — não vai pro repo público
+importar_eventos.js
+eventos_limpos.json
