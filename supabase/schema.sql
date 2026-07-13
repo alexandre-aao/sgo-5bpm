@@ -97,8 +97,10 @@ create table if not exists pessoal (
   nome text not null,
   posto_graduacao text not null,
   tipo text not null check (tipo in ('Praça', 'Oficial')),
-  categorias text[] not null default '{}',
-  ativo boolean not null default true
+  categorias text[] not null default '{}', -- pode ficar vazio: efetivo geral sem papel no Cartão Programa ainda
+  ativo boolean not null default true,
+  matricula text default '', -- RE (matrícula), opcional, alimentado pela importação do relatório de efetivo do SGEPM
+  subunidade text default '' -- PCS / 1ª Companhia / 2ª Companhia / 3ª Companhia, texto livre (mesmo domínio de `companhia` em viaturas, mas sem "Não informada")
 );
 
 -- Cadastro central de viaturas: alimenta o autocomplete de prefixo no Cartão Programa,

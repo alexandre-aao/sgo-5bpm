@@ -293,6 +293,7 @@ const POSTOS_GRADUACAO = [
   { posto: 'Coronel PM', tipo: 'Oficial' }
 ];
 const CATEGORIAS_PESSOAL = ['Adjunto', 'Fiscal de Operações', 'Oficial de Operações', 'Oficial de Sobreaviso', 'Executor'];
+const SUBUNIDADES_PESSOAL = ['PCS', '1ª Companhia', '2ª Companhia', '3ª Companhia'];
 
 // -------------------------------------------------------------
 // SEGURANÇA: HASH DE SENHAS (scrypt) E SESSÕES COM EXPIRAÇÃO
@@ -599,15 +600,14 @@ app.post('/api/pessoal', exigirP3, asyncRoute(async (req, res) => {
 
   const db = await readDB();
   const { nome, posto_graduacao } = v.valores;
-  const { categorias } = req.body;
+  const { categorias, matricula, subunidade } = req.body;
   const postoInfo = POSTOS_GRADUACAO.find(p => p.posto === posto_graduacao);
   if (!postoInfo) {
     return res.status(400).json({ error: 'Posto/graduação inválido.' });
   }
+  // Categorias são opcionais: uma pessoa pode existir só como efetivo geral (ex: importação em massa
+  // do relatório de efetivo do SGEPM), sem papel definido ainda no Cartão Programa.
   const categoriasValidas = Array.isArray(categorias) ? categorias.filter(c => CATEGORIAS_PESSOAL.includes(c)) : [];
-  if (categoriasValidas.length === 0) {
-    return res.status(400).json({ error: 'Selecione ao menos uma categoria.' });
-  }
 
   const novaPessoa = {
     id: generateId('pes'),
@@ -615,7 +615,9 @@ app.post('/api/pessoal', exigirP3, asyncRoute(async (req, res) => {
     posto_graduacao,
     tipo: postoInfo.tipo,
     categorias: categoriasValidas,
-    ativo: true
+    ativo: true,
+    matricula: matricula ? String(matricula).trim().slice(0, 30) : '',
+    subunidade: SUBUNIDADES_PESSOAL.includes(subunidade) ? subunidade : ''
   };
   db.pessoal.push(novaPessoa);
   await writeDB(db, ['pessoal']);
@@ -638,9 +640,10 @@ app.put('/api/pessoal/:id', exigirP3, asyncRoute(async (req, res) => {
   }
   if (req.body.categorias !== undefined) {
     const categoriasValidas = Array.isArray(req.body.categorias) ? req.body.categorias.filter(c => CATEGORIAS_PESSOAL.includes(c)) : [];
-    if (categoriasValidas.length === 0) return res.status(400).json({ error: 'Selecione ao menos uma categoria.' });
     pessoa.categorias = categoriasValidas;
   }
+  if (req.body.matricula !== undefined) pessoa.matricula = String(req.body.matricula).trim().slice(0, 30);
+  if (req.body.subunidade !== undefined) pessoa.subunidade = SUBUNIDADES_PESSOAL.includes(req.body.subunidade) ? req.body.subunidade : '';
   if (req.body.ativo !== undefined) pessoa.ativo = !!req.body.ativo;
 
   await writeDB(db, ['pessoal']);

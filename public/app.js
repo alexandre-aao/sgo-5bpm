@@ -3933,33 +3933,40 @@ let pessoalListaAtual = []; // última lista carregada na tela, usada para abrir
 
 async function renderPessoalTab() {
   const tableBody = document.getElementById('table-pessoal-body');
-  tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Carregando...</td></tr>`;
+  tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">Carregando...</td></tr>`;
 
   try {
-    const params = pessoalFiltroCategoria ? `?categoria=${encodeURIComponent(pessoalFiltroCategoria)}` : '';
+    // "__sem_categoria__" é um filtro só do frontend (pessoas com categorias=[]) — a API não sabe filtrar por
+    // ausência de categoria, então nesse caso busca tudo e filtra aqui.
+    const filtroSemCategoria = pessoalFiltroCategoria === '__sem_categoria__';
+    const params = (pessoalFiltroCategoria && !filtroSemCategoria) ? `?categoria=${encodeURIComponent(pessoalFiltroCategoria)}` : '';
     const res = await apiFetch(`${API_BASE_URL}/api/pessoal${params}`);
-    const pessoal = await res.json();
+    let pessoal = await res.json();
 
     if (!res.ok) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:24px;">${esc(pessoal.error) || 'Falha ao carregar o cadastro de pessoal.'}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--danger);padding:24px;">${esc(pessoal.error) || 'Falha ao carregar o cadastro de pessoal.'}</td></tr>`;
       return;
     }
 
-    pessoalListaAtual = pessoal;
     // Mantém a lista completa em memória para alimentar os seletores de Fiscal/Adjunto/Sobreaviso no Cartão Programa
     if (!pessoalFiltroCategoria) state.pessoal = pessoal;
 
+    if (filtroSemCategoria) pessoal = pessoal.filter(p => !p.categorias || p.categorias.length === 0);
+    pessoalListaAtual = pessoal;
+
     if (pessoal.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhuma pessoa cadastrada${pessoalFiltroCategoria ? ' nesta categoria' : ''}.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhuma pessoa cadastrada${pessoalFiltroCategoria ? ' nesta categoria' : ''}.</td></tr>`;
       return;
     }
 
     tableBody.innerHTML = pessoal.map(p => `
       <tr>
+        <td>${esc(p.matricula) || '<span style="color:var(--text-muted);">—</span>'}</td>
         <td><strong>${esc(p.nome)}</strong></td>
+        <td>${esc(p.subunidade) || '<span style="color:var(--text-muted);">—</span>'}</td>
         <td>${esc(p.posto_graduacao)}</td>
         <td><span class="badge tipo-${p.tipo === 'Praça' ? 'praca' : 'oficial'}">${esc(p.tipo)}</span></td>
-        <td>${p.categorias.map(c => `<span class="badge outros" style="margin:2px;">${esc(c)}</span>`).join('')}</td>
+        <td>${p.categorias.length > 0 ? p.categorias.map(c => `<span class="badge outros" style="margin:2px;">${esc(c)}</span>`).join('') : '<span style="color:var(--text-muted);">Sem categoria</span>'}</td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
             <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirModalPessoa('${p.id}')">
@@ -3976,7 +3983,7 @@ async function renderPessoalTab() {
     lucide.createIcons();
   } catch (error) {
     console.error('Erro ao carregar o cadastro de pessoal:', error);
-    tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:24px;">Falha ao carregar o cadastro de pessoal.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--danger);padding:24px;">Falha ao carregar o cadastro de pessoal.</td></tr>`;
   }
 }
 
@@ -3992,6 +3999,8 @@ window.abrirModalPessoa = function(id) {
   if (pessoa) {
     titulo.innerHTML = `<i data-lucide="pencil"></i> Editar Pessoa`;
     document.getElementById('pes-nome').value = pessoa.nome;
+    document.getElementById('pes-matricula').value = pessoa.matricula || '';
+    document.getElementById('pes-subunidade').value = pessoa.subunidade || '';
     document.getElementById('pes-posto').value = pessoa.posto_graduacao;
     document.querySelectorAll('.pessoal-categorias-checkboxes input').forEach(cb => {
       cb.checked = pessoa.categorias.includes(cb.value);
@@ -4008,13 +4017,10 @@ async function handleSalvarPessoa(e) {
   e.preventDefault();
 
   const nome = document.getElementById('pes-nome').value.trim();
+  const matricula = document.getElementById('pes-matricula').value.trim();
+  const subunidade = document.getElementById('pes-subunidade').value;
   const posto_graduacao = document.getElementById('pes-posto').value;
   const categorias = Array.from(document.querySelectorAll('.pessoal-categorias-checkboxes input:checked')).map(cb => cb.value);
-
-  if (categorias.length === 0) {
-    showToast('Selecione ao menos uma categoria.', 'warning');
-    return;
-  }
 
   await comBotaoCarregando(e.submitter, async () => {
     try {
@@ -4023,13 +4029,13 @@ async function handleSalvarPessoa(e) {
         res = await apiFetch(`${API_BASE_URL}/api/pessoal/${pessoaEmEdicao}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome, posto_graduacao, categorias })
+          body: JSON.stringify({ nome, matricula, subunidade, posto_graduacao, categorias })
         });
       } else {
         res = await apiFetch(`${API_BASE_URL}/api/pessoal`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome, posto_graduacao, categorias })
+          body: JSON.stringify({ nome, matricula, subunidade, posto_graduacao, categorias })
         });
       }
 
