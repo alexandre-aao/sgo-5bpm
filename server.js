@@ -1112,39 +1112,64 @@ app.get('/api/planejador-diarias', asyncRoute(async (req, res) => {
 app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
   const hojeStr = getLocalDateStrServer();
-  const [anoAtual, mesAtual] = hojeStr.split('-');
-  const prefixoMesAtual = `${anoAtual}-${mesAtual}`;
+  const [anoHoje, mesHoje] = hojeStr.split('-');
 
-  // Eventos: total no mês corrente + próximos 7 dias
-  const eventosDoMes = db.eventos.filter(e => e.data_inicio.startsWith(prefixoMesAtual));
+  // Período do relatório: vem do filtro (?mes=&ano=) ou o mês/ano atual por padrão. "Hoje" (Cartão
+  // Programa de hoje, próximos 7 dias) continua sempre literal, independente do período escolhido.
+  const anoPeriodo = req.query.ano || anoHoje;
+  const mesPeriodo = req.query.mes || mesHoje;
+  const prefixoPeriodo = `${anoPeriodo}-${mesPeriodo}`;
+
+  const eventosDoPeriodo = db.eventos.filter(e => e.data_inicio.startsWith(prefixoPeriodo));
+  const idsEventosDoPeriodo = new Set(eventosDoPeriodo.map(e => e.id));
+
+  // Eventos: total no período + próximos 7 dias (sempre a partir de hoje, não do período filtrado)
   const daqui7Dias = new Date();
   daqui7Dias.setDate(daqui7Dias.getDate() + 7);
   const daqui7DiasStr = getLocalDateStrServer(daqui7Dias);
   const eventosProximos7Dias = db.eventos.filter(e => e.data_inicio >= hojeStr && e.data_inicio <= daqui7DiasStr).length;
 
-  // Planejador: saldo da cota do mês + missões planejadas não convertidas (mesma lógica de /api/planejador-diarias)
-  const idsEventosDoMes = new Set(eventosDoMes.map(e => e.id));
-  const consumidoMes = db.escalas
-    .filter(s => idsEventosDoMes.has(s.evento_id))
+  // Diárias: total pago no período + saldo da cota do período (mesma lógica de /api/planejador-diarias)
+  const consumidoPeriodo = db.escalas
+    .filter(s => idsEventosDoPeriodo.has(s.evento_id))
     .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
-  const missoesDoMes = (db.missoes_planejadas || []).filter(m => m.ano === anoAtual && m.mes === mesAtual);
-  const planejadoMes = missoesDoMes.reduce((sum, m) => sum + (m.qtd_diarias_por_ocorrencia || 0), 0);
+  const missoesDoPeriodo = (db.missoes_planejadas || []).filter(m => m.ano === anoPeriodo && m.mes === mesPeriodo);
+  const planejadoPeriodo = missoesDoPeriodo.reduce((sum, m) => sum + (m.qtd_diarias_por_ocorrencia || 0), 0);
   const cota = (db.config && db.config.cota_mensal_diarias) || 0;
-  const missoesNaoConvertidas = missoesDoMes.filter(m => !m.convertida_em_evento_id).length;
+  const missoesNaoConvertidas = missoesDoPeriodo.filter(m => !m.convertida_em_evento_id).length;
 
-  // Estatísticas: total de eventos no ano corrente (dado-destaque escolhido para o card)
-  const totalEventosAno = db.eventos.filter(e => e.data_inicio.startsWith(anoAtual)).length;
+  // Efetivo total empregado no período
+  const alocacoesDoPeriodo = db.alocacoes.filter(a => idsEventosDoPeriodo.has(a.evento_id));
+  const efetivoTotalPeriodo = alocacoesDoPeriodo.reduce((sum, a) => sum + a.qtd_policiais, 0);
 
-  // Cadastro de Pessoal: total + quebra Praça/Oficial
+  // Distribuição por tipo de missão/evento no período — mesma agregação de GET /api/estatisticas,
+  // só filtrada por mês+ano em vez de ano inteiro.
+  const mapaTipo = {};
+  eventosDoPeriodo.forEach(evt => {
+    const chave = evt.tipo_evento || 'Outros';
+    if (!mapaTipo[chave]) {
+      mapaTipo[chave] = { tipo_evento: chave, total_eventos: 0, total_policiais: 0, total_viaturas: 0 };
+    }
+    mapaTipo[chave].total_eventos += 1;
+    db.alocacoes.filter(a => a.evento_id === evt.id).forEach(a => {
+      mapaTipo[chave].total_policiais += a.qtd_policiais;
+      mapaTipo[chave].total_viaturas += a.qtd_viaturas;
+    });
+  });
+  const distribuicaoTipo = Object.values(mapaTipo).sort((a, b) => b.total_eventos - a.total_eventos);
+
+  // Cadastro de Pessoal: total + quebra Praça/Oficial (não depende de período)
   const totalPessoal = db.pessoal.length;
   const pracas = db.pessoal.filter(p => p.tipo === 'Praça').length;
   const oficiais = db.pessoal.filter(p => p.tipo === 'Oficial').length;
 
   res.json({
-    eventos: { total_mes: eventosDoMes.length, proximos_7_dias: eventosProximos7Dias },
-    planejador: { saldo_cota_mes: cota - consumidoMes - planejadoMes, missoes_nao_convertidas: missoesNaoConvertidas },
-    relatorio_diarias: { total_pago_mes: consumidoMes },
-    estatisticas: { total_eventos_ano: totalEventosAno },
+    periodo: { mes: mesPeriodo, ano: anoPeriodo },
+    eventos: { total_periodo: eventosDoPeriodo.length, proximos_7_dias: eventosProximos7Dias },
+    diarias: { total_pago_periodo: consumidoPeriodo, saldo_cota_periodo: cota - consumidoPeriodo - planejadoPeriodo },
+    planejador: { missoes_nao_convertidas: missoesNaoConvertidas },
+    efetivo_total_periodo: efetivoTotalPeriodo,
+    distribuicao_tipo: distribuicaoTipo,
     pessoal: { total: totalPessoal, pracas, oficiais },
     usuarios: { total: db.usuarios.length }
   });

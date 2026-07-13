@@ -146,16 +146,15 @@ function applyRolePermissions(user) {
   const btnCadastro = document.getElementById('nav-btn-cadastro');
   const btnRelatorio = document.getElementById('nav-btn-relatorio');
   const btnPlanejador = document.getElementById('nav-btn-planejador');
-  const btnEstatisticas = document.getElementById('nav-btn-estatisticas');
   const btnUsuarios = document.getElementById('nav-btn-usuarios');
   const btnPessoal = document.getElementById('nav-btn-pessoal');
   const btnViaturas = document.getElementById('nav-btn-viaturas');
   const btnTurno = document.getElementById('nav-btn-turno');
   const btnEventos = document.getElementById('nav-btn-eventos');
 
-  // Rótulos de seção exclusivos do P3 (Diárias, Análise, Administração só têm
-  // itens administrativos; Eventos e Patrulhamento sempre têm algo visível pra todo perfil)
-  const secoesSomenteP3 = ['nav-section-diarias', 'nav-section-analise', 'nav-section-administracao']
+  // Rótulos de seção exclusivos do P3 (Diárias, Administração só têm itens administrativos;
+  // Eventos e Patrulhamento sempre têm algo visível pra todo perfil)
+  const secoesSomenteP3 = ['nav-section-diarias', 'nav-section-administracao']
     .map(id => document.getElementById(id));
 
   // Ajusta visibilidade com base no Role
@@ -164,7 +163,6 @@ function applyRolePermissions(user) {
     btnCadastro.classList.remove('hidden-role');
     btnRelatorio.classList.remove('hidden-role');
     btnPlanejador.classList.remove('hidden-role');
-    btnEstatisticas.classList.remove('hidden-role');
     btnUsuarios.classList.remove('hidden-role');
     btnPessoal.classList.remove('hidden-role');
     btnViaturas.classList.remove('hidden-role');
@@ -182,7 +180,6 @@ function applyRolePermissions(user) {
     btnCadastro.classList.add('hidden-role');
     btnRelatorio.classList.add('hidden-role');
     btnPlanejador.classList.add('hidden-role');
-    btnEstatisticas.classList.add('hidden-role');
     btnUsuarios.classList.add('hidden-role');
     btnPessoal.classList.add('hidden-role');
     btnViaturas.classList.add('hidden-role');
@@ -214,7 +211,6 @@ function setupNavigation() {
     'tab-eventos': { title: 'Consulta Geral de Pautas', subtitle: 'Lista consolidada de eventos históricos e futuros com filtros de busca.' },
     'tab-mapa': { title: 'Mapa de Eventos da Semana', subtitle: 'Localização geográfica dos eventos da semana corrente por bairro.' },
     'tab-planejador': { title: 'Planejador Mensal de Diárias', subtitle: 'Controle da cota mensal e distribuição de diárias operacionais por evento.' },
-    'tab-estatisticas': { title: 'Painel Analítico de Policiamento', subtitle: 'Cruzamento de dados históricos para apoiar o planejamento de efetivo e recursos.' },
     'tab-cartao': { title: 'Cartão Programa', subtitle: 'Roteiro diário de patrulhamento das viaturas: locais, horários e atividades.' },
     'tab-usuarios': { title: 'Usuários do Sistema', subtitle: 'Gestão de perfis de acesso e redefinição de senhas.' },
     'tab-pessoal': { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' },
@@ -252,8 +248,6 @@ function setupNavigation() {
         renderMapaTab();
       } else if (targetId === 'tab-planejador') {
         renderPlanejadorTab();
-      } else if (targetId === 'tab-estatisticas') {
-        renderEstatisticasTab();
       } else if (targetId === 'tab-cartao') {
         renderCartaoTab();
       } else if (targetId === 'tab-usuarios') {
@@ -509,8 +503,9 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-missao-planejada').addEventListener('click', fecharModalMissaoPlanejada);
   document.getElementById('form-missao-planejada').addEventListener('submit', handleCriarMissaoPlanejada);
 
-  // Filtro de ano do Painel de Estatísticas
-  document.getElementById('stats-filter-ano').addEventListener('change', renderEstatisticasTab);
+  // Filtro de período do Dashboard (reprocessa os cards-resumo + donut de distribuição por tipo)
+  document.getElementById('dashboard-filtro-mes').addEventListener('change', renderDashboardResumo);
+  document.getElementById('dashboard-filtro-ano').addEventListener('change', renderDashboardResumo);
 
   // Cartão Programa
   document.getElementById('cartao-data').addEventListener('change', renderCartaoTab);
@@ -586,7 +581,7 @@ function initPeriodFilters() {
   const mesAtual = String(agora.getMonth() + 1).padStart(2, '0');
   const anoAtual = agora.getFullYear();
 
-  ['filter-ano', 'plan-filter-ano', 'stats-filter-ano'].forEach(id => {
+  ['filter-ano', 'plan-filter-ano', 'dashboard-filtro-ano'].forEach(id => {
     const sel = document.getElementById(id);
     sel.innerHTML = '';
     for (let ano = anoAtual - 1; ano <= anoAtual + 2; ano++) {
@@ -600,6 +595,7 @@ function initPeriodFilters() {
 
   document.getElementById('filter-mes').value = mesAtual;
   document.getElementById('plan-filter-mes').value = mesAtual;
+  document.getElementById('dashboard-filtro-mes').value = mesAtual;
 }
 
 // -------------------------------------------------------------
@@ -753,8 +749,6 @@ async function fetchData() {
       renderMapaTab();
     } else if (activeTab === 'tab-planejador') {
       renderPlanejadorTab();
-    } else if (activeTab === 'tab-estatisticas') {
-      renderEstatisticasTab();
     }
 
     // Se a gaveta lateral de detalhes do evento estiver aberta, recarrega
@@ -987,27 +981,80 @@ window.handleDashboardCardClick = function(navBtnId) {
   document.getElementById(navBtnId).click();
 };
 
+// Cores da distribuição por tipo — reaproveita exatamente as mesmas variáveis já usadas nos
+// badges de tipo_evento (Listar Eventos), pra consistência visual automática entre as telas.
+const CORES_TIPO_EVENTO = {
+  'Show': 'var(--badge-evento-1)',
+  'Futebol': 'var(--badge-evento-2)',
+  'Religioso': 'var(--badge-evento-3)',
+  'Ato Público': 'var(--warning)',
+  'Cultural': 'var(--badge-evento-4)',
+  'Missão Avulsa': 'var(--badge-evento-5)',
+  'Outros': 'var(--badge-neutro)'
+};
+function corTipoEvento(tipo) {
+  return CORES_TIPO_EVENTO[tipo] || 'var(--badge-neutro)';
+}
+
+// Donut SVG feito à mão (sem lib nova), mesmo espírito de renderSparkline/renderSazonalidadeChart —
+// cada fatia é um segmento de circle via stroke-dasharray/stroke-dashoffset.
+function renderDashboardDonut(distribuicaoTipo) {
+  const container = document.getElementById('dashboard-donut-tipo');
+  if (!container) return;
+
+  const total = (distribuicaoTipo || []).reduce((sum, t) => sum + t.total_eventos, 0);
+  if (total === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px;">Sem eventos neste período.</p>';
+    return;
+  }
+
+  const r = 40, cx = 50, cy = 50, larguraTraço = 16;
+  const circunferencia = 2 * Math.PI * r;
+  let acumulado = 0;
+  const fatias = distribuicaoTipo.map(t => {
+    const comprimento = (t.total_eventos / total) * circunferencia;
+    const offset = -acumulado;
+    acumulado += comprimento;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${corTipoEvento(t.tipo_evento)}" stroke-width="${larguraTraço}" stroke-dasharray="${comprimento} ${circunferencia - comprimento}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"><title>${esc(t.tipo_evento)}: ${t.total_eventos} evento(s)</title></circle>`;
+  }).join('');
+
+  const legenda = distribuicaoTipo.map(t => `
+    <span><i class="legenda-dot" style="background:${corTipoEvento(t.tipo_evento)};"></i> ${esc(t.tipo_evento)} (${t.total_eventos})</span>
+  `).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 100 100" class="dashboard-donut-svg">
+      ${fatias}
+      <text x="50" y="55" text-anchor="middle" class="dashboard-donut-total">${total}</text>
+    </svg>
+    <div class="dashboard-donut-legenda">${legenda}</div>
+  `;
+}
+
 async function renderDashboardResumo() {
+  const mes = document.getElementById('dashboard-filtro-mes').value;
+  const ano = document.getElementById('dashboard-filtro-ano').value;
+
   try {
-    const res = await apiFetch(`${API_BASE_URL}/api/dashboard-resumo`);
+    const res = await apiFetch(`${API_BASE_URL}/api/dashboard-resumo?mes=${mes}&ano=${ano}`);
     const resumo = await res.json();
     if (!res.ok) throw new Error(resumo.error || 'Falha ao carregar o resumo do Dashboard.');
 
     document.getElementById('dash-resumo-eventos').textContent =
-      `${resumo.eventos.total_mes} no mês · ${resumo.eventos.proximos_7_dias} nos próximos 7 dias`;
-    document.getElementById('dash-resumo-planejador').textContent =
-      `Saldo: ${resumo.planejador.saldo_cota_mes} diária(s) · ${resumo.planejador.missoes_nao_convertidas} missão(ões) não convertida(s)`;
-    document.getElementById('dash-resumo-relatorio').textContent =
-      `${resumo.relatorio_diarias.total_pago_mes} diária(s) pagas no mês`;
-    document.getElementById('dash-resumo-estatisticas').textContent =
-      `${resumo.estatisticas.total_eventos_ano} evento(s) no ano`;
+      `${resumo.eventos.total_periodo} no período · ${resumo.eventos.proximos_7_dias} nos próximos 7 dias`;
+    document.getElementById('dash-resumo-diarias').textContent =
+      `${resumo.diarias.total_pago_periodo} paga(s) · saldo de ${resumo.diarias.saldo_cota_periodo} · ${resumo.planejador.missoes_nao_convertidas} missão(ões) não convertida(s)`;
+    document.getElementById('dash-resumo-efetivo').textContent =
+      `${resumo.efetivo_total_periodo} militar(es) empregado(s) no período`;
     document.getElementById('dash-resumo-pessoal').textContent =
       `${resumo.pessoal.total} militar(es) · ${resumo.pessoal.pracas} Praça(s) / ${resumo.pessoal.oficiais} Oficial(is)`;
     document.getElementById('dash-resumo-usuarios').textContent =
       `${resumo.usuarios.total} conta(s) cadastrada(s)`;
+
+    renderDashboardDonut(resumo.distribuicao_tipo);
   } catch (error) {
     console.error('Erro ao carregar o resumo do Dashboard:', error);
-    ['dash-resumo-eventos', 'dash-resumo-planejador', 'dash-resumo-relatorio', 'dash-resumo-estatisticas', 'dash-resumo-pessoal', 'dash-resumo-usuarios']
+    ['dash-resumo-eventos', 'dash-resumo-diarias', 'dash-resumo-efetivo', 'dash-resumo-pessoal', 'dash-resumo-usuarios']
       .forEach(id => { document.getElementById(id).textContent = 'Falha ao carregar.'; });
   }
 }
@@ -2604,186 +2651,6 @@ function renderSparkline(elementId, valores) {
   `;
 }
 
-async function renderEstatisticasTab() {
-  const ano = document.getElementById('stats-filter-ano').value;
-
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/estatisticas?ano=${ano}`);
-    const data = await res.json();
-
-    // Cards de resumo
-    document.getElementById('stats-total-eventos').textContent = data.resumo.total_eventos;
-    document.getElementById('stats-total-policiais').textContent = data.resumo.total_policiais;
-    document.getElementById('stats-total-viaturas').textContent = data.resumo.total_viaturas;
-    document.getElementById('stats-total-diarias').textContent = data.resumo.total_diarias;
-
-    // Tabela: Por Bairro
-    const bodyBairro = document.getElementById('table-stats-bairro-body');
-    if (data.por_bairro.length === 0) {
-      bodyBairro.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">Sem dados para este ano.</td></tr>`;
-    } else {
-      bodyBairro.innerHTML = data.por_bairro.map(item => `
-        <tr>
-          <td>${esc(item.bairro)}</td>
-          <td class="text-center">${item.total_eventos}</td>
-          <td class="text-center">${item.total_policiais}</td>
-          <td class="text-center">${item.total_viaturas}</td>
-        </tr>
-      `).join('');
-    }
-
-    // Tabela: Por Tipo de Evento
-    const bodyTipo = document.getElementById('table-stats-tipo-body');
-    if (data.por_tipo.length === 0) {
-      bodyTipo.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">Sem dados para este ano.</td></tr>`;
-    } else {
-      bodyTipo.innerHTML = data.por_tipo.map(item => {
-        const typeClass = item.tipo_evento.toLowerCase().replace(' ', '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        return `
-        <tr>
-          <td><span class="badge ${typeClass}">${esc(item.tipo_evento)}</span></td>
-          <td class="text-center">${item.total_eventos}</td>
-          <td class="text-center">${item.total_policiais}</td>
-          <td class="text-center">${item.media_policiais_por_evento}</td>
-        </tr>
-      `;
-      }).join('');
-    }
-
-    // Tabela: Por Modalidade
-    const bodyModalidade = document.getElementById('table-stats-modalidade-body');
-    if (data.por_modalidade.length === 0) {
-      bodyModalidade.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">Sem dados para este ano.</td></tr>`;
-    } else {
-      bodyModalidade.innerHTML = data.por_modalidade.map(item => `
-        <tr>
-          <td>${esc(item.modalidade)}</td>
-          <td class="text-center">${item.total_policiais}</td>
-          <td class="text-center">${item.total_viaturas}</td>
-          <td class="text-right">${item.percentual_efetivo}%</td>
-        </tr>
-      `).join('');
-    }
-
-    // Gráfico de Sazonalidade: Planejados x Realizados por mês, com pico de diárias destacado
-    renderSazonalidadeChart(data.tendencia_mensal);
-
-    // Mini-sparklines dos cards de resumo (evolução mensal no ano filtrado)
-    renderSparkline('spark-stats-eventos', data.tendencia_mensal.map(m => m.total_eventos));
-    renderSparkline('spark-stats-policiais', data.tendencia_mensal.map(m => m.total_policiais));
-    renderSparkline('spark-stats-viaturas', data.tendencia_mensal.map(m => m.total_viaturas));
-    renderSparkline('spark-stats-diarias', data.tendencia_mensal.map(m => m.total_diarias));
-
-    // Tabela: Tendência Mensal (com mini-barra proporcional ao maior mês)
-    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const maiorEfetivoMes = Math.max(1, ...data.tendencia_mensal.map(m => m.total_policiais));
-    const bodyTendencia = document.getElementById('table-stats-tendencia-body');
-    bodyTendencia.innerHTML = data.tendencia_mensal.map(item => {
-      const pct = (item.total_policiais / maiorEfetivoMes) * 100;
-      return `
-        <tr>
-          <td><strong>${meses[parseInt(item.mes, 10) - 1]}</strong></td>
-          <td class="text-center">${item.total_eventos}</td>
-          <td>
-            <div class="mini-bar-row">
-              <div class="mini-bar-track">
-                <div class="mini-bar-fill" style="width:${pct}%;"></div>
-              </div>
-              <span class="mini-bar-value">${item.total_policiais}</span>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-  } catch (error) {
-    console.error("Erro ao carregar estatísticas:", error);
-    showToast('Falha ao carregar o painel analítico.', 'danger');
-  }
-
-  await renderEstatisticasCartaoTab(ano);
-}
-
-// Estatísticas de patrulhamento (Cartão Programa), mesma seleção de ano da aba
-async function renderEstatisticasCartaoTab(ano) {
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/estatisticas-cartao?ano=${ano}`);
-    const data = await res.json();
-
-    document.getElementById('stats-cartao-total-cartoes').textContent = data.resumo.total_cartoes;
-    document.getElementById('stats-cartao-total-viaturas-dia').textContent = data.resumo.total_viaturas_dia;
-    document.getElementById('stats-cartao-total-itens').textContent = data.resumo.total_itens_roteiro;
-    document.getElementById('stats-cartao-total-horas').textContent = data.resumo.total_horas;
-
-    // Tabela: Por Setor
-    const bodySetor = document.getElementById('table-stats-cartao-setor-body');
-    if (data.por_setor.length === 0) {
-      bodySetor.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:24px;">Sem cartões lançados neste ano.</td></tr>`;
-    } else {
-      bodySetor.innerHTML = data.por_setor.map(item => `
-        <tr>
-          <td>${esc(item.setor)}</td>
-          <td class="text-center">${item.qtd_itens}</td>
-          <td class="text-center">${item.horas_totais}</td>
-        </tr>
-      `).join('');
-    }
-
-    // Tabela: Por Atividade
-    const bodyAtividade = document.getElementById('table-stats-cartao-atividade-body');
-    if (data.por_atividade.length === 0) {
-      bodyAtividade.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:24px;">Sem cartões lançados neste ano.</td></tr>`;
-    } else {
-      bodyAtividade.innerHTML = data.por_atividade.map(item => `
-        <tr>
-          <td><span class="badge ${atividadeBadgeClass(item.atividade)}">${esc(item.atividade)}</span></td>
-          <td class="text-center">${item.qtd_itens}</td>
-          <td class="text-right">${item.percentual}%</td>
-        </tr>
-      `).join('');
-    }
-
-    // Tabela: Por Viatura
-    const bodyViatura = document.getElementById('table-stats-cartao-viatura-body');
-    if (data.por_viatura.length === 0) {
-      bodyViatura.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:24px;">Sem cartões lançados neste ano.</td></tr>`;
-    } else {
-      bodyViatura.innerHTML = data.por_viatura.map(item => `
-        <tr>
-          <td><strong>${esc(item.prefixo)}</strong></td>
-          <td class="text-center">${item.qtd_dias}</td>
-          <td class="text-center">${item.qtd_itens}</td>
-        </tr>
-      `).join('');
-    }
-
-    // Tabela: Tendência Mensal (mini-barra proporcional ao maior mês)
-    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const maiorViaturasDiaMes = Math.max(1, ...data.tendencia_mensal.map(m => m.total_viaturas_dia));
-    const bodyTendenciaCartao = document.getElementById('table-stats-cartao-tendencia-body');
-    bodyTendenciaCartao.innerHTML = data.tendencia_mensal.map(item => {
-      const pct = (item.total_viaturas_dia / maiorViaturasDiaMes) * 100;
-      return `
-        <tr>
-          <td><strong>${meses[parseInt(item.mes, 10) - 1]}</strong></td>
-          <td class="text-center">${item.total_cartoes}</td>
-          <td>
-            <div class="mini-bar-row">
-              <div class="mini-bar-track">
-                <div class="mini-bar-fill" style="width:${pct}%;"></div>
-              </div>
-              <span class="mini-bar-value">${item.total_viaturas_dia}</span>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-  } catch (error) {
-    console.error("Erro ao carregar estatísticas do Cartão Programa:", error);
-    showToast('Falha ao carregar as estatísticas de patrulhamento.', 'danger');
-  }
-}
 
 // -------------------------------------------------------------
 // TELA 8: CARTÃO PROGRAMA (PATRULHAMENTO DIÁRIO POR VIATURA)

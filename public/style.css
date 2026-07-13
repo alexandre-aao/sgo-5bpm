@@ -832,6 +832,53 @@ body.sgo-sincronizando .topbar::before {
   margin-bottom: 24px;
 }
 
+.dashboard-periodo-filtro {
+  margin-bottom: 20px;
+}
+
+.dashboard-donut-panel {
+  margin-bottom: 24px;
+}
+
+.dashboard-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+  padding: 8px 4px 16px;
+}
+
+.dashboard-donut-svg {
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
+}
+
+.dashboard-donut-svg circle {
+  transition: stroke-dasharray 0.3s ease;
+}
+
+.dashboard-donut-total {
+  font-family: var(--font-title);
+  font-size: 1rem;
+  font-weight: 700;
+  fill: var(--text-main);
+}
+
+.dashboard-donut-legenda {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.dashboard-donut-legenda span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .dash-patrulhamento-panel {
   margin-top: 24px;
 }
@@ -2733,6 +2780,9 @@ body.sgo-sincronizando .topbar::before {
     opacity: 1;
     visibility: visible;
   }
+
+  /* Donut de distribuição por tipo (Dashboard) — só em desktop, poupa processamento em tela pequena */
+  .dashboard-donut-panel { display: none; }
 
   /* Tabela -> card em telas pequenas: CSS-only, reaproveita o mesmo <tr>/<td> do
      desktop, sem duplicar lógica de render em JS. Cada <td> precisa de

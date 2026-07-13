@@ -114,13 +114,6 @@
           <span>Relatório Diárias</span>
         </button>
 
-        <!-- Seção: Análise -->
-        <div class="nav-section-label" id="nav-section-analise">Análise</div>
-        <button class="nav-btn" id="nav-btn-estatisticas" data-target="tab-estatisticas">
-          <i data-lucide="bar-chart-3"></i>
-          <span>Estatísticas</span>
-        </button>
-
         <!-- Seção: Administração -->
         <div class="nav-section-label" id="nav-section-administracao">Administração</div>
         <button class="nav-btn" id="nav-btn-usuarios" data-target="tab-usuarios">
@@ -229,13 +222,45 @@
           </div>
         </div>
 
-        <!-- Grid de cards-resumo por módulo, cada um clicável levando à aba correspondente -->
+        <!-- Filtro de período: reprocessa os cards abaixo e o donut de distribuição por tipo -->
+        <div class="report-filters dashboard-periodo-filtro">
+          <div class="filter-group">
+            <label for="dashboard-filtro-mes">Mês</label>
+            <select id="dashboard-filtro-mes">
+              <option value="01">Janeiro</option>
+              <option value="02">Fevereiro</option>
+              <option value="03">Março</option>
+              <option value="04">Abril</option>
+              <option value="05">Maio</option>
+              <option value="06">Junho</option>
+              <option value="07">Julho</option>
+              <option value="08">Agosto</option>
+              <option value="09">Setembro</option>
+              <option value="10">Outubro</option>
+              <option value="11">Novembro</option>
+              <option value="12">Dezembro</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="dashboard-filtro-ano">Ano</label>
+            <select id="dashboard-filtro-ano"></select>
+          </div>
+        </div>
+
+        <!-- Grid de cards-resumo do período selecionado, cada um clicável levando à aba correspondente -->
         <div class="dashboard-grid">
           <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-eventos')" title="Ir para Listar Eventos">
             <div class="stat-icon"><i data-lucide="calendar-range"></i></div>
             <div class="stat-info">
               <h3>Eventos</h3>
               <p id="dash-resumo-eventos">Carregando...</p>
+            </div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-planejador')" title="Ir para o Planejador de Diárias">
+            <div class="stat-icon info"><i data-lucide="wallet"></i></div>
+            <div class="stat-info">
+              <h3>Diárias</h3>
+              <p id="dash-resumo-diarias">Carregando...</p>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-cartao')" title="Ir para o Cartão Programa">
@@ -245,25 +270,11 @@
               <p id="dash-resumo-cartao">Carregando...</p>
             </div>
           </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-planejador')" title="Ir para o Planejador de Diárias">
-            <div class="stat-icon info"><i data-lucide="wallet"></i></div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-eventos')" title="Ir para Listar Eventos">
+            <div class="stat-icon info"><i data-lucide="users"></i></div>
             <div class="stat-info">
-              <h3>Planejador de Diárias</h3>
-              <p id="dash-resumo-planejador">Carregando...</p>
-            </div>
-          </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-relatorio')" title="Ir para o Relatório de Diárias">
-            <div class="stat-icon"><i data-lucide="file-text"></i></div>
-            <div class="stat-info">
-              <h3>Relatório de Diárias</h3>
-              <p id="dash-resumo-relatorio">Carregando...</p>
-            </div>
-          </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-estatisticas')" title="Ir para Estatísticas">
-            <div class="stat-icon"><i data-lucide="bar-chart-3"></i></div>
-            <div class="stat-info">
-              <h3>Estatísticas</h3>
-              <p id="dash-resumo-estatisticas">Carregando...</p>
+              <h3>Efetivo Total Empregado</h3>
+              <p id="dash-resumo-efetivo">Carregando...</p>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-pessoal')" title="Ir para o Cadastro de Pessoal">
@@ -280,6 +291,17 @@
               <p id="dash-resumo-usuarios">Carregando...</p>
             </div>
           </div>
+        </div>
+
+        <!-- Distribuição por tipo de missão/evento no período — só em desktop (@media 768px oculta) -->
+        <div class="panel dashboard-donut-panel" id="dashboard-donut-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i data-lucide="pie-chart"></i>
+              <h2>Distribuição por Tipo de Missão</h2>
+            </div>
+          </div>
+          <div id="dashboard-donut-tipo" class="dashboard-donut-wrap"></div>
         </div>
 
         <!-- Patrulhamento de Hoje (preview do Cartão Programa) -->
@@ -817,300 +839,6 @@
                 <!-- Injetado dinamicamente -->
               </tbody>
             </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- Aba 7: Estatísticas (Painel Analítico para Planejamento) (Apenas P3) -->
-      <section id="tab-estatisticas" class="tab-content">
-        <div class="panel-header flex-column-mobile" style="border:none;padding:0 0 16px 0;">
-          <div class="panel-title">
-            <i data-lucide="bar-chart-3"></i>
-            <h2>Painel Analítico de Policiamento</h2>
-          </div>
-          <div class="filter-group">
-            <label for="stats-filter-ano">Ano de Referência</label>
-            <select id="stats-filter-ano"></select>
-          </div>
-        </div>
-
-        <div class="stats-row">
-          <div class="stat-card">
-            <div class="stat-icon">
-              <i data-lucide="calendar"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Eventos no Ano</h3>
-              <p id="stats-total-eventos">0</p>
-              <svg class="stat-sparkline" id="spark-stats-eventos" preserveAspectRatio="none"></svg>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon info">
-              <i data-lucide="users"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Efetivo Total Empregado</h3>
-              <p id="stats-total-policiais">0</p>
-              <svg class="stat-sparkline" id="spark-stats-policiais" preserveAspectRatio="none"></svg>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon alert">
-              <i data-lucide="car"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Viaturas Totais Empregadas</h3>
-              <p id="stats-total-viaturas">0</p>
-              <svg class="stat-sparkline" id="spark-stats-viaturas" preserveAspectRatio="none"></svg>
-            </div>
-          </div>
-          <div class="stat-card success">
-            <div class="stat-icon success">
-              <i data-lucide="wallet"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Diárias Pagas no Ano</h3>
-              <p id="stats-total-diarias">0</p>
-              <svg class="stat-sparkline" id="spark-stats-diarias" preserveAspectRatio="none"></svg>
-            </div>
-          </div>
-        </div>
-
-        <div class="dashboard-grid">
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="map-pin"></i>
-                <h2>Efetivo Empregado por Bairro</h2>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="styled-table" id="table-stats-bairro">
-                <thead>
-                  <tr>
-                    <th>Bairro</th>
-                    <th class="text-center">Eventos</th>
-                    <th class="text-center">Policiais</th>
-                    <th class="text-center">Viaturas</th>
-                  </tr>
-                </thead>
-                <tbody id="table-stats-bairro-body"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="tag"></i>
-                <h2>Demanda por Tipo de Evento</h2>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="styled-table" id="table-stats-tipo">
-                <thead>
-                  <tr>
-                    <th>Tipo</th>
-                    <th class="text-center">Eventos</th>
-                    <th class="text-center">Policiais</th>
-                    <th class="text-center">Média PM/Evento</th>
-                  </tr>
-                </thead>
-                <tbody id="table-stats-tipo-body"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="shield-half"></i>
-                <h2>Distribuição por Modalidade</h2>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="styled-table" id="table-stats-modalidade">
-                <thead>
-                  <tr>
-                    <th>Modalidade</th>
-                    <th class="text-center">Policiais</th>
-                    <th class="text-center">Viaturas</th>
-                    <th class="text-right">% do Efetivo</th>
-                  </tr>
-                </thead>
-                <tbody id="table-stats-modalidade-body"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="activity"></i>
-                <h2>Sazonalidade — Planejados x Realizados</h2>
-              </div>
-            </div>
-            <div class="sazonalidade-wrap">
-              <div id="chart-sazonalidade" class="sazonalidade-chart"></div>
-              <div class="sazonalidade-legenda">
-                <span><i class="legenda-dot legenda-planejado"></i> Planejados</span>
-                <span><i class="legenda-dot legenda-realizado"></i> Realizados</span>
-                <span><i class="legenda-dot legenda-pico"></i> Pico de diárias</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="trending-up"></i>
-                <h2>Tendência Mensal (Eventos x Efetivo)</h2>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="styled-table" id="table-stats-tendencia">
-                <thead>
-                  <tr>
-                    <th>Mês</th>
-                    <th class="text-center">Eventos</th>
-                    <th>Efetivo Empregado</th>
-                  </tr>
-                </thead>
-                <tbody id="table-stats-tendencia-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Estatísticas do Cartão Programa (Patrulhamento) -->
-        <div class="stats-section-divider">
-          <i data-lucide="route"></i>
-          <h2>Estatísticas de Patrulhamento (Cartão Programa)</h2>
-        </div>
-
-        <div class="stats-row">
-          <div class="stat-card">
-            <div class="stat-icon">
-              <i data-lucide="clipboard-list"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Cartões Lançados no Ano</h3>
-              <p id="stats-cartao-total-cartoes">0</p>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon info">
-              <i data-lucide="car"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Viaturas-Dia no Ano</h3>
-              <p id="stats-cartao-total-viaturas-dia">0</p>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon alert">
-              <i data-lucide="list-checks"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Itens de Roteiro Lançados</h3>
-              <p id="stats-cartao-total-itens">0</p>
-            </div>
-          </div>
-          <div class="stat-card success">
-            <div class="stat-icon success">
-              <i data-lucide="clock"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Horas de Patrulhamento Registradas</h3>
-              <p id="stats-cartao-total-horas">0</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="dashboard-grid">
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="map-pin"></i>
-                <h2>Patrulhamento por Setor / Bairro</h2>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="styled-table" id="table-stats-cartao-setor">
-                <thead>
-                  <tr>
-                    <th>Setor</th>
-                    <th class="text-center">Itens de Roteiro</th>
-                    <th class="text-center">Horas Registradas</th>
-                  </tr>
-                </thead>
-                <tbody id="table-stats-cartao-setor-body"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="tag"></i>
-                <h2>Distribuição por Tipo de Atividade</h2>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="styled-table" id="table-stats-cartao-atividade">
-                <thead>
-                  <tr>
-                    <th>Atividade</th>
-                    <th class="text-center">Ocorrências</th>
-                    <th class="text-right">% do Total</th>
-                  </tr>
-                </thead>
-                <tbody id="table-stats-cartao-atividade-body"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="car"></i>
-                <h2>Utilização por Viatura</h2>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="styled-table" id="table-stats-cartao-viatura">
-                <thead>
-                  <tr>
-                    <th>Viatura</th>
-                    <th class="text-center">Dias Escalada</th>
-                    <th class="text-center">Itens de Roteiro</th>
-                  </tr>
-                </thead>
-                <tbody id="table-stats-cartao-viatura-body"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="trending-up"></i>
-                <h2>Tendência Mensal (Cartões x Viaturas-Dia)</h2>
-              </div>
-            </div>
-            <div class="table-responsive">
-              <table class="styled-table" id="table-stats-cartao-tendencia">
-                <thead>
-                  <tr>
-                    <th>Mês</th>
-                    <th class="text-center">Cartões Lançados</th>
-                    <th>Viaturas-Dia</th>
-                  </tr>
-                </thead>
-                <tbody id="table-stats-cartao-tendencia-body"></tbody>
-              </table>
-            </div>
           </div>
         </div>
       </section>
