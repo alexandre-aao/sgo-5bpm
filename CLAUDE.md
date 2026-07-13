@@ -115,6 +115,6 @@ Botão "Gerar Relatório para SEI" (Listar Eventos, por período filtrado) e na 
 
 Repositório Git local, remoto `alexandre-aao/sgo-5bpm` no GitHub, conectado à Vercel (deploy automático a cada push em `main`). Mudanças em arquivos versionados só chegam à produção depois de commit + push — editar o arquivo local não é suficiente.
 
-## Pendências em aberto
+## Pendências em aberto 
 
 Nenhuma pendência de arquitetura em aberto no momento. Cadastro de Viaturas/Frota já existe (ver seção "Módulos principais"), e o Cadastro de Pessoal já foi populado com o efetivo geral do batalhão (244 militares importados do relatório SGEPM em 2026-07, com campo `matricula`) — a maioria sem `categorias` (efetivo geral sem papel operacional ainda; ver nota em "Modelo de dados"). Ideias sugeridas e ainda não priorizadas pelo usuário: Setores de Patrulhamento com vínculo N:N a Bairros, Demandantes, Modalidades de Policiamento, para eliminar texto livre restante em outras telas (demandante do evento, modalidade de policiamento).
