@@ -4,8 +4,6 @@ let state = {
   alocacoes: [],
   escalas: [],
   currentEventId: null,
-  calendarMonth: new Date().getMonth(),
-  calendarYear: new Date().getFullYear(),
   calendarDiariasMonth: new Date().getMonth(),
   calendarDiariasYear: new Date().getFullYear(),
   user: null, // Dados do usuário logado
@@ -238,6 +236,9 @@ function setupNavigation() {
       const targetTab = document.getElementById(targetId);
       if (targetTab) targetTab.classList.add('active');
 
+      // Fecha o drawer de navegação mobile ao trocar de aba (sem efeito em desktop)
+      fecharNavDrawer();
+
       // Atualiza cabeçalho
       if (titles[targetId]) {
         titleEl.textContent = titles[targetId].title;
@@ -276,6 +277,13 @@ function setupNavigation() {
 // EVENT LISTENERS GERAIS
 // -------------------------------------------------------------
 function setupEventListeners() {
+  // Drawer de navegação mobile: hambúrguer abre, overlay/Esc fecham
+  document.getElementById('btn-abrir-nav-drawer').addEventListener('click', abrirNavDrawer);
+  document.getElementById('nav-drawer-overlay').addEventListener('click', fecharNavDrawer);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') fecharNavDrawer();
+  });
+
   // Seletor de tema (aplicado ao body no boot, aqui só sincroniza o <select> e liga a troca)
   const temaSelect = document.getElementById('tema-select');
   temaSelect.value = carregarPrefsTema();
@@ -381,25 +389,6 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-reset').addEventListener('click', fecharModalReset);
   document.getElementById('form-reset-senha').addEventListener('submit', handleResetarSenha);
 
-
-  // Navegação do Calendário
-  document.getElementById('btn-prev-month').addEventListener('click', () => {
-    state.calendarMonth--;
-    if (state.calendarMonth < 0) {
-      state.calendarMonth = 11;
-      state.calendarYear--;
-    }
-    renderCalendar();
-  });
-
-  document.getElementById('btn-next-month').addEventListener('click', () => {
-    state.calendarMonth++;
-    if (state.calendarMonth > 11) {
-      state.calendarMonth = 0;
-      state.calendarYear++;
-    }
-    renderCalendar();
-  });
 
   // Submissão do Formulário de Cadastro de Evento
   document.getElementById('form-evento').addEventListener('submit', handleCreateEvento);
@@ -763,7 +752,7 @@ async function fetchData() {
     // Atualiza aba atual
     const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
     if (activeTab === 'tab-dashboard') {
-      renderCalendar();
+      renderDashboardResumo();
       renderDashboardOperacional();
     } else if (activeTab === 'tab-turno') {
       renderTurnoTab();
@@ -932,17 +921,26 @@ async function renderDashboardOperacional() {
     console.error("Erro ao verificar o Cartão Programa de hoje:", error);
   }
 
-  // Card de resumo "Cartão Programa de Hoje"
+  // Card de resumo "Cartão Programa de Hoje" (topo) + card do grid do Dashboard,
+  // ambos alimentados pela mesma consulta acima — sem fetch duplicado.
   const iconCartaoHoje = document.getElementById('stat-cartao-hoje-icon');
   const statCartaoHoje = document.getElementById('stat-cartao-hoje');
+  const iconDashResumoCartao = document.getElementById('dash-resumo-cartao-icon');
+  const dashResumoCartao = document.getElementById('dash-resumo-cartao');
   if (cartaoHoje) {
     statCartaoHoje.textContent = `${cartaoHoje.viaturas.length} viatura(s)`;
     iconCartaoHoje.classList.remove('alert');
     iconCartaoHoje.classList.add('success');
+    dashResumoCartao.textContent = `${cartaoHoje.viaturas.length} viatura(s) · Criado`;
+    iconDashResumoCartao.classList.remove('alert');
+    iconDashResumoCartao.classList.add('success');
   } else {
     statCartaoHoje.textContent = 'Não lançado';
     iconCartaoHoje.classList.remove('success');
     iconCartaoHoje.classList.add('alert');
+    dashResumoCartao.textContent = 'Pendente — nenhum cartão lançado hoje';
+    iconDashResumoCartao.classList.remove('success');
+    iconDashResumoCartao.classList.add('alert');
   }
 
   // Alertas consolidados: conflitos do cartão de hoje + eventos com OS pendente se aproximando
@@ -993,73 +991,34 @@ window.handleIrParaCartaoHoje = function() {
   document.getElementById('nav-btn-cartao').click();
 };
 
-function renderCalendar() {
-  const grid = document.getElementById('calendar-grid');
-  grid.innerHTML = '';
+// Clique genérico nos cards-resumo do Dashboard: troca de aba reaproveitando o nav-btn já existente
+window.handleDashboardCardClick = function(navBtnId) {
+  document.getElementById(navBtnId).click();
+};
 
-  const meses = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
-  document.getElementById('calendar-month-year').textContent = `${meses[state.calendarMonth]} ${state.calendarYear}`;
+async function renderDashboardResumo() {
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/dashboard-resumo`);
+    const resumo = await res.json();
+    if (!res.ok) throw new Error(resumo.error || 'Falha ao carregar o resumo do Dashboard.');
 
-  // Primeiro dia do mês e número de dias
-  const primeiroDiaSemana = new Date(state.calendarYear, state.calendarMonth, 1).getDay();
-  const totalDiasMes = new Date(state.calendarYear, state.calendarMonth + 1, 0).getDate();
-
-  // Dias em branco do mês anterior
-  for (let i = 0; i < primeiroDiaSemana; i++) {
-    const emptyCell = document.createElement('div');
-    emptyCell.className = 'calendar-day inactive';
-    grid.appendChild(emptyCell);
+    document.getElementById('dash-resumo-eventos').textContent =
+      `${resumo.eventos.total_mes} no mês · ${resumo.eventos.proximos_7_dias} nos próximos 7 dias`;
+    document.getElementById('dash-resumo-planejador').textContent =
+      `Saldo: ${resumo.planejador.saldo_cota_mes} diária(s) · ${resumo.planejador.missoes_nao_convertidas} missão(ões) não convertida(s)`;
+    document.getElementById('dash-resumo-relatorio').textContent =
+      `${resumo.relatorio_diarias.total_pago_mes} diária(s) pagas no mês`;
+    document.getElementById('dash-resumo-estatisticas').textContent =
+      `${resumo.estatisticas.total_eventos_ano} evento(s) no ano`;
+    document.getElementById('dash-resumo-pessoal').textContent =
+      `${resumo.pessoal.total} militar(es) · ${resumo.pessoal.pracas} Praça(s) / ${resumo.pessoal.oficiais} Oficial(is)`;
+    document.getElementById('dash-resumo-usuarios').textContent =
+      `${resumo.usuarios.total} conta(s) cadastrada(s)`;
+  } catch (error) {
+    console.error('Erro ao carregar o resumo do Dashboard:', error);
+    ['dash-resumo-eventos', 'dash-resumo-planejador', 'dash-resumo-relatorio', 'dash-resumo-estatisticas', 'dash-resumo-pessoal', 'dash-resumo-usuarios']
+      .forEach(id => { document.getElementById(id).textContent = 'Falha ao carregar.'; });
   }
-
-  // Dias do mês atual
-  const hoje = new Date();
-  for (let dia = 1; dia <= totalDiasMes; dia++) {
-    const dayCell = document.createElement('div');
-    dayCell.className = 'calendar-day';
-    
-    // Verifica se é hoje
-    if (hoje.getDate() === dia && hoje.getMonth() === state.calendarMonth && hoje.getFullYear() === state.calendarYear) {
-      dayCell.classList.add('today');
-    }
-
-    const dayNum = document.createElement('span');
-    dayNum.className = 'calendar-day-number';
-    dayNum.textContent = dia;
-    dayCell.appendChild(dayNum);
-
-    // Eventos do dia
-    const mesFormatado = String(state.calendarMonth + 1).padStart(2, '0');
-    const diaFormatado = String(dia).padStart(2, '0');
-    const dataStr = `${state.calendarYear}-${mesFormatado}-${diaFormatado}`;
-
-    const eventosDoDia = state.eventos.filter(e => e.data_inicio === dataStr);
-    
-    if (eventosDoDia.length > 0) {
-      const container = document.createElement('div');
-      container.className = 'calendar-events-container';
-
-      eventosDoDia.forEach(evt => {
-        const item = document.createElement('div');
-        const classeTipo = evt.tipo_evento.toLowerCase().replace(' ', '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        item.className = `calendar-event-item badge ${classeTipo}`;
-        item.textContent = evt.nome_evento;
-        item.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openDrawer(evt.id);
-        });
-        container.appendChild(item);
-      });
-
-      dayCell.appendChild(container);
-    }
-
-    grid.appendChild(dayCell);
-  }
-  
-  lucide.createIcons();
 }
 
 // -------------------------------------------------------------
@@ -1780,6 +1739,20 @@ window.handleExcluirBairro = async function (id) {
 };
 
 // -------------------------------------------------------------
+// DRAWER DE NAVEGAÇÃO MOBILE (sidebar off-canvas, distinto da gaveta de
+// detalhes de evento abaixo — mesma técnica visual, classes próprias)
+// -------------------------------------------------------------
+function abrirNavDrawer() {
+  document.querySelector('.sidebar').classList.add('nav-drawer-open');
+  document.getElementById('nav-drawer-overlay').classList.add('open');
+}
+
+function fecharNavDrawer() {
+  document.querySelector('.sidebar').classList.remove('nav-drawer-open');
+  document.getElementById('nav-drawer-overlay').classList.remove('open');
+}
+
+// -------------------------------------------------------------
 // GAVETA LATERAL DE DETALHES (DRAWER)
 // -------------------------------------------------------------
 async function openDrawer(eventId) {
@@ -2268,7 +2241,7 @@ function renderMissoesPlanejadasTab(missoes) {
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
             ${convertida
-              ? `<span class="badge outros" title="Já convertida em evento">Convertida</span>`
+              ? `<span class="badge missao-convertida" title="Já convertida em evento">Convertida</span>`
               : `<button class="btn btn-secondary btn-sm admin-only" onclick="handleConverterMissaoPlanejada('${m.id}')">
                    <i data-lucide="arrow-right-circle" style="width:12px;height:12px;"></i> Converter em Evento
                  </button>`}
@@ -2828,6 +2801,19 @@ function atividadeBadgeClass(atividade) {
 function categoriaBadgeClass(categoria) {
   const slug = (categoria || 'Ordin\u00e1ria').toLowerCase().replace(/ /g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return `cat-${slug}`;
+}
+
+// Mapa fixo (em vez de transformar a string) porque as 5 categorias têm preposições/acentos
+// que não convertem de forma previsível pelo mesmo slug usado nos outros badges.
+const CATEGORIA_PESSOAL_BADGE_MAP = {
+  'Adjunto': 'pcat-adjunto',
+  'Fiscal de Operações': 'pcat-fiscal-de-operacoes',
+  'Oficial de Operações': 'pcat-oficial-de-operacoes',
+  'Oficial de Sobreaviso': 'pcat-oficial-de-sobreaviso',
+  'Executor': 'pcat-executor'
+};
+function categoriaPessoalBadgeClass(categoria) {
+  return CATEGORIA_PESSOAL_BADGE_MAP[categoria] || 'outros';
 }
 
 function statusViaturaBadgeClass(status) {
@@ -3966,7 +3952,7 @@ async function renderPessoalTab() {
         <td>${esc(p.subunidade) || '<span style="color:var(--text-muted);">—</span>'}</td>
         <td>${esc(p.posto_graduacao)}</td>
         <td><span class="badge tipo-${p.tipo === 'Praça' ? 'praca' : 'oficial'}">${esc(p.tipo)}</span></td>
-        <td>${p.categorias.length > 0 ? p.categorias.map(c => `<span class="badge outros" style="margin:2px;">${esc(c)}</span>`).join('') : '<span style="color:var(--text-muted);">Sem categoria</span>'}</td>
+        <td>${p.categorias.length > 0 ? p.categorias.map(c => `<span class="badge ${categoriaPessoalBadgeClass(c)}" style="margin:2px;">${esc(c)}</span>`).join('') : '<span style="color:var(--text-muted);">Sem categoria</span>'}</td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
             <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirModalPessoa('${p.id}')">

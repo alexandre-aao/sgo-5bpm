@@ -40,6 +40,13 @@
   --badge-pessoal-1: #4f46e5;
   --badge-pessoal-2: #0284c7;
   --badge-pessoal-3: #075985;
+  /* Categorias operacionais do Cadastro de Pessoal (Adjunto/Fiscal/Oficial/Executor) —
+     tons distintos dos de perfil/tipo acima para não colidir visualmente na mesma tela. */
+  --badge-categoria-1: #0e7490;
+  --badge-categoria-2: #1d4ed8;
+  --badge-categoria-3: #4338ca;
+  --badge-categoria-4: #6d28d9;
+  --badge-categoria-5: #0f766e;
 
   --font-title: 'Outfit', sans-serif;
   --font-body: 'Inter', sans-serif;
@@ -401,6 +408,20 @@ button, input, select, textarea {
   flex-shrink: 0;
 }
 
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-drawer-toggle.btn-icon {
+  display: none;
+}
+
+.nav-drawer-overlay {
+  display: none;
+}
+
 .header-title h1 {
   font-family: var(--font-title);
   font-size: 1.3rem;
@@ -655,6 +676,16 @@ body.sgo-sincronizando .topbar::before {
 .badge.tipo-praca { background-color: var(--badge-pessoal-2); color: #fff; }
 .badge.tipo-oficial { background-color: var(--badge-pessoal-3); color: #fff; }
 
+/* Badges de categoria operacional (Cadastro de Pessoal) */
+.badge.pcat-adjunto { background-color: var(--badge-categoria-1); color: #fff; }
+.badge.pcat-fiscal-de-operacoes { background-color: var(--badge-categoria-2); color: #fff; }
+.badge.pcat-oficial-de-operacoes { background-color: var(--badge-categoria-3); color: #fff; }
+.badge.pcat-oficial-de-sobreaviso { background-color: var(--badge-categoria-4); color: #fff; }
+.badge.pcat-executor { background-color: var(--badge-categoria-5); color: #fff; }
+
+/* Badge de missão planejada já convertida em evento (Planejador de Diárias) */
+.badge.missao-convertida { background-color: var(--success); color: #fff; }
+
 /* Badges de status (Cadastro de Viaturas) */
 .badge.status-ativa { background-color: var(--success); color: #fff; }
 .badge.status-manutencao { background-color: var(--warning); color: #000; }
@@ -796,8 +827,9 @@ body.sgo-sincronizando .topbar::before {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
 }
 
 .dash-patrulhamento-panel {
@@ -2659,20 +2691,44 @@ body.sgo-sincronizando .topbar::before {
 /* Responsividade menor */
 @media (max-width: 768px) {
   .app-container {
-    flex-direction: column;
-  }
-  .sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    padding: 12px;
-  }
-  .nav-menu {
     flex-direction: row;
-    justify-content: space-around;
   }
-  .nav-btn span {
-    display: none;
+
+  /* Sidebar vira um drawer off-canvas (mesma técnica do #drawer de evento —
+     wrapper fixo + overlay com fade + painel deslizando via transition —
+     mas com classes próprias, .nav-drawer-*, para não colidir com o drawer
+     de detalhe de evento). Fica idêntica à sidebar desktop (ícone+rótulo,
+     seções, rodapé), só que fora da tela por padrão. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sidebar.nav-drawer-open {
+    transform: translateX(0);
+  }
+  .nav-drawer-toggle.btn-icon {
+    display: inline-flex;
+  }
+  .nav-drawer-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+    z-index: 190;
+  }
+  .nav-drawer-overlay.open {
+    opacity: 1;
+    visibility: visible;
   }
 
   /* Tabela -> card em telas pequenas: CSS-only, reaproveita o mesmo <tr>/<td> do

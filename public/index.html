@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Lucide Icons (CDN) -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Lucide Icons (CDN) — versão fixada (era @latest) pra não quebrar ícones com update não controlado -->
+  <script src="https://unpkg.com/lucide@1.24.0"></script>
   <!-- Leaflet (CDN) — usado no Mapa de Eventos -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -57,6 +57,7 @@
   <div class="app-container">
     
     <!-- Sidebar -->
+    <div class="nav-drawer-overlay" id="nav-drawer-overlay"></div>
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-icon">
@@ -163,8 +164,13 @@
       <!-- Topbar -->
       <header class="topbar">
         <div class="header-title">
-          <h1 id="tab-title">Dashboard Operacional</h1>
-          <p id="tab-subtitle">Visão geral do policiamento e pautas do batalhão.</p>
+          <button id="btn-abrir-nav-drawer" class="nav-drawer-toggle btn-icon" aria-label="Abrir menu">
+            <i data-lucide="menu"></i>
+          </button>
+          <div class="header-title-text">
+            <h1 id="tab-title">Dashboard Operacional</h1>
+            <p id="tab-subtitle">Visão geral do policiamento e pautas do batalhão.</p>
+          </div>
         </div>
         <div class="header-actions">
           <div class="filter-group tema-select-group">
@@ -227,28 +233,55 @@
           </div>
         </div>
 
-        <!-- Dashboard Layout Grid -->
+        <!-- Grid de cards-resumo por módulo, cada um clicável levando à aba correspondente -->
         <div class="dashboard-grid">
-          <!-- Calendário -->
-          <div class="panel calendar-panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="calendar-days"></i>
-                <h2>Calendário de Eventos</h2>
-              </div>
-              <div class="calendar-nav">
-                <button id="btn-prev-month" class="btn-icon" aria-label="Mês anterior" title="Mês anterior"><i data-lucide="chevron-left"></i></button>
-                <span id="calendar-month-year">Julho 2026</span>
-                <button id="btn-next-month" class="btn-icon" aria-label="Próximo mês" title="Próximo mês"><i data-lucide="chevron-right"></i></button>
-              </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-eventos')" title="Ir para Listar Eventos">
+            <div class="stat-icon"><i data-lucide="calendar-range"></i></div>
+            <div class="stat-info">
+              <h3>Eventos</h3>
+              <p id="dash-resumo-eventos">Carregando...</p>
             </div>
-            <div class="calendar-container">
-              <div class="calendar-weekdays">
-                <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
-              </div>
-              <div id="calendar-grid" class="calendar-grid">
-                <!-- Injetado dinamicamente -->
-              </div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-cartao')" title="Ir para o Cartão Programa">
+            <div class="stat-icon alert" id="dash-resumo-cartao-icon"><i data-lucide="route"></i></div>
+            <div class="stat-info">
+              <h3>Cartão Programa</h3>
+              <p id="dash-resumo-cartao">Carregando...</p>
+            </div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-planejador')" title="Ir para o Planejador de Diárias">
+            <div class="stat-icon info"><i data-lucide="wallet"></i></div>
+            <div class="stat-info">
+              <h3>Planejador de Diárias</h3>
+              <p id="dash-resumo-planejador">Carregando...</p>
+            </div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-relatorio')" title="Ir para o Relatório de Diárias">
+            <div class="stat-icon"><i data-lucide="file-text"></i></div>
+            <div class="stat-info">
+              <h3>Relatório de Diárias</h3>
+              <p id="dash-resumo-relatorio">Carregando...</p>
+            </div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-estatisticas')" title="Ir para Estatísticas">
+            <div class="stat-icon"><i data-lucide="bar-chart-3"></i></div>
+            <div class="stat-info">
+              <h3>Estatísticas</h3>
+              <p id="dash-resumo-estatisticas">Carregando...</p>
+            </div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-pessoal')" title="Ir para o Cadastro de Pessoal">
+            <div class="stat-icon info"><i data-lucide="contact"></i></div>
+            <div class="stat-info">
+              <h3>Cadastro de Pessoal</h3>
+              <p id="dash-resumo-pessoal">Carregando...</p>
+            </div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-usuarios')" title="Ir para Usuários">
+            <div class="stat-icon"><i data-lucide="users-round"></i></div>
+            <div class="stat-info">
+              <h3>Usuários</h3>
+              <p id="dash-resumo-usuarios">Carregando...</p>
             </div>
           </div>
         </div>
