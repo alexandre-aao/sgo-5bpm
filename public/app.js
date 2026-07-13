@@ -3038,7 +3038,7 @@ function exibirCartaoNoEditor(cartao) {
   const headerFieldsEl = document.querySelector('#tab-cartao .cartao-header-fields');
 
   if (cartao.is_template) {
-    document.getElementById('cartao-titulo-print').textContent = `TEMPLATE: ${cartao.nome_template}`;
+    document.getElementById('cartao-titulo-print').textContent = `CARTÃO PADRÃO: ${cartao.nome_template}`;
     document.getElementById('cartao-subtitulo-print').textContent =
       `${cartao.tipo_periodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'} · ${cartao.qtd_viaturas_base} viatura(s) base`;
     if (headerFieldsEl) headerFieldsEl.classList.add('hidden');
@@ -3121,15 +3121,15 @@ async function handleBuscarTemplateSugerido() {
       resultadoEl.innerHTML = `
         <div class="template-sugerido-box nao-encontrado">
           <span><i data-lucide="alert-triangle" style="width:14px;height:14px;vertical-align:middle;"></i>
-          Nenhum template cadastrado para <strong>${tipoPeriodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'}</strong> com <strong>${qtdViaturas}</strong> viaturas.
-          Crie o cartão manualmente abaixo, ou cadastre um template em "Novo Template".</span>
+          Nenhum cartão padrão cadastrado para <strong>${tipoPeriodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'}</strong> com <strong>${qtdViaturas}</strong> viaturas.
+          Crie o cartão manualmente abaixo, ou cadastre um cartão padrão em "Novo Cartão Padrão".</span>
         </div>`;
     } else {
       const tpl = templates[0];
       resultadoEl.innerHTML = `
         <div class="template-sugerido-box encontrado">
           <span><i data-lucide="layout-template" style="width:14px;height:14px;vertical-align:middle;"></i>
-          Template sugerido: <strong>${esc(tpl.nome_template)}</strong> (${tpl.qtd_viaturas} viatura(s) cadastradas)</span>
+          Cartão padrão sugerido: <strong>${esc(tpl.nome_template)}</strong> (${tpl.qtd_viaturas} viatura(s) cadastradas)</span>
           <button class="btn btn-primary btn-sm" onclick="handleImportarClonarTemplate('${tpl.id}')">
             <i data-lucide="copy-plus"></i> Importar e Clonar
           </button>
@@ -3139,7 +3139,7 @@ async function handleBuscarTemplateSugerido() {
   } catch (error) {
     console.error('Erro ao buscar template sugerido:', error);
     resultadoEl.innerHTML = '';
-    showToast('Falha ao buscar template.', 'danger');
+    showToast('Falha ao buscar cartão padrão.', 'danger');
   }
 }
 
@@ -3160,11 +3160,11 @@ window.handleImportarClonarTemplate = async function (templateId) {
     }
     if (res.ok) {
       const criado = await res.json();
-      showToast(`Cartão criado a partir do template, com <strong>${criado.viaturas.length}</strong> viatura(s). Preencha os comandantes.`, 'success');
+      showToast(`Cartão criado a partir do cartão padrão, com <strong>${criado.viaturas.length}</strong> viatura(s). Preencha os comandantes.`, 'success');
       renderCartaoTab();
     } else {
       const err = await res.json();
-      showToast(err.error || 'Falha ao importar o template.', 'danger');
+      showToast(err.error || 'Falha ao importar o cartão padrão.', 'danger');
     }
   } catch (error) {
     console.error('Erro ao clonar template:', error);
@@ -3183,7 +3183,7 @@ async function renderTemplatesTab() {
     const templates = await res.json();
 
     if (templates.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhum template cadastrado ainda.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhum cartão padrão cadastrado ainda.</td></tr>`;
       return;
     }
 
@@ -3206,7 +3206,7 @@ async function renderTemplatesTab() {
     lucide.createIcons();
   } catch (error) {
     console.error('Erro ao carregar templates:', error);
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:24px;">Falha ao carregar templates.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:24px;">Falha ao carregar cartões padrão.</td></tr>`;
   }
 }
 
@@ -3219,16 +3219,16 @@ window.handleAbrirTemplate = async function (id) {
     document.getElementById('cartao-templates-panel').classList.add('hidden');
   } catch (error) {
     console.error('Erro ao abrir template:', error);
-    showToast('Falha ao abrir o template.', 'danger');
+    showToast('Falha ao abrir o cartão padrão.', 'danger');
   }
 };
 
 window.handleExcluirTemplate = async function (id) {
-  if (!confirm('Excluir permanentemente este template?')) return;
+  if (!confirm('Excluir permanentemente este cartão padrão?')) return;
   try {
     const res = await apiFetch(`${API_BASE_URL}/api/cartoes/${id}`, { method: 'DELETE' });
     if (res.ok) {
-      showToast('Template excluído.', 'info');
+      showToast('Cartão padrão excluído.', 'info');
       renderTemplatesTab();
       if (state.cartaoAtual && state.cartaoAtual.id === id) {
         state.cartaoAtual = null;
@@ -3237,7 +3237,7 @@ window.handleExcluirTemplate = async function (id) {
       }
     } else {
       const err = await res.json();
-      showToast(err.error || 'Falha ao excluir template.', 'danger');
+      showToast(err.error || 'Falha ao excluir o cartão padrão.', 'danger');
     }
   } catch (error) {
     console.error('Erro ao excluir template:', error);
@@ -3266,12 +3266,12 @@ async function handleCriarTemplate(e) {
         const criado = await res.json();
         document.getElementById('modal-novo-template').classList.add('hidden');
         document.getElementById('form-novo-template').reset();
-        showToast('Template criado. Adicione as viaturas e roteiros abaixo.', 'success');
+        showToast('Cartão padrão criado. Adicione as viaturas e roteiros abaixo.', 'success');
         document.getElementById('cartao-data').value = '';
         exibirCartaoNoEditor(criado);
       } else {
         const err = await res.json();
-        showToast(err.error || 'Falha ao criar o template.', 'danger');
+        showToast(err.error || 'Falha ao criar o cartão padrão.', 'danger');
       }
     } catch (error) {
       console.error('Erro ao criar template:', error);
