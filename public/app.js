@@ -103,12 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   checkAuth();
   
-  // Atualiza dados automaticamente a cada 15 segundos para sincronização online
+  // Atualiza dados automaticamente a cada 60 segundos para sincronização online
   setInterval(() => {
     if (state.user) {
       fetchData();
     }
-  }, 15000);
+  }, 60000);
 });
 
 // -------------------------------------------------------------
