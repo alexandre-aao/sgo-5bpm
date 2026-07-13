@@ -150,7 +150,6 @@ function applyRolePermissions(user) {
   const btnUsuarios = document.getElementById('nav-btn-usuarios');
   const btnPessoal = document.getElementById('nav-btn-pessoal');
   const btnViaturas = document.getElementById('nav-btn-viaturas');
-  const btnAuditoria = document.getElementById('nav-btn-auditoria');
   const btnTurno = document.getElementById('nav-btn-turno');
   const btnEventos = document.getElementById('nav-btn-eventos');
 
@@ -169,7 +168,6 @@ function applyRolePermissions(user) {
     btnUsuarios.classList.remove('hidden-role');
     btnPessoal.classList.remove('hidden-role');
     btnViaturas.classList.remove('hidden-role');
-    btnAuditoria.classList.remove('hidden-role');
     btnTurno.classList.add('hidden-role'); // P3 foca no Dashboard Geral
     secoesSomenteP3.forEach(el => el.classList.remove('hidden-role'));
 
@@ -188,7 +186,6 @@ function applyRolePermissions(user) {
     btnUsuarios.classList.add('hidden-role');
     btnPessoal.classList.add('hidden-role');
     btnViaturas.classList.add('hidden-role');
-    btnAuditoria.classList.add('hidden-role');
     btnTurno.classList.remove('hidden-role');
     secoesSomenteP3.forEach(el => el.classList.add('hidden-role'));
 
@@ -221,8 +218,7 @@ function setupNavigation() {
     'tab-cartao': { title: 'Cartão Programa', subtitle: 'Roteiro diário de patrulhamento das viaturas: locais, horários e atividades.' },
     'tab-usuarios': { title: 'Usuários do Sistema', subtitle: 'Gestão de perfis de acesso e redefinição de senhas.' },
     'tab-pessoal': { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' },
-    'tab-viaturas': { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' },
-    'tab-auditoria': { title: 'Trilha de Auditoria', subtitle: 'Registro de criação, edição e exclusão de dados no sistema.' }
+    'tab-viaturas': { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' }
   };
 
   navButtons.forEach(btn => {
@@ -266,8 +262,6 @@ function setupNavigation() {
         renderPessoalTab();
       } else if (targetId === 'tab-viaturas') {
         renderViaturasTab();
-      } else if (targetId === 'tab-auditoria') {
-        renderAuditoriaTab();
       }
     });
   });
@@ -347,9 +341,6 @@ function setupEventListeners() {
       renderViaturasTab();
     });
   });
-
-  // Auditoria (P3)
-  document.getElementById('btn-filtrar-auditoria').addEventListener('click', renderAuditoriaTab);
 
   // Modal de confirmação forte de exclusão (reaproveitável)
   document.getElementById('confirmar-exclusao-input').addEventListener('input', (e) => {
@@ -4219,61 +4210,6 @@ function popularDatalistViaturas() {
   const datalist = document.getElementById('lista-prefixos-viaturas');
   if (!datalist) return;
   datalist.innerHTML = (state.viaturas || []).map(v => `<option value="${esc(v.prefixo)}"></option>`).join('');
-}
-
-// -------------------------------------------------------------
-// TRILHA DE AUDITORIA (P3) — só leitura, sem edição/exclusão pela interface
-// -------------------------------------------------------------
-const ENTIDADE_LABELS_AUDITORIA = {
-  evento: 'Evento', alocacao: 'Alocação', escala: 'Escala', pessoal: 'Pessoal',
-  usuario: 'Usuário', viatura: 'Viatura', missao_planejada: 'Missão Planejada',
-  cartao: 'Cartão Programa', bairro: 'Bairro', config: 'Configuração'
-};
-const ACAO_LABELS_AUDITORIA = { criar: 'Criar', editar: 'Editar', excluir: 'Excluir' };
-
-async function renderAuditoriaTab() {
-  const tableBody = document.getElementById('table-auditoria-body');
-  tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Carregando...</td></tr>`;
-
-  const params = new URLSearchParams();
-  const usuario = document.getElementById('aud-filtro-usuario').value.trim();
-  const entidade = document.getElementById('aud-filtro-entidade').value;
-  const dataInicio = document.getElementById('aud-filtro-data-inicio').value;
-  const dataFim = document.getElementById('aud-filtro-data-fim').value;
-  if (usuario) params.set('usuario', usuario);
-  if (entidade) params.set('entidade', entidade);
-  if (dataInicio) params.set('data_inicio', dataInicio);
-  if (dataFim) params.set('data_fim', dataFim);
-
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/auditoria?${params.toString()}`);
-    const registros = await res.json();
-
-    if (!res.ok) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:24px;">${esc(registros.error) || 'Falha ao carregar a auditoria.'}</td></tr>`;
-      return;
-    }
-
-    if (registros.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhum registro encontrado.</td></tr>`;
-      return;
-    }
-
-    tableBody.innerHTML = registros.map(r => `
-      <tr>
-        <td>${esc(new Date(r.criado_em).toLocaleString('pt-BR'))}</td>
-        <td>${esc(r.usuario)}</td>
-        <td><span class="badge acao-${esc(r.acao)}">${esc(ACAO_LABELS_AUDITORIA[r.acao] || r.acao)}</span></td>
-        <td>${esc(ENTIDADE_LABELS_AUDITORIA[r.entidade] || r.entidade)}</td>
-        <td>${esc(r.descricao_resumida) || '-'}</td>
-      </tr>
-    `).join('');
-
-    lucide.createIcons();
-  } catch (error) {
-    console.error('Erro ao carregar auditoria:', error);
-    tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:24px;">Falha ao carregar a auditoria.</td></tr>`;
-  }
 }
 
 // -------------------------------------------------------------

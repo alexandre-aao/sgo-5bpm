@@ -141,18 +141,3 @@ create unique index if not exists cartoes_data_unica
   on cartoes (data)
   where is_template = false;
 
--- Trilha de auditoria: fora da lista TABELAS/readDB()/writeDB() de propósito — é um log
--- que só cresce, não pode entrar no ciclo de leitura da tabela inteira a cada requisição.
--- Acesso via consultas pontuais (insert no registro; select filtrado na tela de consulta).
-create table if not exists auditoria (
-  id text primary key,
-  usuario text not null,
-  acao text not null check (acao in ('criar', 'editar', 'excluir')),
-  entidade text not null,
-  entidade_id text,
-  descricao_resumida text default '',
-  criado_em bigint not null
-);
-create index if not exists idx_auditoria_criado_em on auditoria(criado_em desc);
-create index if not exists idx_auditoria_usuario on auditoria(usuario);
-create index if not exists idx_auditoria_entidade on auditoria(entidade);

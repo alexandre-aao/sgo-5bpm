@@ -135,10 +135,6 @@
           <i data-lucide="car"></i>
           <span>Cadastro de Viaturas</span>
         </button>
-        <button class="nav-btn" id="nav-btn-auditoria" data-target="tab-auditoria">
-          <i data-lucide="scroll-text"></i>
-          <span>Auditoria</span>
-        </button>
       </nav>
 
       <!-- Sidebar Footer com dados de Usuário -->
@@ -1480,67 +1476,6 @@
         </div>
       </section>
 
-      <!-- Aba 12: Auditoria (Apenas P3) -->
-      <section id="tab-auditoria" class="tab-content">
-        <div class="panel">
-          <div class="panel-header flex-column-mobile">
-            <div class="panel-title">
-              <i data-lucide="scroll-text"></i>
-              <h2>Trilha de Auditoria</h2>
-            </div>
-            <p style="font-size:0.75rem;color:var(--text-muted);">Registro de criação, edição e exclusão de dados. Somente leitura — sem edição nem exclusão pela interface.</p>
-          </div>
-
-          <div class="report-filters">
-            <div class="filter-group">
-              <label for="aud-filtro-usuario">Usuário</label>
-              <input type="text" id="aud-filtro-usuario" placeholder="Ex: p3">
-            </div>
-            <div class="filter-group">
-              <label for="aud-filtro-entidade">Entidade</label>
-              <select id="aud-filtro-entidade">
-                <option value="">Todas</option>
-                <option value="evento">Evento</option>
-                <option value="alocacao">Alocação</option>
-                <option value="escala">Escala</option>
-                <option value="pessoal">Pessoal</option>
-                <option value="usuario">Usuário</option>
-                <option value="viatura">Viatura</option>
-                <option value="missao_planejada">Missão Planejada</option>
-                <option value="cartao">Cartão Programa</option>
-                <option value="bairro">Bairro</option>
-                <option value="config">Configuração</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="aud-filtro-data-inicio">Data Inicial</label>
-              <input type="date" id="aud-filtro-data-inicio">
-            </div>
-            <div class="filter-group">
-              <label for="aud-filtro-data-fim">Data Final</label>
-              <input type="date" id="aud-filtro-data-fim">
-            </div>
-            <button id="btn-filtrar-auditoria" class="btn btn-secondary btn-sm">
-              <i data-lucide="filter"></i> Filtrar
-            </button>
-          </div>
-
-          <div class="table-responsive">
-            <table class="styled-table" id="table-auditoria">
-              <thead>
-                <tr>
-                  <th>Data/Hora</th>
-                  <th>Usuário</th>
-                  <th>Ação</th>
-                  <th>Entidade</th>
-                  <th>Descrição</th>
-                </tr>
-              </thead>
-              <tbody id="table-auditoria-body"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
 
     </main>
   </div>
