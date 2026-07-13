@@ -4,3 +4,4 @@ node_modules/
 data/db.json
 .vercel
 .claude/launch.json
+.claude/settings.local.json
