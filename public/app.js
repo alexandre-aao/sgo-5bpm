@@ -1347,6 +1347,7 @@ async function handleCopiarRelatorioSei() {
 // -------------------------------------------------------------
 let mapaLeafletInstancia = null;
 let mapaLeafletTileLayer = null;
+let mapaLeafletEstiloAtual = null; // estilo já aplicado ao tile layer atual — evita recriar à toa
 let mapaLeafletMarkersEventos = [];
 let mapaLeafletMarkersViaturas = [];
 
@@ -1427,13 +1428,18 @@ async function renderMapaTab() {
     mapaLeafletInstancia = L.map(container).setView([-5.85, -35.21], 12); // centro aproximado da Zona Sul de Natal
   }
 
-  // Troca o tile conforme o estilo salvo (dark vs. colorido)
-  if (mapaLeafletTileLayer) mapaLeafletInstancia.removeLayer(mapaLeafletTileLayer);
-  mapaLeafletTileLayer = L.tileLayer(MAPA_TILES[prefs.estilo], {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 19
-  }).addTo(mapaLeafletInstancia);
+  // Troca o tile conforme o estilo salvo (dark vs. colorido) — só recria a camada se o estilo
+  // realmente mudou desde a última renderização (evita descartar/recarregar tiles a cada
+  // sincronização de 15s enquanto a aba Mapa está ativa e o estilo continua o mesmo).
+  if (prefs.estilo !== mapaLeafletEstiloAtual) {
+    if (mapaLeafletTileLayer) mapaLeafletInstancia.removeLayer(mapaLeafletTileLayer);
+    mapaLeafletTileLayer = L.tileLayer(MAPA_TILES[prefs.estilo], {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(mapaLeafletInstancia);
+    mapaLeafletEstiloAtual = prefs.estilo;
+  }
 
   // Limpa marcadores da renderização anterior
   mapaLeafletMarkersEventos.forEach(m => mapaLeafletInstancia.removeLayer(m));
