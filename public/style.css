@@ -804,6 +804,42 @@ body.sgo-sincronizando .topbar::before {
   margin-top: 4px;
 }
 
+/* Linha secundária muda dos cards de resumo (contexto abaixo do número) */
+.stat-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* Barra fina de consumo da cota no card de Diárias — reaproveita .mini-bar-* */
+.stat-bar {
+  margin-top: 8px;
+}
+.stat-bar .mini-bar-track {
+  width: 100%;
+  min-width: 0;
+  /* var(--border-color) é visível nos 3 temas; o rgba branco padrão some no tema claro */
+  background-color: var(--border-color);
+}
+
+/* Composição em badges compactos (card Cadastro de Pessoal) */
+.stat-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.stat-badges .badge {
+  text-transform: none;
+}
+
+/* Cards do Dashboard: info ocupa a largura útil pra barra/badges respirarem */
+.dashboard-grid .stat-info {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Selo de tendência vs. período anterior (Dashboard) */
 .stat-tendencia {
   display: inline-flex;
@@ -828,8 +864,8 @@ body.sgo-sincronizando .topbar::before {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
   margin-bottom: 24px;
 }
 

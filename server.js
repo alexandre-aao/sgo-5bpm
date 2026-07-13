@@ -1166,7 +1166,7 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   res.json({
     periodo: { mes: mesPeriodo, ano: anoPeriodo },
     eventos: { total_periodo: eventosDoPeriodo.length, proximos_7_dias: eventosProximos7Dias },
-    diarias: { total_pago_periodo: consumidoPeriodo, saldo_cota_periodo: cota - consumidoPeriodo - planejadoPeriodo },
+    diarias: { total_pago_periodo: consumidoPeriodo, saldo_cota_periodo: cota - consumidoPeriodo - planejadoPeriodo, cota_mensal: cota },
     planejador: { missoes_nao_convertidas: missoesNaoConvertidas },
     efetivo_total_periodo: efetivoTotalPeriodo,
     distribuicao_tipo: distribuicaoTipo,

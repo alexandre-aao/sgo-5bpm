@@ -253,14 +253,16 @@
             <div class="stat-icon"><i data-lucide="calendar-range"></i></div>
             <div class="stat-info">
               <h3>Eventos</h3>
-              <p id="dash-resumo-eventos">Carregando...</p>
+              <p id="dash-resumo-eventos">—</p>
+              <span class="stat-sub" id="dash-resumo-eventos-sub"></span>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-planejador')" title="Ir para o Planejador de Diárias">
             <div class="stat-icon info"><i data-lucide="wallet"></i></div>
             <div class="stat-info">
-              <h3>Diárias</h3>
-              <p id="dash-resumo-diarias">Carregando...</p>
+              <h3>Diárias no Período / Cota</h3>
+              <p id="dash-resumo-diarias">—</p>
+              <div class="stat-bar"><div class="mini-bar-track"><div class="mini-bar-fill" id="dash-resumo-diarias-bar" style="width:0%"></div></div></div>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-cartao')" title="Ir para o Cartão Programa">
@@ -274,21 +276,24 @@
             <div class="stat-icon info"><i data-lucide="users"></i></div>
             <div class="stat-info">
               <h3>Efetivo Total Empregado</h3>
-              <p id="dash-resumo-efetivo">Carregando...</p>
+              <p id="dash-resumo-efetivo">—</p>
+              <span class="stat-sub">militares no período</span>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-pessoal')" title="Ir para o Cadastro de Pessoal">
             <div class="stat-icon info"><i data-lucide="contact"></i></div>
             <div class="stat-info">
               <h3>Cadastro de Pessoal</h3>
-              <p id="dash-resumo-pessoal">Carregando...</p>
+              <p id="dash-resumo-pessoal">—</p>
+              <div class="stat-badges" id="dash-resumo-pessoal-badges"></div>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-usuarios')" title="Ir para Usuários">
             <div class="stat-icon"><i data-lucide="users-round"></i></div>
             <div class="stat-info">
               <h3>Usuários</h3>
-              <p id="dash-resumo-usuarios">Carregando...</p>
+              <p id="dash-resumo-usuarios">—</p>
+              <span class="stat-sub">contas cadastradas</span>
             </div>
           </div>
         </div>

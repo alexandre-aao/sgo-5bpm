@@ -1061,22 +1061,35 @@ async function renderDashboardResumo() {
     const resumo = await res.json();
     if (!res.ok) throw new Error(resumo.error || 'Falha ao carregar o resumo do Dashboard.');
 
-    document.getElementById('dash-resumo-eventos').textContent =
-      `${resumo.eventos.total_periodo} no período · ${resumo.eventos.proximos_7_dias} nos próximos 7 dias`;
-    document.getElementById('dash-resumo-diarias').textContent =
-      `${resumo.diarias.total_pago_periodo} paga(s) · saldo de ${resumo.diarias.saldo_cota_periodo} · ${resumo.planejador.missoes_nao_convertidas} missão(ões) não convertida(s)`;
-    document.getElementById('dash-resumo-efetivo').textContent =
-      `${resumo.efetivo_total_periodo} militar(es) empregado(s) no período`;
-    document.getElementById('dash-resumo-pessoal').textContent =
-      `${resumo.pessoal.total} militar(es) · ${resumo.pessoal.pracas} Praça(s) / ${resumo.pessoal.oficiais} Oficial(is)`;
-    document.getElementById('dash-resumo-usuarios').textContent =
-      `${resumo.usuarios.total} conta(s) cadastrada(s)`;
+    // Eventos: número em destaque + sub-linha dos próximos 7 dias
+    document.getElementById('dash-resumo-eventos').textContent = resumo.eventos.total_periodo;
+    document.getElementById('dash-resumo-eventos-sub').textContent =
+      `${resumo.eventos.proximos_7_dias} nos próximos 7 dias`;
+
+    // Diárias: "consumido / cota" + barra de progresso do consumo da cota
+    const consumido = resumo.diarias.total_pago_periodo;
+    const cota = resumo.diarias.cota_mensal || 0;
+    document.getElementById('dash-resumo-diarias').textContent = `${consumido} / ${cota}`;
+    const pctCota = cota > 0 ? Math.min(100, (consumido / cota) * 100) : 0;
+    document.getElementById('dash-resumo-diarias-bar').style.width = `${pctCota}%`;
+
+    document.getElementById('dash-resumo-efetivo').textContent = resumo.efetivo_total_periodo;
+
+    // Cadastro de Pessoal: total em destaque + composição em badges compactos
+    document.getElementById('dash-resumo-pessoal').textContent = resumo.pessoal.total;
+    document.getElementById('dash-resumo-pessoal-badges').innerHTML =
+      `<span class="badge tipo-praca">${esc(resumo.pessoal.pracas)} Praças</span>` +
+      `<span class="badge tipo-oficial">${esc(resumo.pessoal.oficiais)} Oficiais</span>`;
+
+    document.getElementById('dash-resumo-usuarios').textContent = resumo.usuarios.total;
 
     renderDashboardDonut(resumo.distribuicao_tipo);
   } catch (error) {
     console.error('Erro ao carregar o resumo do Dashboard:', error);
     ['dash-resumo-eventos', 'dash-resumo-diarias', 'dash-resumo-efetivo', 'dash-resumo-pessoal', 'dash-resumo-usuarios']
-      .forEach(id => { document.getElementById(id).textContent = 'Falha ao carregar.'; });
+      .forEach(id => { document.getElementById(id).textContent = '—'; });
+    const subEv = document.getElementById('dash-resumo-eventos-sub');
+    if (subEv) subEv.textContent = 'Falha ao carregar.';
   }
 }
 
