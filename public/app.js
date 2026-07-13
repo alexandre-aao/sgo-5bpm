@@ -959,10 +959,10 @@ async function renderDashboardOperacional() {
     vazioEl.classList.add('hidden');
     listaEl.innerHTML = cartaoHoje.viaturas.map(v => `
       <tr>
-        <td><strong>${esc(v.prefixo)}</strong></td>
-        <td>${esc(v.setor)}</td>
-        <td>${esc(v.companhia) || '-'}</td>
-        <td>${esc(v.comandante) || 'Não informado'}</td>
+        <td class="card-title-cell"><strong>${esc(v.prefixo)}</strong></td>
+        <td data-label="Setor">${esc(v.setor)}</td>
+        <td data-label="Companhia">${esc(v.companhia) || '-'}</td>
+        <td data-label="Comandante">${esc(v.comandante) || 'Não informado'}</td>
       </tr>
     `).join('');
   }
