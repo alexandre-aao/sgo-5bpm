@@ -2784,6 +2784,28 @@ body.sgo-sincronizando .topbar::before {
   /* Donut de distribuição por tipo (Dashboard) — só em desktop, poupa processamento em tela pequena */
   .dashboard-donut-panel { display: none; }
 
+  /* Formulário de Cartão Programa (Adicionar Viatura + roteiro por viatura): empilha em
+     coluna única, largura total, e dá área de toque de 44px aos botões de ação — sem
+     mexer no fluxo/estrutura do formulário, só no layout em telas estreitas. */
+  .cartao-add-vtr-panel .form-row .form-group,
+  .cartao-item-form {
+    flex-basis: 100% !important;
+    min-width: 0;
+  }
+  .cartao-item-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cartao-item-form input[type="time"],
+  .cartao-item-form input[type="text"] {
+    width: 100%;
+  }
+  #form-cartao-vtr button[type="submit"],
+  .cartao-item-form button {
+    min-height: 44px;
+    width: 100%;
+  }
+
   /* Tabela -> card em telas pequenas: CSS-only, reaproveita o mesmo <tr>/<td> do
      desktop, sem duplicar lógica de render em JS. Cada <td> precisa de
      data-label="Nome da Coluna" (mostrado via ::before). Primeira coluna de
