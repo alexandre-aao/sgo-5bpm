@@ -877,6 +877,17 @@ body.sgo-sincronizando .topbar::before {
   margin-bottom: 24px;
 }
 
+/* Top 10 — Ranking de Empenho */
+.dashboard-ranking-panel {
+  margin-bottom: 24px;
+}
+.rank-posto {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 .dashboard-donut-wrap {
   display: flex;
   align-items: center;

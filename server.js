@@ -1158,6 +1158,29 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   });
   const distribuicaoTipo = Object.values(mapaTipo).sort((a, b) => b.total_eventos - a.total_eventos);
 
+  // Top 10 militares por empenho no período — mesma agregação por militar de /api/relatorio-diarias,
+  // sobre as escalas do período. Enriquece com posto/graduação via matrícula (best-effort; escalas
+  // antigas podem ter militar_id de texto livre que não casa com nenhum cadastro).
+  const postoPorMatricula = new Map();
+  db.pessoal.forEach(p => { if (p.matricula) postoPorMatricula.set(String(p.matricula), p.posto_graduacao || ''); });
+  const consolidadoMilitares = {};
+  db.escalas.filter(s => idsEventosDoPeriodo.has(s.evento_id)).forEach(s => {
+    const chave = s.militar_id || s.militar_nome;
+    if (!consolidadoMilitares[chave]) {
+      consolidadoMilitares[chave] = {
+        militar_nome: s.militar_nome,
+        posto_graduacao: postoPorMatricula.get(String(s.militar_id)) || '',
+        escalas_count: 0,
+        total_diarias: 0
+      };
+    }
+    consolidadoMilitares[chave].escalas_count += 1;
+    consolidadoMilitares[chave].total_diarias += (s.total_diarias || 0);
+  });
+  const topMilitares = Object.values(consolidadoMilitares)
+    .sort((a, b) => b.total_diarias - a.total_diarias || b.escalas_count - a.escalas_count)
+    .slice(0, 10);
+
   // Cadastro de Pessoal: total + quebra Praça/Oficial (não depende de período)
   const totalPessoal = db.pessoal.length;
   const pracas = db.pessoal.filter(p => p.tipo === 'Praça').length;
@@ -1170,6 +1193,7 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
     planejador: { missoes_nao_convertidas: missoesNaoConvertidas },
     efetivo_total_periodo: efetivoTotalPeriodo,
     distribuicao_tipo: distribuicaoTipo,
+    top_militares: topMilitares,
     pessoal: { total: totalPessoal, pracas, oficiais },
     usuarios: { total: db.usuarios.length }
   });

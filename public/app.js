@@ -1084,6 +1084,7 @@ async function renderDashboardResumo() {
     document.getElementById('dash-resumo-usuarios').textContent = resumo.usuarios.total;
 
     renderDashboardDonut(resumo.distribuicao_tipo);
+    renderTopMilitares(resumo.top_militares);
   } catch (error) {
     console.error('Erro ao carregar o resumo do Dashboard:', error);
     ['dash-resumo-eventos', 'dash-resumo-diarias', 'dash-resumo-efetivo', 'dash-resumo-pessoal', 'dash-resumo-usuarios']
@@ -1091,6 +1092,29 @@ async function renderDashboardResumo() {
     const subEv = document.getElementById('dash-resumo-eventos-sub');
     if (subEv) subEv.textContent = 'Falha ao carregar.';
   }
+}
+
+// Top 10 — Ranking de Empenho (militares com mais diárias no período filtrado).
+// Visível em desktop e mobile (usa o padrão table-cards-mobile já estabelecido).
+function renderTopMilitares(topMilitares) {
+  const tbody = document.getElementById('table-top-militares-body');
+  if (!tbody) return;
+
+  if (!topMilitares || topMilitares.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhuma escala lançada neste período.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = topMilitares.map((m, i) => `
+    <tr>
+      <td data-label="Posição">${i + 1}º</td>
+      <td class="card-title-cell">
+        <strong>${esc(m.militar_nome)}</strong>${m.posto_graduacao ? `<span class="rank-posto">${esc(m.posto_graduacao)}</span>` : ''}
+      </td>
+      <td class="text-center" data-label="Escalas">${m.escalas_count}</td>
+      <td class="text-center" data-label="Diárias">${m.total_diarias}</td>
+    </tr>
+  `).join('');
 }
 
 // -------------------------------------------------------------
