@@ -1980,6 +1980,9 @@ body.sgo-sincronizando .topbar::before {
    ------------------------------------------------------------- */
 .cartao-toolbar-panel {
   margin-bottom: 20px;
+  /* Sem elemento full-bleed colado na borda que precise do corte de .panel — visible
+     libera o menu "⋯" (position:absolute) de ser cortado pelo overflow:hidden herdado. */
+  overflow: visible;
 }
 
 .cartao-toolbar {
