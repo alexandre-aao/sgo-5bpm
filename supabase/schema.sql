@@ -80,21 +80,8 @@ create table if not exists escalas (
 );
 create index if not exists idx_escalas_operacao on escalas(operacao_id);
 
--- DEPRECADA — substituída pela tabela `operacoes` (situacao='Planejada' + qtd_diarias_estimada).
--- Mantida temporariamente até a migração de dados rodar em produção; será removida
--- (DROP TABLE) só após confirmação do usuário. Não criar novas dependências nela.
-create table if not exists missoes_planejadas (
-  id text primary key,
-  nome text not null,
-  tipo_recorrencia text not null check (tipo_recorrencia in ('diaria', 'fim_de_semana', 'dia_unico')),
-  data_inicio date not null,
-  data_fim date not null,
-  qtd_diarias_por_ocorrencia int not null,
-  mes text not null,
-  ano text not null,
-  convertida_em_evento_id text default null references eventos(id) on delete set null
-);
-create index if not exists idx_missoes_planejadas_mes_ano on missoes_planejadas(ano, mes);
+-- (A antiga tabela `missoes_planejadas` foi migrada para `operacoes` — situacao='Planejada'
+--  com qtd_diarias_estimada — e removida do banco via DROP TABLE. Sem tabela separada.)
 
 create table if not exists usuarios (
   usuario text primary key,

@@ -103,9 +103,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // consultas pontuais em vez desse shim, por serem o caminho mais quente.
 const CHAVE_PRIMARIA = { usuarios: 'usuario', sessoes: 'token' };
 // `operacoes` usa chave 'id' (default de chavePrimariaDe), como eventos/escalas/alocacoes — por
-// isso não entra em CHAVE_PRIMARIA. `missoes_planejadas` continua listada porque a tabela ainda
-// existe no banco (deprecada, aguardando migração de dados + DROP posterior), mas nenhuma rota a usa mais.
-const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'operacoes', 'alocacoes', 'escalas', 'cartoes', 'missoes_planejadas', 'viaturas'];
+// isso não entra em CHAVE_PRIMARIA. `missoes_planejadas` foi migrada para `operacoes` e a tabela
+// foi removida do banco (DROP), então saiu desta lista.
+const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'operacoes', 'alocacoes', 'escalas', 'cartoes', 'viaturas'];
 const TABELAS_E_CONFIG = [...TABELAS, 'config'];
 
 function chavePrimariaDe(tabela) {
