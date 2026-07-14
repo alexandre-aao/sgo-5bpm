@@ -466,6 +466,19 @@ function setupEventListeners() {
   });
   document.getElementById('form-escala').addEventListener('submit', handleCreateEscala);
 
+  // Autocomplete de militar (Item 5): ao casar exatamente uma matrícula do Cadastro de Pessoal,
+  // preenche o nome, e vice-versa. Correspondência exata só — digitação livre continua valendo.
+  const escNomeInput = document.getElementById('esc_militar_nome');
+  const escMatInput = document.getElementById('esc_militar_id');
+  escMatInput.addEventListener('change', () => {
+    const p = (state.pessoal || []).find(p => p.matricula && p.matricula === escMatInput.value.trim());
+    if (p && p.nome) escNomeInput.value = p.nome;
+  });
+  escNomeInput.addEventListener('change', () => {
+    const p = (state.pessoal || []).find(p => p.nome === escNomeInput.value.trim());
+    if (p && p.matricula) escMatInput.value = p.matricula;
+  });
+
   // Preview de diárias no sub-formulário de Escala
   const escQtdAparicoesInput = document.getElementById('esc_qtd_aparicoes');
   escQtdAparicoesInput.addEventListener('input', () => {
@@ -827,6 +840,7 @@ async function fetchData() {
     const resViaturas = await apiFetch(`${API_BASE_URL}/api/viaturas`);
     state.viaturas = await resViaturas.json();
     popularDatalistViaturas();
+    popularDatalistPessoal();
 
     // Cadastro de Bairros — alimenta o select de Bairro em Novo Evento
     popularSelectBairros();
@@ -1443,6 +1457,23 @@ function renderRelatorioSei(data) {
     document.getElementById('sei-periodo').textContent = `${dataBr(data.periodo.data_inicio)} a ${dataBr(data.periodo.data_fim)}`;
   }
 
+  // Documentação e Local — só existe quando há evento/operação único (modo período não tem).
+  const docSecao = document.getElementById('sei-doc-secao');
+  if (data.evento) {
+    const e = data.evento;
+    const bairro = e.bairro || (data.bairros && data.bairros[0]) || '';
+    const endereco = [e.local_itinerario, bairro].filter(Boolean).map(esc).join(' — ');
+    const linhasDoc = [];
+    if (e.num_oficio) linhasDoc.push(`<strong>Ofício:</strong> ${esc(e.num_oficio)}`);
+    linhasDoc.push(`<strong>Nº OS:</strong> ${esc(e.num_os_manual) || 'não informado'}`);
+    linhasDoc.push(`<strong>Nº SEI:</strong> ${esc(e.num_sei) || 'não informado'}`);
+    linhasDoc.push(`<strong>Local:</strong> ${endereco || 'não informado'}`);
+    document.getElementById('sei-documentacao').innerHTML = linhasDoc.join('<br>');
+    docSecao.style.display = '';
+  } else {
+    docSecao.style.display = 'none';
+  }
+
   document.getElementById('sei-resumo-grid').innerHTML = `
     <div class="sei-resumo-item"><strong>${data.resumo.total_eventos}</strong><span>Evento(s)</span></div>
     <div class="sei-resumo-item"><strong>${data.resumo.total_viaturas}</strong><span>Viatura(s)</span></div>
@@ -1478,6 +1509,11 @@ function montarTextoRelatorioSei(data) {
     linhas.push(`RELATÓRIO DE EMPREGO OPERACIONAL — ${data.evento.nome_evento.toUpperCase()}`);
     linhas.push(`Tipo: ${data.evento.tipo_evento} | Data: ${dataBr(data.evento.data_inicio)}${data.evento.data_termino && data.evento.data_termino !== data.evento.data_inicio ? ' a ' + dataBr(data.evento.data_termino) : ''}`);
     linhas.push(`Demandante: ${data.evento.demandante || 'Não informado'}`);
+    const bairro = data.evento.bairro || (data.bairros && data.bairros[0]) || '';
+    const endereco = [data.evento.local_itinerario, bairro].filter(Boolean).join(' — ');
+    if (data.evento.num_oficio) linhas.push(`Ofício: ${data.evento.num_oficio}`);
+    linhas.push(`Nº OS: ${data.evento.num_os_manual || 'não informado'} | Nº SEI: ${data.evento.num_sei || 'não informado'}`);
+    linhas.push(`Local: ${endereco || 'não informado'}`);
   } else {
     linhas.push('RELATÓRIO DE EMPREGO OPERACIONAL — PERÍODO');
     linhas.push(`Período: ${dataBr(data.periodo.data_inicio)} a ${dataBr(data.periodo.data_fim)}`);
@@ -4146,7 +4182,10 @@ async function renderPessoalTab() {
     }
 
     // Mantém a lista completa em memória para alimentar os seletores de Fiscal/Adjunto/Sobreaviso no Cartão Programa
-    if (!pessoalFiltroCategoria) state.pessoal = pessoal;
+    if (!pessoalFiltroCategoria) {
+      state.pessoal = pessoal;
+      popularDatalistPessoal(); // mantém o autocomplete de escala em dia após CRUD de pessoal
+    }
 
     if (filtroSemCategoria) pessoal = pessoal.filter(p => !p.categorias || p.categorias.length === 0);
     pessoalListaAtual = pessoal;
@@ -4424,6 +4463,22 @@ function popularDatalistViaturas() {
   const datalist = document.getElementById('lista-prefixos-viaturas');
   if (!datalist) return;
   datalist.innerHTML = (state.viaturas || []).map(v => `<option value="${esc(v.prefixo)}"></option>`).join('');
+}
+
+// Preenche os <datalist> de sugestão do form "Escalar Militar" (gaveta de Operação) a partir
+// do Cadastro de Pessoal. A matrícula mostra o nome como rótulo e vice-versa; os campos seguem
+// texto livre (autofill só em correspondência exata, ver listeners no init).
+function popularDatalistPessoal() {
+  const dlNome = document.getElementById('datalist-pessoal-nome');
+  const dlMat = document.getElementById('datalist-pessoal-matricula');
+  if (!dlNome || !dlMat) return;
+  const pessoal = Array.isArray(state.pessoal) ? state.pessoal : [];
+  dlNome.innerHTML = pessoal
+    .filter(p => p.nome)
+    .map(p => `<option value="${esc(p.nome)}">${esc(p.matricula) || ''}</option>`).join('');
+  dlMat.innerHTML = pessoal
+    .filter(p => p.matricula)
+    .map(p => `<option value="${esc(p.matricula)}">${esc(p.nome)}</option>`).join('');
 }
 
 // -------------------------------------------------------------

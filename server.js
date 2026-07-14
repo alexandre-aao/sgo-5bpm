@@ -1430,7 +1430,9 @@ app.get('/api/relatorio-sei', asyncRoute(async (req, res) => {
         data_termino: operacao.data_termino,
         num_os_manual: operacao.num_os_manual,
         num_sei: operacao.num_sei,
-        num_oficio: operacao.num_oficio
+        num_oficio: operacao.num_oficio,
+        local_itinerario: operacao.local_itinerario,
+        bairro: operacao.bairro
       },
       periodo: null,
       resumo: {
