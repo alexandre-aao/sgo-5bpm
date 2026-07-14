@@ -816,29 +816,26 @@ async function handleAlterarSenha(e) {
 async function fetchData() {
   document.body.classList.add('sgo-sincronizando');
   try {
-    const resEventos = await apiFetch(`${API_BASE_URL}/api/eventos`);
-    state.eventos = await resEventos.json();
-
-    const resOperacoes = await apiFetch(`${API_BASE_URL}/api/operacoes`);
-    state.operacoes = await resOperacoes.json();
-
-    // Carrega todas as alocações/escalas de fundo para permitir métricas rápidas nos cards do Turno
-    const resAloc = await apiFetch(`${API_BASE_URL}/api/alocacoes`);
-    state.alocacoes = await resAloc.json();
-
-    const resEsc = await apiFetch(`${API_BASE_URL}/api/escalas`);
-    state.escalas = await resEsc.json();
-
-    const resConfig = await apiFetch(`${API_BASE_URL}/api/config`);
-    state.config = await resConfig.json();
-
-    // Cadastro de Pessoal em memória — alimenta os seletores de Fiscal/Adjunto/Sobreaviso do Cartão Programa
-    const resPessoal = await apiFetch(`${API_BASE_URL}/api/pessoal`);
-    state.pessoal = await resPessoal.json();
-
-    // Cadastro de Viaturas em memória — alimenta a sugestão de prefixo no Cartão Programa
-    const resViaturas = await apiFetch(`${API_BASE_URL}/api/viaturas`);
-    state.viaturas = await resViaturas.json();
+    // Os 7 carregamentos são independentes entre si (nenhum usa o resultado do outro),
+    // então rodam em paralelo — reduz o tempo de carga de ~7 round-trips em série para ~1.
+    // Alocações/escalas alimentam as métricas rápidas dos cards do Turno; pessoal e viaturas
+    // alimentam os seletores/sugestões do Cartão Programa.
+    const [eventos, operacoes, alocacoes, escalas, config, pessoal, viaturas] = await Promise.all([
+      apiFetch(`${API_BASE_URL}/api/eventos`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/operacoes`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/alocacoes`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/escalas`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/config`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/pessoal`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/viaturas`).then(r => r.json()),
+    ]);
+    state.eventos = eventos;
+    state.operacoes = operacoes;
+    state.alocacoes = alocacoes;
+    state.escalas = escalas;
+    state.config = config;
+    state.pessoal = pessoal;
+    state.viaturas = viaturas;
     popularDatalistViaturas();
     popularDatalistPessoal();
 
@@ -4462,7 +4459,8 @@ window.handleExcluirViatura = async function(id) {
 function popularDatalistViaturas() {
   const datalist = document.getElementById('lista-prefixos-viaturas');
   if (!datalist) return;
-  datalist.innerHTML = (state.viaturas || []).map(v => `<option value="${esc(v.prefixo)}"></option>`).join('');
+  const viaturas = Array.isArray(state.viaturas) ? state.viaturas : [];
+  datalist.innerHTML = viaturas.map(v => `<option value="${esc(v.prefixo)}"></option>`).join('');
 }
 
 // Preenche os <datalist> de sugestão do form "Escalar Militar" (gaveta de Operação) a partir
