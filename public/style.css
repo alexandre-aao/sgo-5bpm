@@ -2833,6 +2833,26 @@ body.sgo-sincronizando .topbar::before {
     visibility: visible;
   }
 
+  /* Gavetas de detalhe (#drawer de evento / #drawer-op de operação) em telas estreitas.
+     Três correções, todas escopadas ao mobile — desktop fica intacto:
+     - dvh: a altura passa a acompanhar a barra dinâmica do navegador; com 100vh o rodapé
+       ficava atrás da barra e os botões sumiam. Navegadores sem dvh ignoram a linha e
+       mantêm o 100vh original (fallback natural).
+     - safe-area: o rodapé respeita a home indicator (iOS com notch), sem botão sob ela.
+     - wrap: os 4–5 botões do rodapé quebram em linhas e crescem para preencher a largura,
+       com área de toque, em vez de estourar/espremer (antes: flex sem wrap). */
+  .drawer {
+    height: 100dvh;
+  }
+  .drawer-footer {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .drawer-footer .btn {
+    flex: 1 1 auto;
+  }
+
   /* Donut de distribuição por tipo (Dashboard) — só em desktop, poupa processamento em tela pequena */
   .dashboard-donut-panel { display: none; }
 
