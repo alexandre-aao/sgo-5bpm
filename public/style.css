@@ -687,6 +687,10 @@ body.sgo-sincronizando .topbar::before {
 /* Badge de missão planejada já convertida em evento (Planejador de Diárias) */
 .badge.missao-convertida { background-color: var(--success); color: #fff; }
 
+/* Badges de situação da Operação (Operações / Planejador de Diárias) */
+.badge.situacao-planejada { background-color: var(--warning); color: #000; }
+.badge.situacao-executada { background-color: var(--success); color: #fff; }
+
 /* Badges de status (Cadastro de Viaturas) */
 .badge.status-ativa { background-color: var(--success); color: #fff; }
 .badge.status-manutencao { background-color: var(--warning); color: #000; }

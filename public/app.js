@@ -1,9 +1,11 @@
 // State Management
 let state = {
   eventos: [],
+  operacoes: [],
   alocacoes: [],
   escalas: [],
   currentEventId: null,
+  currentOperacaoId: null,
   calendarDiariasMonth: new Date().getMonth(),
   calendarDiariasYear: new Date().getFullYear(),
   user: null, // Dados do usuário logado
@@ -145,6 +147,7 @@ function applyRolePermissions(user) {
   const btnDashboard = document.getElementById('nav-btn-dashboard');
   const btnCadastro = document.getElementById('nav-btn-cadastro');
   const btnRelatorio = document.getElementById('nav-btn-relatorio');
+  const btnOperacoes = document.getElementById('nav-btn-operacoes');
   const btnPlanejador = document.getElementById('nav-btn-planejador');
   const btnUsuarios = document.getElementById('nav-btn-usuarios');
   const btnPessoal = document.getElementById('nav-btn-pessoal');
@@ -162,6 +165,7 @@ function applyRolePermissions(user) {
     btnDashboard.classList.remove('hidden-role');
     btnCadastro.classList.remove('hidden-role');
     btnRelatorio.classList.remove('hidden-role');
+    btnOperacoes.classList.remove('hidden-role');
     btnPlanejador.classList.remove('hidden-role');
     btnUsuarios.classList.remove('hidden-role');
     btnPessoal.classList.remove('hidden-role');
@@ -179,6 +183,7 @@ function applyRolePermissions(user) {
     btnDashboard.classList.add('hidden-role');
     btnCadastro.classList.add('hidden-role');
     btnRelatorio.classList.add('hidden-role');
+    btnOperacoes.classList.add('hidden-role');
     btnPlanejador.classList.add('hidden-role');
     btnUsuarios.classList.add('hidden-role');
     btnPessoal.classList.add('hidden-role');
@@ -210,7 +215,8 @@ function setupNavigation() {
     'tab-turno': { title: 'Escala de Turno (Serviço Diário)', subtitle: 'Pauta focada de policiamento para os Oficiais de Dia e Adjuntos.' },
     'tab-eventos': { title: 'Consulta Geral de Pautas', subtitle: 'Lista consolidada de eventos históricos e futuros com filtros de busca.' },
     'tab-mapa': { title: 'Mapa de Eventos da Semana', subtitle: 'Localização geográfica dos eventos da semana corrente por bairro.' },
-    'tab-planejador': { title: 'Planejador Mensal de Diárias', subtitle: 'Controle da cota mensal e distribuição de diárias operacionais por evento.' },
+    'tab-operacoes': { title: 'Operações (Diárias)', subtitle: 'Operações planejadas e executadas, com efetivo escalado e diárias.' },
+    'tab-planejador': { title: 'Planejador Mensal de Diárias', subtitle: 'Controle da cota mensal e distribuição de diárias operacionais por operação.' },
     'tab-cartao': { title: 'Cartão Programa', subtitle: 'Roteiro diário de patrulhamento das viaturas: locais, horários e atividades.' },
     'tab-usuarios': { title: 'Usuários do Sistema', subtitle: 'Gestão de perfis de acesso e redefinição de senhas.' },
     'tab-pessoal': { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' },
@@ -246,6 +252,8 @@ function setupNavigation() {
         renderEventosTab();
       } else if (targetId === 'tab-mapa') {
         renderMapaTab();
+      } else if (targetId === 'tab-operacoes') {
+        renderOperacoesTab();
       } else if (targetId === 'tab-planejador') {
         renderPlanejadorTab();
       } else if (targetId === 'tab-cartao') {
@@ -506,12 +514,25 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-missao').addEventListener('click', fecharModalMissao);
   document.getElementById('form-missao-avulsa').addEventListener('submit', handleCriarMissaoAvulsa);
 
-  // Modal de Nova Missão Planejada (Planejador de Diárias)
-  document.getElementById('btn-nova-missao-planejada').addEventListener('click', abrirModalMissaoPlanejada);
-  const fecharModalMissaoPlanejada = () => document.getElementById('modal-missao-planejada').classList.add('hidden');
-  document.getElementById('btn-fechar-modal-missao-planejada').addEventListener('click', fecharModalMissaoPlanejada);
-  document.getElementById('btn-cancelar-modal-missao-planejada').addEventListener('click', fecharModalMissaoPlanejada);
-  document.getElementById('form-missao-planejada').addEventListener('submit', handleCriarMissaoPlanejada);
+  // Aba Operações: filtros + Nova Operação + modal + gaveta
+  document.getElementById('filter-operacoes-situacao').addEventListener('change', renderOperacoesTab);
+  document.getElementById('filter-operacoes-search').addEventListener('input', renderOperacoesTab);
+  document.getElementById('btn-nova-operacao').addEventListener('click', () => abrirModalOperacao());
+  const fecharModalOperacao = () => document.getElementById('modal-operacao').classList.add('hidden');
+  document.getElementById('btn-fechar-modal-operacao').addEventListener('click', fecharModalOperacao);
+  document.getElementById('btn-cancelar-modal-operacao').addEventListener('click', fecharModalOperacao);
+  document.getElementById('form-operacao').addEventListener('submit', handleSalvarOperacao);
+
+  // Gaveta de Operação
+  document.getElementById('btn-close-drawer-op').addEventListener('click', closeDrawerOperacao);
+  document.getElementById('btn-close-drawer-op-footer').addEventListener('click', closeDrawerOperacao);
+  document.getElementById('drawer-op-overlay').addEventListener('click', closeDrawerOperacao);
+  document.getElementById('btn-op-marcar-executada').addEventListener('click', handleMarcarOperacaoExecutada);
+  document.getElementById('btn-op-delete').addEventListener('click', handleDeleteOperacao);
+  document.getElementById('btn-op-editar').addEventListener('click', () => { if (state.currentOperacaoId) abrirModalOperacao(state.currentOperacaoId); });
+  document.getElementById('btn-op-relatorio-sei').addEventListener('click', () => {
+    if (state.currentOperacaoId) abrirRelatorioSei({ operacaoId: state.currentOperacaoId });
+  });
 
   // Filtro de período do Dashboard (reprocessa os cards-resumo + donut de distribuição por tipo)
   document.getElementById('dashboard-filtro-mes').addEventListener('change', renderDashboardResumo);
@@ -675,12 +696,15 @@ function encerrarSessaoLocal() {
   localStorage.removeItem('user');
   state.user = null;
   state.eventos = [];
+  state.operacoes = [];
   state.alocacoes = [];
   state.escalas = [];
   state.currentEventId = null;
+  state.currentOperacaoId = null;
   state.cartaoAtual = null;
 
   closeDrawer();
+  closeDrawerOperacao();
   document.getElementById('login-container').classList.remove('hidden');
 }
 
@@ -741,7 +765,10 @@ async function fetchData() {
   try {
     const resEventos = await apiFetch(`${API_BASE_URL}/api/eventos`);
     state.eventos = await resEventos.json();
-    
+
+    const resOperacoes = await apiFetch(`${API_BASE_URL}/api/operacoes`);
+    state.operacoes = await resOperacoes.json();
+
     // Carrega todas as alocações/escalas de fundo para permitir métricas rápidas nos cards do Turno
     const resAloc = await apiFetch(`${API_BASE_URL}/api/alocacoes`);
     state.alocacoes = await resAloc.json();
@@ -777,6 +804,8 @@ async function fetchData() {
       renderEventosTab();
     } else if (activeTab === 'tab-mapa') {
       renderMapaTab();
+    } else if (activeTab === 'tab-operacoes') {
+      renderOperacoesTab();
     } else if (activeTab === 'tab-planejador') {
       renderPlanejadorTab();
     }
@@ -784,6 +813,10 @@ async function fetchData() {
     // Se a gaveta lateral de detalhes do evento estiver aberta, recarrega
     if (state.currentEventId) {
       await fetchEventDetails(state.currentEventId);
+    }
+    // Idem para a gaveta de Operação
+    if (state.currentOperacaoId) {
+      await fetchOperacaoDetails(state.currentOperacaoId);
     }
   } catch (error) {
     console.error("Erro ao buscar dados do servidor:", error);
@@ -859,18 +892,19 @@ function updateStats() {
   const dataMesAnterior = new Date(anoAtualNum, mesAtualNum - 2, 1);
   const prefixoMesAnterior = `${dataMesAnterior.getFullYear()}-${String(dataMesAnterior.getMonth() + 1).padStart(2, '0')}`;
 
-  const idsEventosMes = new Set(
-    state.eventos.filter(e => e.data_inicio.startsWith(prefixoMesAtual)).map(e => e.id)
+  // Diárias consumidas agora vêm das OPERAÇÕES (não mais dos eventos).
+  const idsOperacoesMes = new Set(
+    (state.operacoes || []).filter(o => o.data_inicio.startsWith(prefixoMesAtual)).map(o => o.id)
   );
   const consumidoMes = state.escalas
-    .filter(s => idsEventosMes.has(s.evento_id))
+    .filter(s => idsOperacoesMes.has(s.operacao_id))
     .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
 
-  const idsEventosMesAnterior = new Set(
-    state.eventos.filter(e => e.data_inicio.startsWith(prefixoMesAnterior)).map(e => e.id)
+  const idsOperacoesMesAnterior = new Set(
+    (state.operacoes || []).filter(o => o.data_inicio.startsWith(prefixoMesAnterior)).map(o => o.id)
   );
   const consumidoMesAnterior = state.escalas
-    .filter(s => idsEventosMesAnterior.has(s.evento_id))
+    .filter(s => idsOperacoesMesAnterior.has(s.operacao_id))
     .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
 
   const cota = state.config ? (state.config.cota_mensal_diarias || 0) : 0;
@@ -1289,7 +1323,7 @@ function renderEventosTab() {
   }
 
   if (eventosFiltrados.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhum evento localizado com os filtros aplicados.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhum evento localizado com os filtros aplicados.</td></tr>`;
     return;
   }
 
@@ -1304,12 +1338,6 @@ function renderEventosTab() {
     const typeClass = evt.tipo_evento.toLowerCase().replace(' ', '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const dateBr = evt.data_inicio.split('-').reverse().join('/');
 
-    const escalasEvt = state.escalas.filter(s => s.evento_id === evt.id);
-    const totalDiariasEvt = escalasEvt.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
-    const badgeDiaria = totalDiariasEvt > 0
-      ? `<span class="badge-diaria tem-diaria"><i data-lucide="wallet"></i> ${totalDiariasEvt} diária(s)</span>`
-      : `<span class="badge-diaria sem-diaria">Sem diária</span>`;
-
     tr.innerHTML = `
       <td data-label="Data"><strong>${dateBr}</strong></td>
       <td class="card-title-cell">${esc(evt.nome_evento)}</td>
@@ -1318,7 +1346,6 @@ function renderEventosTab() {
       <td data-label="Bairro/Local">${esc(evt.bairro) || 'Centro'}</td>
       <td data-label="Nº OS"><code style="color:#a5b4fc;">${esc(evt.num_os_manual) || '-'}</code></td>
       <td data-label="Nº SEI"><code style="color:#a5b4fc;">${esc(evt.num_sei) || '-'}</code></td>
-      <td data-label="Diária">${badgeDiaria}</td>
     `;
 
     tableBody.appendChild(tr);
@@ -1332,9 +1359,11 @@ function renderEventosTab() {
 // -------------------------------------------------------------
 
 // Abre o modal e busca os dados: { eventoId } para um único evento, ou { dataInicio, dataFim } para um período
-async function abrirRelatorioSei({ eventoId, dataInicio, dataFim } = {}) {
+async function abrirRelatorioSei({ eventoId, operacaoId, dataInicio, dataFim } = {}) {
   const params = new URLSearchParams();
-  if (eventoId) {
+  if (operacaoId) {
+    params.set('operacao_id', operacaoId);
+  } else if (eventoId) {
     params.set('evento_id', eventoId);
   } else if (dataInicio && dataFim) {
     params.set('data_inicio', dataInicio);
@@ -1364,7 +1393,7 @@ async function abrirRelatorioSei({ eventoId, dataInicio, dataFim } = {}) {
 function renderRelatorioSei(data) {
   const dataBr = (iso) => iso ? iso.split('-').reverse().join('/') : '-';
 
-  if (data.modo === 'evento') {
+  if (data.evento) {
     const evt = data.evento;
     document.getElementById('sei-titulo').textContent = evt.nome_evento;
     document.getElementById('sei-periodo').textContent =
@@ -1405,7 +1434,7 @@ function montarTextoRelatorioSei(data) {
   linhas.push('SEÇÃO DE PLANEJAMENTO E OPERAÇÕES — P3');
   linhas.push('');
 
-  if (data.modo === 'evento') {
+  if (data.evento) {
     linhas.push(`RELATÓRIO DE EMPREGO OPERACIONAL — ${data.evento.nome_evento.toUpperCase()}`);
     linhas.push(`Tipo: ${data.evento.tipo_evento} | Data: ${dataBr(data.evento.data_inicio)}${data.evento.data_termino && data.evento.data_termino !== data.evento.data_inicio ? ' a ' + dataBr(data.evento.data_termino) : ''}`);
     linhas.push(`Demandante: ${data.evento.demandante || 'Não informado'}`);
@@ -1876,12 +1905,9 @@ async function openDrawer(eventId) {
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('open');
   state.currentEventId = null;
-  
+
   document.getElementById('form-alocacao-container').classList.add('hidden');
-  document.getElementById('form-escala-container').classList.add('hidden');
   document.getElementById('form-alocacao').reset();
-  document.getElementById('form-escala').reset();
-  document.getElementById('diarias-calc-preview').textContent = '2';
 }
 
 async function fetchEventDetails(id) {
@@ -1912,15 +1938,10 @@ async function fetchEventDetails(id) {
     document.getElementById('detail-local').textContent = evt.local_itinerario;
     document.getElementById('detail-bairro').textContent = evt.bairro || '-';
 
-    // Carrega alocações da API
+    // Carrega alocações da API (evento não tem mais escala nominal — isso é das operações)
     const resAloc = await apiFetch(`${API_BASE_URL}/api/alocacoes?evento_id=${id}`);
     const alocacoes = await resAloc.json();
     renderAlocacoesList(alocacoes);
-
-    // Carrega escalas da API
-    const resEscalas = await apiFetch(`${API_BASE_URL}/api/escalas?evento_id=${id}`);
-    const escalas = await resEscalas.json();
-    renderEscalasList(escalas);
 
   } catch (error) {
     console.error(error);
@@ -2109,9 +2130,10 @@ async function handleCreateAlocacao(e) {
 
 async function handleCreateEscala(e) {
   e.preventDefault();
+  if (!state.currentOperacaoId) return;
 
   const payload = {
-    evento_id: state.currentEventId,
+    operacao_id: state.currentOperacaoId,
     militar_nome: document.getElementById('esc_militar_nome').value.trim(),
     militar_id: document.getElementById('esc_militar_id').value.trim(),
     qtd_aparicoes: document.getElementById('esc_qtd_aparicoes').value
@@ -2131,7 +2153,7 @@ async function handleCreateEscala(e) {
         document.getElementById('diarias-calc-preview').textContent = '2';
 
         await fetchData(); // Atualiza escalas em cache
-        fetchEventDetails(state.currentEventId);
+        fetchOperacaoDetails(state.currentOperacaoId);
       }
     } catch (error) {
       console.error(error);
@@ -2162,7 +2184,7 @@ window.handleDeleteEscala = async function(id) {
       if (res.ok) {
         showToast('Militar removido da escala.', 'info');
         await fetchData();
-        fetchEventDetails(state.currentEventId);
+        if (state.currentOperacaoId) fetchOperacaoDetails(state.currentOperacaoId);
       }
     } catch (e) {
       console.error(e);
@@ -2363,32 +2385,31 @@ async function renderPlanejadorTab() {
       alertEl.classList.add('hidden');
     }
 
-    renderMissoesPlanejadasTab(data.missoes_planejadas || []);
-
-    // Tabela de eventos do mês
+    // Tabela de operações do mês
     tableBody.innerHTML = '';
+    const operacoesMes = data.operacoes || [];
 
-    if (data.eventos.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhum evento na pauta para este mês.</td></tr>`;
+    if (operacoesMes.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhuma operação para este mês.</td></tr>`;
     } else {
-      data.eventos.forEach(evt => {
+      operacoesMes.forEach(op => {
         const tr = document.createElement('tr');
         tr.style.cursor = 'pointer';
-        tr.addEventListener('click', () => openDrawer(evt.id));
+        tr.addEventListener('click', () => openDrawerOperacao(op.id));
 
-        const typeClass = evt.tipo_evento.toLowerCase().replace(' ', '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const dateBr = evt.data_inicio.split('-').reverse().join('/');
-        const pctEvento = data.cota_mensal > 0
-          ? `${((evt.total_diarias / data.cota_mensal) * 100).toFixed(1)}%`
+        const dateBr = op.data_inicio.split('-').reverse().join('/');
+        const pctOp = data.cota_mensal > 0
+          ? `${((op.total_diarias / data.cota_mensal) * 100).toFixed(1)}%`
           : '—';
 
         tr.innerHTML = `
           <td><strong>${dateBr}</strong></td>
-          <td>${esc(evt.nome_evento)}</td>
-          <td><span class="badge ${typeClass}">${esc(evt.tipo_evento)}</span></td>
-          <td class="text-center">${evt.militares_escalados}</td>
-          <td class="text-right" style="color:#f59e0b;font-weight:600;">${evt.total_diarias}</td>
-          <td class="text-right">${pctEvento}</td>
+          <td>${esc(op.nome_operacao)}</td>
+          <td>${esc(op.tipo_operacao)}</td>
+          <td>${badgeSituacaoOperacao(op.situacao)}</td>
+          <td class="text-center">${op.militares_escalados}</td>
+          <td class="text-right" style="color:#f59e0b;font-weight:600;">${op.total_diarias}${op.tem_escala ? '' : ' <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">(est.)</span>'}</td>
+          <td class="text-right">${pctOp}</td>
         `;
         tableBody.appendChild(tr);
       });
@@ -2402,7 +2423,7 @@ async function renderPlanejadorTab() {
 }
 
 // -------------------------------------------------------------
-// MISSÕES PLANEJADAS (PLANEJADOR DE DIÁRIAS)
+// OPERAÇÕES (PLANEJAMENTO -> EXECUÇÃO, COM DIÁRIA)
 // -------------------------------------------------------------
 const ROTULOS_RECORRENCIA = {
   diaria: 'Diária',
@@ -2410,127 +2431,257 @@ const ROTULOS_RECORRENCIA = {
   dia_unico: 'Dia Único'
 };
 
-function renderMissoesPlanejadasTab(missoes) {
-  const tbody = document.getElementById('table-missoes-planejadas-body');
+// Badge de situação da operação (Planejada = amarelo/alerta; Executada = verde/sucesso).
+function badgeSituacaoOperacao(situacao) {
+  const cls = situacao === 'Executada' ? 'situacao-executada' : 'situacao-planejada';
+  return `<span class="badge ${cls}">${esc(situacao || 'Planejada')}</span>`;
+}
+
+function renderOperacoesTab() {
+  const tbody = document.getElementById('table-operacoes-body');
   if (!tbody) return;
 
-  if (missoes.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhuma missão planejada para este mês.</td></tr>`;
+  const filtroSituacao = document.getElementById('filter-operacoes-situacao').value;
+  const termo = normalizarTexto(document.getElementById('filter-operacoes-search').value || '');
+
+  // Diária de cada operação, calculada client-side a partir de state.escalas (real se há escala,
+  // estimada se não) — mesma regra do backend (diariaDaOperacao).
+  let lista = (state.operacoes || []).map(op => {
+    const escalasOp = state.escalas.filter(s => s.operacao_id === op.id);
+    const temEscala = escalasOp.length > 0;
+    const totalDiarias = temEscala
+      ? escalasOp.reduce((sum, s) => sum + (s.total_diarias || 0), 0)
+      : (op.qtd_diarias_estimada || 0);
+    return { ...op, militares_escalados: escalasOp.length, tem_escala: temEscala, total_diarias: totalDiarias };
+  });
+
+  if (filtroSituacao) lista = lista.filter(op => op.situacao === filtroSituacao);
+  if (termo) {
+    lista = lista.filter(op =>
+      normalizarTexto(op.nome_operacao || '').includes(termo) ||
+      normalizarTexto(op.demandante || '').includes(termo)
+    );
+  }
+
+  lista.sort((a, b) => b.data_inicio.localeCompare(a.data_inicio));
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhuma operação localizada.</td></tr>`;
     lucide.createIcons();
     return;
   }
 
-  const isAdmin = state.user && state.user.role === 'P3';
-
-  tbody.innerHTML = missoes.map(m => {
-    const inicioBr = m.data_inicio.split('-').reverse().join('/');
-    const fimBr = m.data_fim.split('-').reverse().join('/');
-    const periodo = m.data_inicio === m.data_fim ? inicioBr : `${inicioBr} a ${fimBr}`;
-    const convertida = !!m.convertida_em_evento_id;
-
-    return `
-      <tr>
-        <td><strong>${esc(m.nome)}</strong></td>
-        <td>${esc(ROTULOS_RECORRENCIA[m.tipo_recorrencia] || m.tipo_recorrencia)}</td>
-        <td>${periodo}</td>
-        <td class="text-right" style="color:#f59e0b;font-weight:600;">${m.qtd_diarias_por_ocorrencia}</td>
-        <td class="text-right">
-          <div style="display:flex;gap:6px;justify-content:flex-end;">
-            ${convertida
-              ? `<span class="badge missao-convertida" title="Já convertida em evento">Convertida</span>`
-              : `<button class="btn btn-secondary btn-sm admin-only" onclick="handleConverterMissaoPlanejada('${m.id}')">
-                   <i data-lucide="arrow-right-circle" style="width:12px;height:12px;"></i> Converter em Evento
-                 </button>`}
-            ${isAdmin ? `
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirMissaoPlanejada('${m.id}')">
-              <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
-            </button>` : ''}
-          </div>
-        </td>
-      </tr>
+  tbody.innerHTML = '';
+  lista.forEach(op => {
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => openDrawerOperacao(op.id));
+    const dateBr = op.data_inicio.split('-').reverse().join('/');
+    tr.innerHTML = `
+      <td data-label="Data"><strong>${dateBr}</strong></td>
+      <td class="card-title-cell">${esc(op.nome_operacao)}</td>
+      <td data-label="Tipo">${esc(op.tipo_operacao)}</td>
+      <td data-label="Situação">${badgeSituacaoOperacao(op.situacao)}</td>
+      <td data-label="Demandante">${esc(op.demandante) || '-'}</td>
+      <td class="text-center" data-label="Militares">${op.militares_escalados}</td>
+      <td class="text-right" data-label="Diária" style="color:#f59e0b;font-weight:600;">${op.total_diarias}${op.tem_escala ? '' : ' <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">(est.)</span>'}</td>
     `;
-  }).join('');
+    tbody.appendChild(tr);
+  });
 
   lucide.createIcons();
 }
 
-window.abrirModalMissaoPlanejada = function() {
-  document.getElementById('form-missao-planejada').reset();
-  document.getElementById('modal-missao-planejada').classList.remove('hidden');
+// Abre o modal de Nova/Editar Operação. Sem id -> criação; com id -> edição pré-preenchida.
+window.abrirModalOperacao = function(id) {
+  const form = document.getElementById('form-operacao');
+  form.reset();
+  document.getElementById('op-id').value = id || '';
+
+  if (id) {
+    const op = (state.operacoes || []).find(o => o.id === id);
+    if (!op) { showToast('Operação não encontrada.', 'danger'); return; }
+    document.getElementById('modal-operacao-titulo').textContent = 'Editar Operação';
+    document.getElementById('op-nome_operacao').value = op.nome_operacao || '';
+    document.getElementById('op-tipo_operacao').value = op.tipo_operacao || 'Outras';
+    document.getElementById('op-data_inicio').value = op.data_inicio || '';
+    document.getElementById('op-data_termino').value = op.data_termino || '';
+    document.getElementById('op-qtd_diarias_estimada').value = op.qtd_diarias_estimada != null ? op.qtd_diarias_estimada : 0;
+    document.getElementById('op-horario_inicio').value = op.horario_inicio || '';
+    document.getElementById('op-tipo_recorrencia').value = op.tipo_recorrencia || '';
+    document.getElementById('op-bairro').value = op.bairro || '';
+    document.getElementById('op-local_itinerario').value = op.local_itinerario || '';
+    document.getElementById('op-num_oficio').value = op.num_oficio || '';
+    document.getElementById('op-num_os_manual').value = op.num_os_manual || '';
+    document.getElementById('op-num_sei').value = op.num_sei || '';
+    document.getElementById('op-demandante').value = op.demandante || '';
+  } else {
+    document.getElementById('modal-operacao-titulo').textContent = 'Nova Operação';
+    document.getElementById('op-tipo_operacao').value = 'Outras';
+    document.getElementById('op-data_inicio').value = getLocalDateStr();
+    document.getElementById('op-qtd_diarias_estimada').value = 0;
+  }
+
+  document.getElementById('modal-operacao').classList.remove('hidden');
+  lucide.createIcons();
 };
 
-async function handleCriarMissaoPlanejada(e) {
+async function handleSalvarOperacao(e) {
   e.preventDefault();
+  const id = document.getElementById('op-id').value;
 
   const payload = {
-    nome: document.getElementById('missao-planejada-nome').value.trim(),
-    tipo_recorrencia: document.getElementById('missao-planejada-recorrencia').value,
-    data_inicio: document.getElementById('missao-planejada-inicio').value,
-    data_fim: document.getElementById('missao-planejada-fim').value || document.getElementById('missao-planejada-inicio').value,
-    qtd_diarias_por_ocorrencia: document.getElementById('missao-planejada-diarias').value
+    nome_operacao: document.getElementById('op-nome_operacao').value.trim(),
+    tipo_operacao: document.getElementById('op-tipo_operacao').value,
+    data_inicio: document.getElementById('op-data_inicio').value,
+    data_termino: document.getElementById('op-data_termino').value,
+    qtd_diarias_estimada: document.getElementById('op-qtd_diarias_estimada').value,
+    horario_inicio: document.getElementById('op-horario_inicio').value,
+    tipo_recorrencia: document.getElementById('op-tipo_recorrencia').value,
+    bairro: document.getElementById('op-bairro').value.trim(),
+    local_itinerario: document.getElementById('op-local_itinerario').value.trim(),
+    num_oficio: document.getElementById('op-num_oficio').value.trim(),
+    num_os_manual: document.getElementById('op-num_os_manual').value.trim(),
+    num_sei: document.getElementById('op-num_sei').value.trim(),
+    demandante: document.getElementById('op-demandante').value.trim()
   };
+
+  if (payload.data_termino && payload.data_termino < payload.data_inicio) {
+    showToast('A data de término não pode ser anterior à data de início.', 'danger');
+    return;
+  }
 
   await comBotaoCarregando(e.submitter, async () => {
     try {
-      const res = await apiFetch(`${API_BASE_URL}/api/missoes-planejadas`, {
-        method: 'POST',
+      const res = await apiFetch(`${API_BASE_URL}/api/operacoes${id ? '/' + id : ''}`, {
+        method: id ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const dados = await res.json();
-
       if (res.ok) {
-        document.getElementById('modal-missao-planejada').classList.add('hidden');
-        showToast('Missão planejada criada com sucesso.', 'success');
-        renderPlanejadorTab();
+        document.getElementById('modal-operacao').classList.add('hidden');
+        showToast(id ? 'Operação atualizada.' : 'Operação criada.', 'success');
+        await fetchData();
+        renderOperacoesTab();
+        if (!id) openDrawerOperacao(dados.id);
       } else {
-        showToast(esc(dados.error) || 'Falha ao criar a missão planejada.', 'danger');
+        showToast(esc(dados.error) || 'Falha ao salvar a operação.', 'danger');
       }
     } catch (error) {
-      console.error('Erro ao criar missão planejada:', error);
+      console.error('Erro ao salvar operação:', error);
       showToast('Falha na comunicação com o servidor.', 'danger');
     }
   });
 }
 
-window.handleExcluirMissaoPlanejada = async function(id) {
-  if (!confirm('Excluir permanentemente esta missão planejada?')) return;
+// Gaveta de detalhes da Operação (com efetivo escalado)
+async function openDrawerOperacao(id) {
+  state.currentOperacaoId = id;
+  document.getElementById('drawer-op').classList.add('open');
+  await fetchOperacaoDetails(id);
+}
 
+function closeDrawerOperacao() {
+  document.getElementById('drawer-op').classList.remove('open');
+  state.currentOperacaoId = null;
+  document.getElementById('form-escala-container').classList.add('hidden');
+  document.getElementById('form-escala').reset();
+  document.getElementById('diarias-calc-preview').textContent = '2';
+}
+
+async function fetchOperacaoDetails(id) {
   try {
-    const res = await apiFetch(`${API_BASE_URL}/api/missoes-planejadas/${id}`, { method: 'DELETE' });
+    const resOp = await apiFetch(`${API_BASE_URL}/api/operacoes`);
+    const operacoes = await resOp.json();
+    const op = operacoes.find(o => o.id === id);
+    if (!op) { closeDrawerOperacao(); return; }
+
+    document.getElementById('drawer-op-title').textContent = op.nome_operacao;
+    document.getElementById('drawer-op-badge').outerHTML =
+      `<span class="badge ${op.situacao === 'Executada' ? 'situacao-executada' : 'situacao-planejada'}" id="drawer-op-badge">${esc(op.situacao)}</span>`;
+
+    document.getElementById('op-detail-tipo').textContent = op.tipo_operacao || '-';
+    document.getElementById('op-detail-recorrencia').textContent = ROTULOS_RECORRENCIA[op.tipo_recorrencia] || '—';
+    document.getElementById('op-detail-oficio').textContent = op.num_oficio || 'Sem ofício informado';
+    document.getElementById('op-detail-os-manual').textContent = op.num_os_manual || 'Não informado';
+    document.getElementById('op-detail-sei').textContent = op.num_sei || 'Não informado';
+    document.getElementById('op-detail-demandante').textContent = op.demandante || 'Não Informado';
+    document.getElementById('op-detail-inicio').textContent = op.data_inicio.split('-').reverse().join('/');
+    document.getElementById('op-detail-termino').textContent = op.data_termino ? op.data_termino.split('-').reverse().join('/') : '-';
+    document.getElementById('op-detail-hora').textContent = op.horario_inicio || 'Não informada';
+    document.getElementById('op-detail-bairro').textContent = op.bairro || '-';
+    document.getElementById('op-detail-estimada').textContent = `${op.qtd_diarias_estimada || 0} diária(s)`;
+    document.getElementById('op-detail-local').textContent = op.local_itinerario || '-';
+
+    // Botão "Marcar como Executada" só faz sentido enquanto está Planejada
+    document.getElementById('btn-op-marcar-executada').style.display = op.situacao === 'Executada' ? 'none' : '';
+
+    const resEscalas = await apiFetch(`${API_BASE_URL}/api/escalas?operacao_id=${id}`);
+    const escalas = await resEscalas.json();
+    renderEscalasList(escalas);
+    lucide.createIcons();
+  } catch (error) {
+    console.error('Erro ao carregar detalhes da operação:', error);
+  }
+}
+
+async function handleMarcarOperacaoExecutada() {
+  const id = state.currentOperacaoId;
+  if (!id) return;
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/operacoes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ situacao: 'Executada' })
+    });
     if (res.ok) {
-      showToast('Missão planejada excluída.', 'info');
-      renderPlanejadorTab();
+      showToast('Operação marcada como Executada.', 'success');
+      await fetchData();
+      if (state.currentOperacaoId === id) fetchOperacaoDetails(id);
+      renderOperacoesTab();
     } else {
       const dados = await res.json();
-      showToast(esc(dados.error) || 'Falha ao excluir a missão planejada.', 'danger');
+      showToast(esc(dados.error) || 'Falha ao marcar como executada.', 'danger');
     }
   } catch (error) {
-    console.error('Erro ao excluir missão planejada:', error);
+    console.error('Erro ao marcar operação como executada:', error);
     showToast('Falha na comunicação com o servidor.', 'danger');
   }
-};
+}
 
-window.handleConverterMissaoPlanejada = async function(id) {
-  if (!confirm('Converter esta missão planejada num evento real? Depois disso você poderá escalar o efetivo normalmente na gaveta do evento.')) return;
+function handleDeleteOperacao() {
+  const id = state.currentOperacaoId;
+  if (!id) return;
+  const escalasOp = state.escalas.filter(s => s.operacao_id === id);
+  const totalDiarias = escalasOp.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
+  const op = (state.operacoes || []).find(o => o.id === id);
+  const nomeOp = op ? op.nome_operacao : '';
 
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/api/missoes-planejadas/${id}/converter`, { method: 'POST' });
-    const dados = await res.json();
+  const avisoExtra = escalasOp.length > 0
+    ? ` Há ${escalasOp.length} militar(es) escalado(s), somando ${totalDiarias} diária(s) — tudo isso será perdido.`
+    : '';
 
-    if (res.ok) {
-      showToast(`Evento "${esc(dados.nome_evento)}" criado a partir da missão planejada.`, 'success');
-      await fetchData();
-      renderPlanejadorTab();
-      openDrawer(dados.id);
-    } else {
-      showToast(esc(dados.error) || 'Falha ao converter a missão planejada.', 'danger');
+  abrirConfirmacaoExclusaoForte({
+    titulo: 'Excluir Operação',
+    aviso: `Isso excluirá permanentemente a operação e todo o efetivo escalado nela.${avisoExtra}`,
+    label: `Digite "${nomeOp}" para confirmar`,
+    valorEsperado: nomeOp,
+    onConfirmar: async () => {
+      try {
+        const res = await apiFetch(`${API_BASE_URL}/api/operacoes/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('Operação excluída com sucesso.', 'success');
+          closeDrawerOperacao();
+          await fetchData();
+          renderOperacoesTab();
+        }
+      } catch (error) {
+        console.error('Erro ao excluir operação:', error);
+      }
     }
-  } catch (error) {
-    console.error('Erro ao converter missão planejada:', error);
-    showToast('Falha na comunicação com o servidor.', 'danger');
-  }
-};
+  });
+}
 
 // -------------------------------------------------------------
 // CALENDÁRIO DE DIÁRIAS + LANÇAMENTO RÁPIDO DE MISSÃO AVULSA
@@ -2612,18 +2763,22 @@ window.abrirModalMissaoAvulsa = function(dataPrefill) {
 async function handleCriarMissaoAvulsa(e) {
   e.preventDefault();
 
+  // A "missão avulsa" agora é uma OPERAÇÃO (Planejada). A diária vem do efetivo escalado depois,
+  // por isso qtd_diarias_estimada nasce 0 (não é reserva de cota, é lançamento pra escalar já).
   const payload = {
-    nome_evento: document.getElementById('missao-nome').value.trim(),
-    tipo_evento: 'Missão Avulsa',
+    nome_operacao: document.getElementById('missao-nome').value.trim(),
+    tipo_operacao: 'Outras',
+    situacao: 'Planejada',
+    qtd_diarias_estimada: 0,
     demandante: 'Interno / Diária Avulsa',
     data_inicio: document.getElementById('missao-data').value,
     horario_inicio: document.getElementById('missao-horario').value,
-    local_itinerario: document.getElementById('missao-local').value.trim() || 'Não informado'
+    local_itinerario: document.getElementById('missao-local').value.trim()
   };
 
   await comBotaoCarregando(e.submitter, async () => {
     try {
-      const res = await apiFetch(`${API_BASE_URL}/api/eventos`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/operacoes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -2632,14 +2787,14 @@ async function handleCriarMissaoAvulsa(e) {
 
       if (res.ok) {
         document.getElementById('modal-missao-avulsa').classList.add('hidden');
-        showToast('Missão avulsa criada! Agora escale o(s) militar(es) para gerar a diária.', 'success');
+        showToast('Operação avulsa criada! Agora escale o(s) militar(es) para gerar a diária.', 'success');
         await fetchData(); // já atualiza o Planejador/Calendário de Diárias, pois esta é a aba ativa
-        openDrawer(criado.id);
+        openDrawerOperacao(criado.id);
       } else {
-        showToast(esc(criado.error) || 'Falha ao criar a missão avulsa.', 'danger');
+        showToast(esc(criado.error) || 'Falha ao criar a operação avulsa.', 'danger');
       }
     } catch (error) {
-      console.error("Erro ao criar missão avulsa:", error);
+      console.error("Erro ao criar operação avulsa:", error);
       showToast('Falha na comunicação com o servidor.', 'danger');
     }
   });
@@ -2677,13 +2832,13 @@ async function handleSaveCota() {
   }
 }
 
-// Mostra o impacto da nova escala no saldo da cota do mês do evento
+// Mostra o impacto da nova escala no saldo da cota do mês da operação
 function updateEscalaBudgetPreview() {
   const textEl = document.getElementById('escala-budget-text');
   const wrap = document.getElementById('escala-budget-preview');
-  const evt = state.eventos.find(e => e.id === state.currentEventId);
+  const op = state.operacoes.find(o => o.id === state.currentOperacaoId);
 
-  if (!evt) {
+  if (!op) {
     textEl.textContent = 'Saldo indisponível.';
     return;
   }
@@ -2691,17 +2846,17 @@ function updateEscalaBudgetPreview() {
   const qtd = parseInt(document.getElementById('esc_qtd_aparicoes').value, 10) || 1;
   const novasDiarias = qtd * 2;
 
-  const prefixoMes = evt.data_inicio.slice(0, 7); // "YYYY-MM"
-  const idsEventosMes = new Set(
-    state.eventos.filter(e => e.data_inicio.startsWith(prefixoMes)).map(e => e.id)
+  const prefixoMes = op.data_inicio.slice(0, 7); // "YYYY-MM"
+  const idsOperacoesMes = new Set(
+    state.operacoes.filter(o => o.data_inicio.startsWith(prefixoMes)).map(o => o.id)
   );
   const consumido = state.escalas
-    .filter(s => idsEventosMes.has(s.evento_id))
+    .filter(s => idsOperacoesMes.has(s.operacao_id))
     .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
 
   const cota = state.config ? (state.config.cota_mensal_diarias || 0) : 0;
   const saldoApos = cota - consumido - novasDiarias;
-  const [anoEvt, mesEvt] = evt.data_inicio.split('-');
+  const [anoEvt, mesEvt] = op.data_inicio.split('-');
 
   wrap.classList.remove('exceeded');
 

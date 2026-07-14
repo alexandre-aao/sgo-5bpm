@@ -26,29 +26,63 @@ create table if not exists eventos (
   created_at timestamptz default now()
 );
 
+-- Operações: registro ÚNICO planejamento -> execução (não duplica registro como
+-- fazia missoes_planejadas). Separadas de "eventos": eventos são civis/sem diária;
+-- operações geram diária (via escalas) ou reservam diária estimada quando ainda Planejada.
+create table if not exists operacoes (
+  id text primary key,
+  num_oficio text default '',
+  num_os_manual text default '',
+  num_sei text default '',
+  nome_operacao text not null,
+  tipo_operacao text not null default 'Outras',
+    -- Ostensiva, Saturação, Cerco, Blitz, Cumprimento de Mandado, Reforço, Outras
+  demandante text default '',
+  data_inicio date not null,
+  data_termino date,
+  horario_inicio text default '',
+  local_itinerario text default '',
+  bairro text default '',
+  situacao text not null default 'Planejada'
+    check (situacao in ('Planejada', 'Executada')),
+  qtd_diarias_estimada int not null default 0,
+  tipo_recorrencia text
+    check (tipo_recorrencia is null or tipo_recorrencia in ('diaria','fim_de_semana','dia_unico')),
+  created_at timestamptz default now()
+);
+
+-- Uma alocação pertence a UM evento OU a UMA operação — nunca aos dois, nunca a
+-- nenhum (constraint alocacoes_um_vinculo). Por isso evento_id agora é nullable.
 create table if not exists alocacoes (
   id text primary key,
-  evento_id text not null references eventos(id) on delete cascade,
+  evento_id text references eventos(id) on delete cascade,
+  operacao_id text references operacoes(id) on delete cascade,
   modalidade text default '',
   qtd_policiais int default 0,
   qtd_viaturas int default 0,
   prefixos_vtr text default '',
-  comando_servico text default ''
+  comando_servico text default '',
+  constraint alocacoes_um_vinculo check (
+    (evento_id is not null)::int + (operacao_id is not null)::int = 1
+  )
 );
 create index if not exists idx_alocacoes_evento on alocacoes(evento_id);
+create index if not exists idx_alocacoes_operacao on alocacoes(operacao_id);
 
+-- Escala nominal de diárias: pertence a uma OPERAÇÃO (antes era evento_id).
 create table if not exists escalas (
   id text primary key,
-  evento_id text not null references eventos(id) on delete cascade,
+  operacao_id text not null references operacoes(id) on delete cascade,
   militar_nome text not null,
   militar_id text default '',
   qtd_aparicoes int not null default 1,
   total_diarias int not null default 2
 );
-create index if not exists idx_escalas_evento on escalas(evento_id);
+create index if not exists idx_escalas_operacao on escalas(operacao_id);
 
--- Missões planejadas: entidade independente de "eventos", usada só no Planejador de Diárias
--- para reservar diárias no mês antes de um evento existir de fato (ou sem nunca virar evento).
+-- DEPRECADA — substituída pela tabela `operacoes` (situacao='Planejada' + qtd_diarias_estimada).
+-- Mantida temporariamente até a migração de dados rodar em produção; será removida
+-- (DROP TABLE) só após confirmação do usuário. Não criar novas dependências nela.
 create table if not exists missoes_planejadas (
   id text primary key,
   nome text not null,

@@ -105,6 +105,10 @@
 
         <!-- Seção: Diárias -->
         <div class="nav-section-label" id="nav-section-diarias">Diárias</div>
+        <button class="nav-btn" id="nav-btn-operacoes" data-target="tab-operacoes">
+          <i data-lucide="shield-alert"></i>
+          <span>Operações</span>
+        </button>
         <button class="nav-btn" id="nav-btn-planejador" data-target="tab-planejador">
           <i data-lucide="wallet"></i>
           <span>Planejador Diárias</span>
@@ -545,7 +549,6 @@
                   <th>Bairro / Local</th>
                   <th>Nº OS</th>
                   <th>Nº SEI</th>
-                  <th>Diária</th>
                 </tr>
               </thead>
               <tbody id="table-eventos-body">
@@ -702,6 +705,56 @@
       </section>
 
       <!-- Aba 6: Planejador Mensal de Diárias (Apenas P3) -->
+      <!-- Aba: Operações (planejamento -> execução, com diária) -->
+      <section id="tab-operacoes" class="tab-content">
+        <div class="panel">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="shield-alert"></i>
+              <h2>Operações (Diárias)</h2>
+            </div>
+            <div class="events-filters-bar">
+              <div class="filter-group">
+                <label for="filter-operacoes-situacao">Situação</label>
+                <select id="filter-operacoes-situacao">
+                  <option value="">Todas</option>
+                  <option value="Planejada">Planejada</option>
+                  <option value="Executada">Executada</option>
+                </select>
+              </div>
+              <div class="filter-search">
+                <label for="filter-operacoes-search">Filtrar Texto</label>
+                <input type="text" id="filter-operacoes-search" placeholder="Buscar por Operação ou Demandante...">
+              </div>
+              <button id="btn-nova-operacao" class="btn btn-primary btn-sm admin-only">
+                <i data-lucide="plus"></i> Nova Operação
+              </button>
+            </div>
+          </div>
+          <p style="padding:12px 20px 0;font-size:0.75rem;color:var(--text-muted);">
+            Operações nascem <strong>Planejadas</strong> (reservam cota via diárias estimadas) e viram <strong>Executadas</strong>. A diária mostrada é a real quando há efetivo escalado, ou a estimativa enquanto ainda não há.
+          </p>
+          <div class="table-responsive">
+            <table class="styled-table table-cards-mobile" id="table-operacoes">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Operação</th>
+                  <th>Tipo</th>
+                  <th>Situação</th>
+                  <th>Demandante</th>
+                  <th class="text-center">Militares</th>
+                  <th class="text-right">Diária</th>
+                </tr>
+              </thead>
+              <tbody id="table-operacoes-body">
+                <!-- Injetado dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section id="tab-planejador" class="tab-content">
         <div class="stats-row">
           <div class="stat-card">
@@ -760,38 +813,6 @@
           </p>
         </div>
 
-        <!-- Missões Planejadas do Mês -->
-        <div class="panel missoes-planejadas-panel">
-          <div class="panel-header flex-column-mobile">
-            <div class="panel-title">
-              <i data-lucide="clipboard-list"></i>
-              <h2>Missões Planejadas do Mês</h2>
-            </div>
-            <button id="btn-nova-missao-planejada" class="btn btn-primary btn-sm admin-only">
-              <i data-lucide="plus"></i> Nova Missão Planejada
-            </button>
-          </div>
-          <p style="padding:12px 20px 0;font-size:0.75rem;color:var(--text-muted);">
-            Reserve diárias no planejamento do mês antes de existir um evento (ex: "Operação Saturação"). Não aparece em Listar Eventos, Cartão Programa ou Mapa até ser convertida.
-          </p>
-          <div class="table-responsive">
-            <table class="styled-table" id="table-missoes-planejadas">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Recorrência</th>
-                  <th>Período</th>
-                  <th class="text-right">Diárias por Ocorrência</th>
-                  <th class="text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody id="table-missoes-planejadas-body">
-                <!-- Injetado dinamicamente -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
         <div class="panel">
           <div class="panel-header flex-column-mobile">
             <div class="panel-title">
@@ -844,7 +865,7 @@
             </div>
             <div class="budget-bar-legenda">
               <span><i class="legenda-dot legenda-consumido"></i> Consumido (efetivo já escalado)</span>
-              <span><i class="legenda-dot legenda-planejado-cota"></i> Planejado (missões ainda não escaladas)</span>
+              <span><i class="legenda-dot legenda-planejado-cota"></i> Planejado (operações ainda não escaladas)</span>
             </div>
             <p class="budget-alert hidden" id="budget-alert">
               <i data-lucide="alert-triangle"></i>
@@ -857,8 +878,9 @@
               <thead>
                 <tr>
                   <th>Data</th>
-                  <th>Evento</th>
+                  <th>Operação</th>
                   <th>Tipo</th>
+                  <th>Situação</th>
                   <th class="text-center">Militares Escalados</th>
                   <th class="text-right">Diárias</th>
                   <th class="text-right">% da Cota</th>
@@ -1552,57 +1574,6 @@
     </div>
   </div>
 
-  <!-- Modal: Nova Missão Planejada (Planejador Diárias) -->
-  <div id="modal-missao-planejada" class="modal-overlay hidden">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3><i data-lucide="clipboard-list"></i> Nova Missão Planejada</h3>
-        <button class="btn-close" id="btn-fechar-modal-missao-planejada" aria-label="Fechar">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-      <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">
-        Reserva diárias no planejamento do mês (ex: "Operação Saturação"). A quantidade de diárias é definida manualmente por você, não segue a fórmula de aparições. Depois pode ser convertida num evento real.
-      </p>
-      <form id="form-missao-planejada">
-        <div class="form-group">
-          <label for="missao-planejada-nome">Nome da Missão *</label>
-          <input type="text" id="missao-planejada-nome" required placeholder="Ex: Operação Saturação">
-        </div>
-        <div class="form-row">
-          <div class="form-group col-md-6">
-            <label for="missao-planejada-recorrencia">Recorrência *</label>
-            <select id="missao-planejada-recorrencia" required>
-              <option value="dia_unico">Dia Único</option>
-              <option value="diaria">Diária (vários dias seguidos)</option>
-              <option value="fim_de_semana">Fim de Semana</option>
-            </select>
-          </div>
-          <div class="form-group col-md-6">
-            <label for="missao-planejada-diarias">Diárias por Ocorrência *</label>
-            <input type="number" id="missao-planejada-diarias" min="0" required placeholder="Ex: 10">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group col-md-6">
-            <label for="missao-planejada-inicio">Data de Início *</label>
-            <input type="date" id="missao-planejada-inicio" required>
-          </div>
-          <div class="form-group col-md-6">
-            <label for="missao-planejada-fim">Data de Término</label>
-            <input type="date" id="missao-planejada-fim" placeholder="Deixe em branco se for 1 dia só">
-          </div>
-        </div>
-        <div class="form-actions" style="border:none;padding-top:8px;margin-top:0;">
-          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-missao-planejada">Cancelar</button>
-          <button type="submit" class="btn btn-primary">
-            <i data-lucide="check"></i> Salvar Missão Planejada
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- Modal: Novo Template de Cartão Programa -->
   <div id="modal-novo-template" class="modal-overlay hidden">
     <div class="modal-box">
@@ -1727,13 +1698,7 @@
 
         <hr class="drawer-divider">
 
-        <!-- Abas Internas da Gaveta -->
-        <div class="drawer-tabs">
-          <button class="drawer-tab-btn active" data-drawer-tab="drawer-tab-policiamento">Alocação de Policiamento</button>
-          <button class="drawer-tab-btn" data-drawer-tab="drawer-tab-escala">Escala de Militares (Diárias)</button>
-        </div>
-
-        <!-- Aba Policiamento (Viaturas e Efetivo Geral) -->
+        <!-- Alocação de Policiamento (evento não tem mais escala nominal — isso é das operações) -->
         <div id="drawer-tab-policiamento" class="drawer-tab-content active">
           <div class="section-actions">
             <h4>Modalidades Alocadas</h4>
@@ -1786,10 +1751,65 @@
           </div>
         </div>
 
-        <!-- Aba Escala (Membros da Guarnição com Diárias) -->
-        <div id="drawer-tab-escala" class="drawer-tab-content">
+      </div>
+
+      <div class="drawer-footer">
+        <button class="btn btn-danger admin-only" id="btn-delete-evento">
+          <i data-lucide="trash-2"></i> Excluir Evento
+        </button>
+        <button class="btn btn-secondary admin-only" id="btn-editar-evento">
+          <i data-lucide="pencil"></i> Editar Evento
+        </button>
+        <button class="btn btn-secondary" id="btn-drawer-relatorio-sei">
+          <i data-lucide="file-output"></i> Relatório SEI
+        </button>
+        <button class="btn btn-primary" id="btn-close-drawer-footer">Fechar</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Gaveta de Detalhes da OPERAÇÃO (planejamento -> execução, com efetivo escalado/diárias) -->
+  <div id="drawer-op" class="drawer">
+    <div class="drawer-overlay" id="drawer-op-overlay"></div>
+    <div class="drawer-content">
+      <div class="drawer-header">
+        <div class="drawer-title-area">
+          <span class="badge" id="drawer-op-badge">Planejada</span>
+          <h2 id="drawer-op-title">Nome da Operação</h2>
+        </div>
+        <button class="btn-close" id="btn-close-drawer-op" aria-label="Fechar">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+
+        <!-- Detalhes da Operação -->
+        <div class="drawer-section">
+          <h3><i data-lucide="info"></i> Detalhes da Operação</h3>
+          <div class="details-grid">
+            <div class="detail-item"><strong>Tipo:</strong> <span id="op-detail-tipo">-</span></div>
+            <div class="detail-item"><strong>Recorrência:</strong> <span id="op-detail-recorrencia">-</span></div>
+            <div class="detail-item"><strong>Ofício:</strong> <span id="op-detail-oficio">-</span></div>
+            <div class="detail-item"><strong>Número da OS:</strong> <span id="op-detail-os-manual">-</span></div>
+            <div class="detail-item"><strong>Número SEI:</strong> <span id="op-detail-sei">-</span></div>
+            <div class="detail-item"><strong>Demandante:</strong> <span id="op-detail-demandante">-</span></div>
+            <div class="detail-item"><strong>Início:</strong> <span id="op-detail-inicio">-</span></div>
+            <div class="detail-item"><strong>Término:</strong> <span id="op-detail-termino">-</span></div>
+            <div class="detail-item"><strong>Hora:</strong> <span id="op-detail-hora">-</span></div>
+            <div class="detail-item"><strong>Bairro:</strong> <span id="op-detail-bairro">-</span></div>
+            <div class="detail-item"><strong>Diárias Estimadas:</strong> <span id="op-detail-estimada">-</span></div>
+            <div class="detail-item" style="grid-column: span 2;"><strong>Local/Itinerário:</strong> <span id="op-detail-local">-</span></div>
+          </div>
+        </div>
+
+        <hr class="drawer-divider">
+
+        <!-- Efetivo Escalado (sempre visível e editável) -->
+        <div class="drawer-tab-content active">
           <div class="section-actions">
-            <h4>Militares Escalados</h4>
+            <h4>Efetivo Escalado (Diárias)</h4>
             <button class="btn btn-secondary btn-sm admin-only" id="btn-add-escala">
               <i data-lucide="user-plus"></i> Escalar Militar
             </button>
@@ -1834,18 +1854,117 @@
       </div>
 
       <div class="drawer-footer">
-        <button class="btn btn-danger admin-only" id="btn-delete-evento">
-          <i data-lucide="trash-2"></i> Excluir Evento
+        <button class="btn btn-danger admin-only" id="btn-op-delete">
+          <i data-lucide="trash-2"></i> Excluir Operação
         </button>
-        <button class="btn btn-secondary admin-only" id="btn-editar-evento">
-          <i data-lucide="pencil"></i> Editar Evento
+        <button class="btn btn-success admin-only" id="btn-op-marcar-executada">
+          <i data-lucide="check-circle"></i> Marcar como Executada
         </button>
-        <button class="btn btn-secondary" id="btn-drawer-relatorio-sei">
+        <button class="btn btn-secondary admin-only" id="btn-op-editar">
+          <i data-lucide="pencil"></i> Editar
+        </button>
+        <button class="btn btn-secondary" id="btn-op-relatorio-sei">
           <i data-lucide="file-output"></i> Relatório SEI
         </button>
-        <button class="btn btn-primary" id="btn-close-drawer-footer">Fechar</button>
+        <button class="btn btn-primary" id="btn-close-drawer-op-footer">Fechar</button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Modal: Nova / Editar Operação (Apenas P3) -->
+  <div id="modal-operacao" class="modal-overlay hidden">
+    <div class="modal-box modal-box-lg">
+      <div class="modal-header">
+        <h3><i data-lucide="shield-alert"></i> <span id="modal-operacao-titulo">Nova Operação</span></h3>
+        <button class="btn-close" id="btn-fechar-modal-operacao" aria-label="Fechar">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-operacao">
+        <input type="hidden" id="op-id">
+        <div class="form-row">
+          <div class="form-group col-md-8">
+            <label for="op-nome_operacao">Nome da Operação *</label>
+            <input type="text" id="op-nome_operacao" required placeholder="Ex: Operação Saturação Zona Sul">
+          </div>
+          <div class="form-group col-md-4">
+            <label for="op-tipo_operacao">Tipo *</label>
+            <select id="op-tipo_operacao" required>
+              <option value="Ostensiva">Ostensiva</option>
+              <option value="Saturação">Saturação</option>
+              <option value="Cerco">Cerco</option>
+              <option value="Blitz">Blitz</option>
+              <option value="Cumprimento de Mandado">Cumprimento de Mandado</option>
+              <option value="Reforço">Reforço</option>
+              <option value="Outras" selected>Outras</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-4">
+            <label for="op-data_inicio">Data de Início *</label>
+            <input type="date" id="op-data_inicio" required>
+          </div>
+          <div class="form-group col-md-4">
+            <label for="op-data_termino">Data de Término</label>
+            <input type="date" id="op-data_termino">
+          </div>
+          <div class="form-group col-md-4">
+            <label for="op-qtd_diarias_estimada">Diárias Estimadas *</label>
+            <input type="number" id="op-qtd_diarias_estimada" min="0" required value="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-4">
+            <label for="op-horario_inicio">Horário de Início</label>
+            <input type="time" id="op-horario_inicio">
+          </div>
+          <div class="form-group col-md-4">
+            <label for="op-tipo_recorrencia">Recorrência</label>
+            <select id="op-tipo_recorrencia">
+              <option value="">— Nenhuma —</option>
+              <option value="dia_unico">Dia Único</option>
+              <option value="fim_de_semana">Fim de Semana</option>
+              <option value="diaria">Diária</option>
+            </select>
+          </div>
+          <div class="form-group col-md-4">
+            <label for="op-bairro">Bairro</label>
+            <input type="text" id="op-bairro" placeholder="Ex: Ponta Negra">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-12">
+            <label for="op-local_itinerario">Local / Itinerário</label>
+            <input type="text" id="op-local_itinerario" placeholder="Opcional — completável depois">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-4">
+            <label for="op-num_oficio">Nº do Ofício</label>
+            <input type="text" id="op-num_oficio" placeholder="Opcional">
+          </div>
+          <div class="form-group col-md-4">
+            <label for="op-num_os_manual">Nº da OS</label>
+            <input type="text" id="op-num_os_manual" placeholder="Opcional">
+          </div>
+          <div class="form-group col-md-4">
+            <label for="op-num_sei">Nº SEI</label>
+            <input type="text" id="op-num_sei" placeholder="Opcional">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-12">
+            <label for="op-demandante">Demandante</label>
+            <input type="text" id="op-demandante" placeholder="Opcional">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-operacao">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Operação</button>
+        </div>
+      </form>
     </div>
   </div>
 

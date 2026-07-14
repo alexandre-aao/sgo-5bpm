@@ -102,7 +102,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 // concorrência. `autenticar` e `/api/login`, que rodam a cada requisição, usam
 // consultas pontuais em vez desse shim, por serem o caminho mais quente.
 const CHAVE_PRIMARIA = { usuarios: 'usuario', sessoes: 'token' };
-const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'alocacoes', 'escalas', 'cartoes', 'missoes_planejadas', 'viaturas'];
+// `operacoes` usa chave 'id' (default de chavePrimariaDe), como eventos/escalas/alocacoes — por
+// isso não entra em CHAVE_PRIMARIA. `missoes_planejadas` continua listada porque a tabela ainda
+// existe no banco (deprecada, aguardando migração de dados + DROP posterior), mas nenhuma rota a usa mais.
+const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'operacoes', 'alocacoes', 'escalas', 'cartoes', 'missoes_planejadas', 'viaturas'];
 const TABELAS_E_CONFIG = [...TABELAS, 'config'];
 
 function chavePrimariaDe(tabela) {
@@ -747,16 +750,137 @@ app.put('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
   res.json(eventoAtualizado);
 }));
 
-// Excluir evento (e alocações/escalas órfãs, apagadas diretamente por evento_id em vez de
-// reescrever as tabelas inteiras)
+// Excluir evento (e alocações órfãs, apagadas diretamente por evento_id em vez de reescrever a
+// tabela inteira). Evento não tem mais escala nominal vinculada — isso agora é das operações.
 app.delete('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
-  const { data: eventoAlvo } = await supabase.from('eventos').select('nome_evento').eq('id', req.params.id).maybeSingle();
   await deleteRow('eventos', req.params.id);
   const { error: erroAlocacoes } = await supabase.from('alocacoes').delete().eq('evento_id', req.params.id);
   if (erroAlocacoes) throw new Error(`Falha ao limpar "alocacoes" no Supabase: ${erroAlocacoes.message}`);
-  const { error: erroEscalas } = await supabase.from('escalas').delete().eq('evento_id', req.params.id);
-  if (erroEscalas) throw new Error(`Falha ao limpar "escalas" no Supabase: ${erroEscalas.message}`);
   res.json({ message: 'Evento e registros relacionados excluídos' });
+}));
+
+
+// -------------------------------------------------------------
+// ROTAS DE OPERAÇÕES (PLANEJAMENTO -> EXECUÇÃO, COM DIÁRIA)
+// -------------------------------------------------------------
+// Registro ÚNICO: a operação nasce Planejada (podendo reservar cota via qtd_diarias_estimada)
+// e vira Executada sem duplicar registro. As escalas nominais (diárias) penduram na operação,
+// não no evento. `operacoes` e `escalas` são de alta escrita concorrente -> writeRow/deleteRow.
+const TIPOS_OPERACAO = ['Ostensiva', 'Saturação', 'Cerco', 'Blitz', 'Cumprimento de Mandado', 'Reforço', 'Outras'];
+
+// Diária de uma operação: se já tem escala nominal lançada, vale a soma real das escalas;
+// senão, vale a estimativa (reserva de cota). Evita contar a mesma diária duas vezes ao somar
+// "planejado" (só operações sem escala) + "consumido" (operações com escala) no planejador.
+function diariaDaOperacao(op, escalasDaOp) {
+  if (escalasDaOp.length > 0) {
+    return escalasDaOp.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
+  }
+  return op.qtd_diarias_estimada || 0;
+}
+
+app.get('/api/operacoes', asyncRoute(async (req, res) => {
+  const db = await readDB();
+  res.json(db.operacoes || []);
+}));
+
+// Criar nova operação. Mínimo para nascer como reserva de cota: nome, data_inicio,
+// qtd_diarias_estimada, tipo_operacao. O resto é completável depois.
+app.post('/api/operacoes', exigirP3, asyncRoute(async (req, res) => {
+  const v = validarCampos(req.body, {
+    nome_operacao: { obrigatorio: true, tipo: 'string', max: 200, label: 'Nome da Operação' },
+    tipo_operacao: { obrigatorio: true, tipo: 'string', max: 50, valores: TIPOS_OPERACAO, label: 'Tipo de Operação' },
+    data_inicio: { obrigatorio: true, tipo: 'string', max: 10, label: 'Data de Início' },
+    data_termino: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Término' },
+    horario_inicio: { obrigatorio: false, tipo: 'string', max: 5, padrao: '', label: 'Horário de Início' },
+    local_itinerario: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Local/Itinerário' },
+    num_oficio: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Número do Ofício' },
+    num_os_manual: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Número da OS' },
+    num_sei: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Número SEI' },
+    demandante: { obrigatorio: false, tipo: 'string', max: 200, padrao: '', label: 'Demandante' },
+    bairro: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Bairro' },
+    situacao: { obrigatorio: false, tipo: 'string', valores: ['Planejada', 'Executada'], padrao: 'Planejada', label: 'Situação' },
+    tipo_recorrencia: { obrigatorio: false, tipo: 'string', valores: ['diaria', 'fim_de_semana', 'dia_unico'], label: 'Tipo de Recorrência' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
+  const qtdEstimada = parseInt(req.body.qtd_diarias_estimada, 10);
+  if (isNaN(qtdEstimada) || qtdEstimada < 0) {
+    return res.status(400).json({ error: 'Quantidade de diárias estimada inválida.' });
+  }
+
+  const db = await readDB();
+  const novaOperacao = {
+    id: generateId('op'),
+    num_oficio: v.valores.num_oficio,
+    num_os_manual: v.valores.num_os_manual,
+    num_sei: v.valores.num_sei,
+    nome_operacao: v.valores.nome_operacao,
+    tipo_operacao: v.valores.tipo_operacao,
+    demandante: v.valores.demandante,
+    data_inicio: v.valores.data_inicio,
+    data_termino: v.valores.data_termino || v.valores.data_inicio,
+    horario_inicio: v.valores.horario_inicio,
+    local_itinerario: v.valores.local_itinerario,
+    bairro: v.valores.bairro,
+    situacao: v.valores.situacao,
+    qtd_diarias_estimada: qtdEstimada,
+    tipo_recorrencia: v.valores.tipo_recorrencia || null
+  };
+
+  db.operacoes.push(novaOperacao);
+  await writeRow('operacoes', novaOperacao);
+  res.status(201).json(novaOperacao);
+}));
+
+// Atualizar operação (inclui o "Marcar como Executada", que só muda situacao)
+app.put('/api/operacoes/:id', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  const index = db.operacoes.findIndex(o => o.id === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Operação não encontrada' });
+  }
+
+  const v = validarCampos(req.body, {
+    nome_operacao: { obrigatorio: false, tipo: 'string', max: 200, label: 'Nome da Operação' },
+    tipo_operacao: { obrigatorio: false, tipo: 'string', max: 50, valores: TIPOS_OPERACAO, label: 'Tipo de Operação' },
+    data_inicio: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Início' },
+    data_termino: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Término' },
+    horario_inicio: { obrigatorio: false, tipo: 'string', max: 5, label: 'Horário de Início' },
+    local_itinerario: { obrigatorio: false, tipo: 'string', max: 300, label: 'Local/Itinerário' },
+    num_oficio: { obrigatorio: false, tipo: 'string', max: 100, label: 'Número do Ofício' },
+    num_os_manual: { obrigatorio: false, tipo: 'string', max: 100, label: 'Número da OS' },
+    num_sei: { obrigatorio: false, tipo: 'string', max: 100, label: 'Número SEI' },
+    demandante: { obrigatorio: false, tipo: 'string', max: 200, label: 'Demandante' },
+    bairro: { obrigatorio: false, tipo: 'string', max: 100, label: 'Bairro' },
+    situacao: { obrigatorio: false, tipo: 'string', valores: ['Planejada', 'Executada'], label: 'Situação' },
+    tipo_recorrencia: { obrigatorio: false, tipo: 'string', valores: ['diaria', 'fim_de_semana', 'dia_unico'], label: 'Tipo de Recorrência' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
+  const operacaoAtualizada = { ...db.operacoes[index], ...v.valores };
+  if (req.body.qtd_diarias_estimada !== undefined) {
+    const qtdEstimada = parseInt(req.body.qtd_diarias_estimada, 10);
+    if (isNaN(qtdEstimada) || qtdEstimada < 0) {
+      return res.status(400).json({ error: 'Quantidade de diárias estimada inválida.' });
+    }
+    operacaoAtualizada.qtd_diarias_estimada = qtdEstimada;
+  }
+
+  db.operacoes[index] = operacaoAtualizada;
+  await writeRow('operacoes', operacaoAtualizada);
+  res.json(operacaoAtualizada);
+}));
+
+// Excluir operação (e escalas/alocações órfãs, apagadas diretamente por operacao_id).
+// O FK ON DELETE CASCADE do banco já cobriria, mas apagamos explicitamente para não depender
+// só da cascata e manter o padrão do delete de evento.
+app.delete('/api/operacoes/:id', exigirP3, asyncRoute(async (req, res) => {
+  await deleteRow('operacoes', req.params.id);
+  const { error: erroEscalas } = await supabase.from('escalas').delete().eq('operacao_id', req.params.id);
+  if (erroEscalas) throw new Error(`Falha ao limpar "escalas" no Supabase: ${erroEscalas.message}`);
+  const { error: erroAlocacoes } = await supabase.from('alocacoes').delete().eq('operacao_id', req.params.id);
+  if (erroAlocacoes) throw new Error(`Falha ao limpar "alocacoes" no Supabase: ${erroAlocacoes.message}`);
+  res.json({ message: 'Operação e registros relacionados excluídos' });
 }));
 
 
@@ -764,20 +888,28 @@ app.delete('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
 // ROTAS DE ALOCAÇÃO DE POLICIAMENTO
 // -------------------------------------------------------------
 
-// Listar alocações (permite filtro por evento_id)
+// Listar alocações (permite filtro por evento_id OU operacao_id)
 app.get('/api/alocacoes', asyncRoute(async (req, res) => {
   const db = await readDB();
   let result = db.alocacoes || [];
   if (req.query.evento_id) {
     result = result.filter(a => a.evento_id === req.query.evento_id);
+  } else if (req.query.operacao_id) {
+    result = result.filter(a => a.operacao_id === req.query.operacao_id);
   }
   res.json(result);
 }));
 
-// Adicionar alocação
+// Adicionar alocação — vinculada a UM evento OU a UMA operação (nunca aos dois, nunca a nenhum),
+// espelhando a constraint alocacoes_um_vinculo do banco.
 app.post('/api/alocacoes', exigirP3, asyncRoute(async (req, res) => {
+  const eventoId = req.body.evento_id ? String(req.body.evento_id).trim() : '';
+  const operacaoId = req.body.operacao_id ? String(req.body.operacao_id).trim() : '';
+  if ((eventoId ? 1 : 0) + (operacaoId ? 1 : 0) !== 1) {
+    return res.status(400).json({ error: 'Informe exatamente um vínculo: evento_id OU operacao_id.' });
+  }
+
   const v = validarCampos(req.body, {
-    evento_id: { obrigatorio: true, tipo: 'string', max: 50, label: 'Evento' },
     modalidade: { obrigatorio: true, tipo: 'string', max: 50, label: 'Modalidade' },
     prefixos_vtr: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Prefixos das Viaturas' },
     comando_servico: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Comando do Serviço' }
@@ -787,7 +919,8 @@ app.post('/api/alocacoes', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
   const novaAlocacao = {
     id: generateId('aloc'),
-    evento_id: v.valores.evento_id,
+    evento_id: eventoId || null,
+    operacao_id: operacaoId || null,
     modalidade: v.valores.modalidade,
     qtd_policiais: parseInt(req.body.qtd_policiais, 10) || 0,
     qtd_viaturas: parseInt(req.body.qtd_viaturas, 10) || 0,
@@ -813,20 +946,21 @@ app.delete('/api/alocacoes/:id', exigirP3, asyncRoute(async (req, res) => {
 // ROTAS DE ESCALA DE DIÁRIAS
 // -------------------------------------------------------------
 
-// Listar escalas (permite filtro por evento_id)
+// Listar escalas (permite filtro por operacao_id)
 app.get('/api/escalas', asyncRoute(async (req, res) => {
   const db = await readDB();
   let result = db.escalas || [];
-  if (req.query.evento_id) {
-    result = result.filter(s => s.evento_id === req.query.evento_id);
+  if (req.query.operacao_id) {
+    result = result.filter(s => s.operacao_id === req.query.operacao_id);
   }
   res.json(result);
 }));
 
-// Adicionar militar na escala (trata a automação de diárias: qtd_aparicoes * 2)
+// Adicionar militar na escala (trata a automação de diárias: qtd_aparicoes * 2). Sem trava por
+// situacao da operação — escala pode ser lançada tanto em operação Planejada quanto Executada.
 app.post('/api/escalas', exigirP3, asyncRoute(async (req, res) => {
   const v = validarCampos(req.body, {
-    evento_id: { obrigatorio: true, tipo: 'string', max: 50, label: 'Evento' },
+    operacao_id: { obrigatorio: true, tipo: 'string', max: 50, label: 'Operação' },
     militar_nome: { obrigatorio: true, tipo: 'string', max: 150, label: 'Nome Completo' },
     militar_id: { obrigatorio: true, tipo: 'string', max: 50, label: 'Matrícula/ID' }
   });
@@ -839,7 +973,7 @@ app.post('/api/escalas', exigirP3, asyncRoute(async (req, res) => {
 
   const novaEscala = {
     id: generateId('esc'),
-    evento_id: v.valores.evento_id,
+    operacao_id: v.valores.operacao_id,
     militar_nome: v.valores.militar_nome,
     militar_id: v.valores.militar_id,
     qtd_aparicoes: qtd_aparicoes,
@@ -857,7 +991,7 @@ app.put('/api/escalas/:id', exigirP3, asyncRoute(async (req, res) => {
   const index = db.escalas.findIndex(s => s.id === req.params.id);
 
   if (index === -1) {
-    return res.status(404).json({ error: 'Militar não escalado neste evento' });
+    return res.status(404).json({ error: 'Militar não escalado nesta operação' });
   }
 
   const qtd_aparicoes = parseInt(req.body.qtd_aparicoes, 10) || 1;
@@ -1066,42 +1200,41 @@ app.get('/api/planejador-diarias', asyncRoute(async (req, res) => {
     return res.status(400).json({ error: 'Parâmetro mês é obrigatório (ex: ?mes=07)' });
   }
 
-  // Eventos do mês/ano com o total de diárias escaladas em cada um
-  const eventos = db.eventos
-    .filter(e => {
-      const [ano, mes] = e.data_inicio.split('-');
+  // Operações do mês/ano, cada uma com sua diária (real se tem escala, estimada se não tem).
+  const operacoes = db.operacoes
+    .filter(o => {
+      const [ano, mes] = o.data_inicio.split('-');
       return ano === anoFiltro && mes === mesFiltro;
     })
-    .map(evt => {
-      const escalasEvt = db.escalas.filter(s => s.evento_id === evt.id);
+    .map(op => {
+      const escalasOp = db.escalas.filter(s => s.operacao_id === op.id);
+      const temEscala = escalasOp.length > 0;
       return {
-        id: evt.id,
-        nome_evento: evt.nome_evento,
-        tipo_evento: evt.tipo_evento,
-        data_inicio: evt.data_inicio,
-        militares_escalados: escalasEvt.length,
-        total_diarias: escalasEvt.reduce((sum, s) => sum + (s.total_diarias || 0), 0)
+        id: op.id,
+        nome_operacao: op.nome_operacao,
+        tipo_operacao: op.tipo_operacao,
+        situacao: op.situacao,
+        data_inicio: op.data_inicio,
+        militares_escalados: escalasOp.length,
+        qtd_diarias_estimada: op.qtd_diarias_estimada || 0,
+        tem_escala: temEscala,
+        total_diarias: diariaDaOperacao(op, escalasOp)
       };
     })
     .sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
 
-  const totalConsumido = eventos.reduce((sum, e) => sum + e.total_diarias, 0);
   const cota = (db.config && db.config.cota_mensal_diarias) || 0;
-
-  // Missões planejadas do mesmo mês/ano — reservam diárias no planejamento sem precisar
-  // de um evento real ainda (ver ROTAS DE MISSÕES PLANEJADAS logo abaixo).
-  const missoesPlanejadas = (db.missoes_planejadas || [])
-    .filter(m => m.ano === anoFiltro && m.mes === mesFiltro)
-    .sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
-  const totalPlanejado = missoesPlanejadas.reduce((sum, m) => sum + (m.qtd_diarias_por_ocorrencia || 0), 0);
+  // Consumido = diárias reais das operações que já têm escala. Planejado = estimativa das que
+  // ainda NÃO têm escala. Nunca a mesma operação nos dois — evita contagem dupla da diária.
+  const totalConsumido = operacoes.filter(o => o.tem_escala).reduce((sum, o) => sum + o.total_diarias, 0);
+  const totalPlanejado = operacoes.filter(o => !o.tem_escala).reduce((sum, o) => sum + o.qtd_diarias_estimada, 0);
 
   res.json({
     cota_mensal: cota,
     total_consumido: totalConsumido,
     total_planejado: totalPlanejado,
     saldo: cota - totalConsumido - totalPlanejado,
-    eventos,
-    missoes_planejadas: missoesPlanejadas
+    operacoes
   });
 }));
 
@@ -1129,14 +1262,17 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   const daqui7DiasStr = getLocalDateStrServer(daqui7Dias);
   const eventosProximos7Dias = db.eventos.filter(e => e.data_inicio >= hojeStr && e.data_inicio <= daqui7DiasStr).length;
 
-  // Diárias: total pago no período + saldo da cota do período (mesma lógica de /api/planejador-diarias)
-  const consumidoPeriodo = db.escalas
-    .filter(s => idsEventosDoPeriodo.has(s.evento_id))
-    .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
-  const missoesDoPeriodo = (db.missoes_planejadas || []).filter(m => m.ano === anoPeriodo && m.mes === mesPeriodo);
-  const planejadoPeriodo = missoesDoPeriodo.reduce((sum, m) => sum + (m.qtd_diarias_por_ocorrencia || 0), 0);
+  // Diárias: total pago no período + saldo da cota do período (mesma lógica de /api/planejador-diarias).
+  // Fonte da diária agora são as OPERAÇÕES do período (não mais eventos): consumido = operações
+  // com escala; planejado = estimativa das operações sem escala. Nunca a mesma nos dois.
+  const operacoesDoPeriodo = db.operacoes.filter(o => o.data_inicio.startsWith(prefixoPeriodo));
+  const idsOperacoesDoPeriodo = new Set(operacoesDoPeriodo.map(o => o.id));
+  const escalasDoPeriodo = db.escalas.filter(s => idsOperacoesDoPeriodo.has(s.operacao_id));
+  const opsComEscala = new Set(escalasDoPeriodo.map(s => s.operacao_id));
+  const consumidoPeriodo = escalasDoPeriodo.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
+  const operacoesPlanejadas = operacoesDoPeriodo.filter(o => !opsComEscala.has(o.id));
+  const planejadoPeriodo = operacoesPlanejadas.reduce((sum, o) => sum + (o.qtd_diarias_estimada || 0), 0);
   const cota = (db.config && db.config.cota_mensal_diarias) || 0;
-  const missoesNaoConvertidas = missoesDoPeriodo.filter(m => !m.convertida_em_evento_id).length;
 
   // Efetivo total empregado no período
   const alocacoesDoPeriodo = db.alocacoes.filter(a => idsEventosDoPeriodo.has(a.evento_id));
@@ -1164,7 +1300,7 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   const postoPorMatricula = new Map();
   db.pessoal.forEach(p => { if (p.matricula) postoPorMatricula.set(String(p.matricula), p.posto_graduacao || ''); });
   const consolidadoMilitares = {};
-  db.escalas.filter(s => idsEventosDoPeriodo.has(s.evento_id)).forEach(s => {
+  escalasDoPeriodo.forEach(s => {
     const chave = s.militar_id || s.militar_nome;
     if (!consolidadoMilitares[chave]) {
       consolidadoMilitares[chave] = {
@@ -1190,7 +1326,7 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
     periodo: { mes: mesPeriodo, ano: anoPeriodo },
     eventos: { total_periodo: eventosDoPeriodo.length, proximos_7_dias: eventosProximos7Dias },
     diarias: { total_pago_periodo: consumidoPeriodo, saldo_cota_periodo: cota - consumidoPeriodo - planejadoPeriodo, cota_mensal: cota },
-    planejador: { missoes_nao_convertidas: missoesNaoConvertidas },
+    planejador: { operacoes_planejadas: operacoesPlanejadas.length },
     efetivo_total_periodo: efetivoTotalPeriodo,
     distribuicao_tipo: distribuicaoTipo,
     top_militares: topMilitares,
@@ -1199,138 +1335,9 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   });
 }));
 
-// -------------------------------------------------------------
-// ROTAS DE MISSÕES PLANEJADAS (PLANEJADOR DE DIÁRIAS)
-// -------------------------------------------------------------
-// Entidade independente de "eventos": reserva diárias no planejamento mensal antes de um
-// evento real existir (ou sem nunca virar evento). Não aparece em Listar Eventos, Cartão
-// Programa ou Mapa.
-app.get('/api/missoes-planejadas', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const mesFiltro = req.query.mes;
-  const anoFiltro = req.query.ano || String(new Date().getFullYear());
-
-  let missoes = db.missoes_planejadas || [];
-  if (mesFiltro) missoes = missoes.filter(m => m.mes === mesFiltro);
-  missoes = missoes.filter(m => m.ano === anoFiltro);
-
-  res.json(missoes.sort((a, b) => a.data_inicio.localeCompare(b.data_inicio)));
-}));
-
-app.post('/api/missoes-planejadas', exigirP3, asyncRoute(async (req, res) => {
-  const vNome = validarCampos(req.body, {
-    nome: { obrigatorio: true, tipo: 'string', max: 200, label: 'Nome da Missão' },
-    data_inicio: { obrigatorio: true, tipo: 'string', max: 10, label: 'Data de Início' }
-  });
-  if (!vNome.ok) return res.status(400).json({ error: vNome.erro });
-
-  const db = await readDB();
-  const nome = vNome.valores.nome;
-  const data_inicio = vNome.valores.data_inicio;
-  const { tipo_recorrencia, data_fim, qtd_diarias_por_ocorrencia } = req.body;
-
-  if (!['diaria', 'fim_de_semana', 'dia_unico'].includes(tipo_recorrencia)) {
-    return res.status(400).json({ error: "tipo_recorrencia deve ser 'diaria', 'fim_de_semana' ou 'dia_unico'." });
-  }
-  const qtdDiarias = parseInt(qtd_diarias_por_ocorrencia, 10);
-  if (isNaN(qtdDiarias) || qtdDiarias < 0) {
-    return res.status(400).json({ error: 'Quantidade de diárias por ocorrência inválida.' });
-  }
-
-  const dataFimFinal = data_fim || data_inicio;
-  const [ano, mes] = data_inicio.split('-');
-
-  const novaMissao = {
-    id: generateId('mpl'),
-    nome: String(nome).trim(),
-    tipo_recorrencia,
-    data_inicio,
-    data_fim: dataFimFinal,
-    qtd_diarias_por_ocorrencia: qtdDiarias,
-    mes,
-    ano,
-    convertida_em_evento_id: null
-  };
-
-  db.missoes_planejadas.push(novaMissao);
-  await writeDB(db, ['missoes_planejadas']);
-  res.status(201).json(novaMissao);
-}));
-
-app.put('/api/missoes-planejadas/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const missao = db.missoes_planejadas.find(m => m.id === req.params.id);
-  if (!missao) return res.status(404).json({ error: 'Missão planejada não encontrada.' });
-
-  if (req.body.nome !== undefined) missao.nome = String(req.body.nome).trim();
-  if (req.body.tipo_recorrencia !== undefined) {
-    if (!['diaria', 'fim_de_semana', 'dia_unico'].includes(req.body.tipo_recorrencia)) {
-      return res.status(400).json({ error: "tipo_recorrencia deve ser 'diaria', 'fim_de_semana' ou 'dia_unico'." });
-    }
-    missao.tipo_recorrencia = req.body.tipo_recorrencia;
-  }
-  if (req.body.data_inicio !== undefined) {
-    missao.data_inicio = req.body.data_inicio;
-    const [ano, mes] = req.body.data_inicio.split('-');
-    missao.mes = mes;
-    missao.ano = ano;
-  }
-  if (req.body.data_fim !== undefined) missao.data_fim = req.body.data_fim || missao.data_inicio;
-  if (req.body.qtd_diarias_por_ocorrencia !== undefined) {
-    const qtdDiarias = parseInt(req.body.qtd_diarias_por_ocorrencia, 10);
-    if (isNaN(qtdDiarias) || qtdDiarias < 0) {
-      return res.status(400).json({ error: 'Quantidade de diárias por ocorrência inválida.' });
-    }
-    missao.qtd_diarias_por_ocorrencia = qtdDiarias;
-  }
-
-  await writeDB(db, ['missoes_planejadas']);
-  res.json(missao);
-}));
-
-app.delete('/api/missoes-planejadas/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const missao = db.missoes_planejadas.find(m => m.id === req.params.id);
-  db.missoes_planejadas = (db.missoes_planejadas || []).filter(m => m.id !== req.params.id);
-  await writeDB(db, ['missoes_planejadas']);
-  res.json({ message: 'Missão planejada excluída.' });
-}));
-
-// Converte a missão planejada num evento real (Novo Evento) — a missão não desaparece,
-// só passa a apontar pro evento criado via convertida_em_evento_id. Não escala efetivo
-// automaticamente: quem faz isso é o fluxo normal da gaveta, depois de aberto o evento.
-app.post('/api/missoes-planejadas/:id/converter', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const missao = db.missoes_planejadas.find(m => m.id === req.params.id);
-  if (!missao) return res.status(404).json({ error: 'Missão planejada não encontrada.' });
-  if (missao.convertida_em_evento_id) {
-    return res.status(409).json({ error: 'Esta missão já foi convertida em evento.' });
-  }
-
-  const novoEvento = {
-    id: generateId('evt'),
-    num_oficio: '',
-    num_os_manual: '',
-    num_sei: '',
-    nome_evento: missao.nome,
-    tipo_evento: 'Missão Avulsa',
-    demandante: 'Interno / Missão Planejada',
-    data_inicio: missao.data_inicio,
-    data_termino: missao.data_fim,
-    horario_inicio: '',
-    local_itinerario: 'Não informado',
-    bairro: ''
-  };
-
-  db.eventos.push(novoEvento);
-  missao.convertida_em_evento_id = novoEvento.id;
-  // Grava eventos primeiro e só depois missoes_planejadas: writeDB grava as tabelas passadas em
-  // paralelo, e convertida_em_evento_id tem FK para eventos(id) — gravar junto na mesma chamada
-  // corria a condição de gravar a missão antes do evento existir, violando a constraint.
-  await writeDB(db, ['eventos']);
-  await writeDB(db, ['missoes_planejadas']);
-  res.status(201).json(novoEvento);
-}));
+// As antigas ROTAS DE MISSÕES PLANEJADAS foram removidas: missões viraram `operacoes`
+// com situacao='Planejada' (reserva de cota via qtd_diarias_estimada), sem entidade separada
+// nem "conversão" que duplicava registro. Ver ROTAS DE OPERAÇÕES acima.
 
 
 // -------------------------------------------------------------
@@ -1345,18 +1352,18 @@ app.get('/api/relatorio-diarias', asyncRoute(async (req, res) => {
     return res.status(400).json({ error: 'Parâmetro mês é obrigatório (ex: ?mes=07)' });
   }
 
-  // 1. Encontra todos os eventos no mês e ano selecionados
-  const eventosNoPeriodo = db.eventos.filter(e => {
-    const dataParts = e.data_inicio.split('-'); // YYYY-MM-DD
+  // 1. Encontra todas as operações no mês e ano selecionados (diária é das operações, não eventos)
+  const operacoesNoPeriodo = db.operacoes.filter(o => {
+    const dataParts = o.data_inicio.split('-'); // YYYY-MM-DD
     const ano = dataParts[0];
     const mes = dataParts[1];
     return ano === anoFiltro && mes === mesFiltro;
   });
 
-  const idsEventosPeriodo = new Set(eventosNoPeriodo.map(e => e.id));
+  const idsOperacoesPeriodo = new Set(operacoesNoPeriodo.map(o => o.id));
 
-  // 2. Filtra escalas vinculadas a esses eventos
-  const escalasFiltradas = db.escalas.filter(s => idsEventosPeriodo.has(s.evento_id));
+  // 2. Filtra escalas vinculadas a essas operações
+  const escalasFiltradas = db.escalas.filter(s => idsOperacoesPeriodo.has(s.operacao_id));
 
   // 3. Agrupa por militar_id e militar_nome
   const consolidado = {};
@@ -1381,12 +1388,64 @@ app.get('/api/relatorio-diarias', asyncRoute(async (req, res) => {
 
 
 // -------------------------------------------------------------
-// ROTA DO RELATÓRIO PARA O SEI (POR EVENTO OU POR PERÍODO)
+// ROTA DO RELATÓRIO PARA O SEI (POR OPERAÇÃO, POR EVENTO OU POR PERÍODO)
 // -------------------------------------------------------------
+// Consolida um efetivo nominal por militar (agrupador `esc` -> {militar, aparições, diárias}).
+function consolidarEfetivoSei(escalas) {
+  const consolidado = {};
+  escalas.forEach(s => {
+    const chave = s.militar_id || s.militar_nome;
+    if (!consolidado[chave]) {
+      consolidado[chave] = { militar_id: s.militar_id, militar_nome: s.militar_nome, qtd_aparicoes: 0, total_diarias: 0 };
+    }
+    consolidado[chave].qtd_aparicoes += s.qtd_aparicoes;
+    consolidado[chave].total_diarias += s.total_diarias;
+  });
+  return Object.values(consolidado).sort((a, b) => a.militar_nome.localeCompare(b.militar_nome));
+}
+
 app.get('/api/relatorio-sei', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const { evento_id, data_inicio, data_fim } = req.query;
+  const { evento_id, operacao_id, data_inicio, data_fim } = req.query;
 
+  // MODO OPERAÇÃO — o único que tem efetivo nominal/diárias (escalas penduram na operação).
+  // Retorna um objeto `evento`-compatível montado a partir da operação, para o modal do SEI
+  // renderizar o cabeçalho sem precisar de um caminho separado no frontend.
+  if (operacao_id) {
+    const operacao = db.operacoes.find(o => o.id === operacao_id);
+    if (!operacao) return res.status(404).json({ error: 'Operação não encontrada' });
+
+    const alocacoesAlvo = db.alocacoes.filter(a => a.operacao_id === operacao_id);
+    const escalasAlvo = db.escalas.filter(s => s.operacao_id === operacao_id);
+    const bairros = operacao.bairro ? [operacao.bairro] : [];
+
+    return res.json({
+      modo: 'operacao',
+      evento: {
+        id: operacao.id,
+        nome_evento: operacao.nome_operacao,
+        tipo_evento: operacao.tipo_operacao,
+        demandante: operacao.demandante,
+        data_inicio: operacao.data_inicio,
+        data_termino: operacao.data_termino,
+        num_os_manual: operacao.num_os_manual,
+        num_sei: operacao.num_sei,
+        num_oficio: operacao.num_oficio
+      },
+      periodo: null,
+      resumo: {
+        total_eventos: 1,
+        total_policiais: alocacoesAlvo.reduce((sum, a) => sum + (a.qtd_policiais || 0), 0),
+        total_viaturas: alocacoesAlvo.reduce((sum, a) => sum + (a.qtd_viaturas || 0), 0),
+        total_diarias: escalasAlvo.reduce((sum, s) => sum + (s.total_diarias || 0), 0)
+      },
+      bairros,
+      efetivo: consolidarEfetivoSei(escalasAlvo)
+    });
+  }
+
+  // MODOS EVENTO / PERÍODO — eventos civis: têm alocação agregada e bairros, mas NÃO têm mais
+  // escala nominal (diárias), então o bloco de efetivo sai vazio e total_diarias = 0.
   let eventosAlvo;
   let modo;
   let eventoUnico = null;
@@ -1402,34 +1461,15 @@ app.get('/api/relatorio-sei', asyncRoute(async (req, res) => {
     eventosAlvo = db.eventos.filter(e => e.data_inicio >= data_inicio && e.data_inicio <= data_fim);
     modo = 'periodo';
   } else {
-    return res.status(400).json({ error: 'Informe evento_id, ou data_inicio e data_fim.' });
+    return res.status(400).json({ error: 'Informe operacao_id, evento_id, ou data_inicio e data_fim.' });
   }
 
   const idsAlvo = new Set(eventosAlvo.map(e => e.id));
   const alocacoesAlvo = db.alocacoes.filter(a => idsAlvo.has(a.evento_id));
-  const escalasAlvo = db.escalas.filter(s => idsAlvo.has(s.evento_id));
 
   const totalPoliciais = alocacoesAlvo.reduce((sum, a) => sum + (a.qtd_policiais || 0), 0);
   const totalViaturas = alocacoesAlvo.reduce((sum, a) => sum + (a.qtd_viaturas || 0), 0);
-  const totalDiarias = escalasAlvo.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
-
   const bairros = [...new Set(eventosAlvo.map(e => e.bairro).filter(Boolean))].sort();
-
-  const consolidadoEfetivo = {};
-  escalasAlvo.forEach(s => {
-    const chave = s.militar_id || s.militar_nome;
-    if (!consolidadoEfetivo[chave]) {
-      consolidadoEfetivo[chave] = {
-        militar_id: s.militar_id,
-        militar_nome: s.militar_nome,
-        qtd_aparicoes: 0,
-        total_diarias: 0
-      };
-    }
-    consolidadoEfetivo[chave].qtd_aparicoes += s.qtd_aparicoes;
-    consolidadoEfetivo[chave].total_diarias += s.total_diarias;
-  });
-  const efetivo = Object.values(consolidadoEfetivo).sort((a, b) => a.militar_nome.localeCompare(b.militar_nome));
 
   res.json({
     modo,
@@ -1439,10 +1479,10 @@ app.get('/api/relatorio-sei', asyncRoute(async (req, res) => {
       total_eventos: eventosAlvo.length,
       total_policiais: totalPoliciais,
       total_viaturas: totalViaturas,
-      total_diarias: totalDiarias
+      total_diarias: 0
     },
     bairros,
-    efetivo
+    efetivo: []
   });
 }));
 
@@ -1459,26 +1499,28 @@ app.get('/api/diarias-calendario', asyncRoute(async (req, res) => {
     return res.status(400).json({ error: 'Parâmetro mês é obrigatório (ex: ?mes=07)' });
   }
 
-  const eventosNoPeriodo = db.eventos.filter(e => {
-    const [ano, mes] = e.data_inicio.split('-');
+  const operacoesNoPeriodo = db.operacoes.filter(o => {
+    const [ano, mes] = o.data_inicio.split('-');
     return ano === anoFiltro && mes === mesFiltro;
   });
 
+  // Calendário de diárias por dia. Usa diariaDaOperacao: operação com escala conta a diária real,
+  // operação só Planejada conta a estimativa — assim a reserva de cota também aparece no calendário.
   const porDia = {};
-  eventosNoPeriodo.forEach(evt => {
-    const escalasEvt = db.escalas.filter(s => s.evento_id === evt.id);
-    const totalDiariasEvt = escalasEvt.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
-    if (totalDiariasEvt === 0) return; // só entra no calendário quem tem diária de fato
+  operacoesNoPeriodo.forEach(op => {
+    const escalasOp = db.escalas.filter(s => s.operacao_id === op.id);
+    const totalDiariasOp = diariaDaOperacao(op, escalasOp);
+    if (totalDiariasOp === 0) return; // só entra no calendário quem tem diária (real ou estimada)
 
-    if (!porDia[evt.data_inicio]) {
-      porDia[evt.data_inicio] = { dia: evt.data_inicio, total_diarias: 0, eventos: [] };
+    if (!porDia[op.data_inicio]) {
+      porDia[op.data_inicio] = { dia: op.data_inicio, total_diarias: 0, eventos: [] };
     }
-    porDia[evt.data_inicio].total_diarias += totalDiariasEvt;
-    porDia[evt.data_inicio].eventos.push({
-      id: evt.id,
-      nome_evento: evt.nome_evento,
-      tipo_evento: evt.tipo_evento,
-      total_diarias: totalDiariasEvt
+    porDia[op.data_inicio].total_diarias += totalDiariasOp;
+    porDia[op.data_inicio].eventos.push({
+      id: op.id,
+      nome_evento: op.nome_operacao,
+      tipo_evento: op.tipo_operacao,
+      total_diarias: totalDiariasOp
     });
   });
 
@@ -1496,7 +1538,12 @@ app.get('/api/estatisticas', asyncRoute(async (req, res) => {
   const eventosDoAno = db.eventos.filter(e => e.data_inicio.startsWith(anoFiltro));
   const idsEventosDoAno = new Set(eventosDoAno.map(e => e.id));
   const alocacoesDoAno = db.alocacoes.filter(a => idsEventosDoAno.has(a.evento_id));
-  const escalasDoAno = db.escalas.filter(s => idsEventosDoAno.has(s.evento_id));
+
+  // Diárias vêm das OPERAÇÕES do ano (não mais dos eventos). Painel analítico = diária realizada,
+  // por isso soma as escalas reais (não a estimativa de operações ainda só Planejadas).
+  const operacoesDoAno = db.operacoes.filter(o => o.data_inicio.startsWith(anoFiltro));
+  const idsOperacoesDoAno = new Set(operacoesDoAno.map(o => o.id));
+  const escalasDoAno = db.escalas.filter(s => idsOperacoesDoAno.has(s.operacao_id));
 
   const totalPoliciais = alocacoesDoAno.reduce((sum, a) => sum + a.qtd_policiais, 0);
   const totalViaturas = alocacoesDoAno.reduce((sum, a) => sum + a.qtd_viaturas, 0);
@@ -1564,8 +1611,9 @@ app.get('/api/estatisticas', asyncRoute(async (req, res) => {
     const viaturasMes = db.alocacoes
       .filter(a => idsEventosDoMes.has(a.evento_id))
       .reduce((sum, a) => sum + a.qtd_viaturas, 0);
+    const idsOperacoesDoMes = new Set(operacoesDoAno.filter(o => o.data_inicio.split('-')[1] === mesStr).map(o => o.id));
     const diariasMes = db.escalas
-      .filter(s => idsEventosDoMes.has(s.evento_id))
+      .filter(s => idsOperacoesDoMes.has(s.operacao_id))
       .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
     const realizadosMes = eventosDoMes.filter(e => (e.data_termino || e.data_inicio) < hojeStr).length;
     const planejadosMes = eventosDoMes.length - realizadosMes;
