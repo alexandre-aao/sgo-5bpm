@@ -437,6 +437,16 @@ function setupEventListeners() {
   // Excluir evento na Gaveta Lateral
   document.getElementById('btn-delete-evento').addEventListener('click', handleDeleteEvento);
 
+  // Editar evento na Gaveta Lateral
+  document.getElementById('btn-editar-evento').addEventListener('click', abrirModalEditarEvento);
+  const fecharModalEditarEvento = () => document.getElementById('modal-editar-evento').classList.add('hidden');
+  document.getElementById('btn-fechar-modal-editar-evento').addEventListener('click', fecharModalEditarEvento);
+  document.getElementById('btn-cancelar-modal-editar-evento').addEventListener('click', fecharModalEditarEvento);
+  document.getElementById('form-editar-evento').addEventListener('submit', handleSalvarEdicaoEvento);
+  document.getElementById('edit-bairro').addEventListener('change', (e) => {
+    document.getElementById('edit-bairro_outro').classList.toggle('hidden', e.target.value !== '__outro__');
+  });
+
   // Filtros de data/texto da aba geral de Eventos
   document.getElementById('filter-eventos-inicio').addEventListener('change', renderEventosTab);
   document.getElementById('filter-eventos-fim').addEventListener('change', renderEventosTab);
@@ -1701,8 +1711,8 @@ function handleMudarPrefsMapa() {
 let bairroEmEdicao = null; // id do bairro sendo editado (null = criando novo)
 
 // Preenche o <select id="bairro"> do formulário de Novo Evento com o cadastro atual, preservando a seleção
-async function popularSelectBairros() {
-  const select = document.getElementById('bairro');
+async function popularSelectBairros(selectId = 'bairro') {
+  const select = document.getElementById(selectId);
   if (!select) return;
 
   const valorAtual = select.value;
@@ -1915,6 +1925,90 @@ async function fetchEventDetails(id) {
   } catch (error) {
     console.error(error);
   }
+}
+
+// Abre o modal de edição do evento atualmente aberto na gaveta, pré-preenchido.
+window.abrirModalEditarEvento = async function () {
+  const evt = (state.eventos || []).find(e => e.id === state.currentEventId);
+  if (!evt) { showToast('Evento não encontrado.', 'danger'); return; }
+
+  document.getElementById('edit-num_oficio').value = evt.num_oficio || '';
+  document.getElementById('edit-num_os_manual').value = evt.num_os_manual || '';
+  document.getElementById('edit-num_sei').value = evt.num_sei || '';
+  document.getElementById('edit-tipo_evento').value = evt.tipo_evento || 'Outros';
+  document.getElementById('edit-nome_evento').value = evt.nome_evento || '';
+  document.getElementById('edit-demandante').value = evt.demandante || '';
+  document.getElementById('edit-data_inicio').value = evt.data_inicio || '';
+  document.getElementById('edit-data_termino').value = evt.data_termino || '';
+  document.getElementById('edit-horario_inicio').value = evt.horario_inicio || '';
+  document.getElementById('edit-local_itinerario').value = evt.local_itinerario || '';
+
+  // Mostra o modal já (feedback imediato); o select de bairro popula logo em seguida.
+  document.getElementById('modal-editar-evento').classList.remove('hidden');
+  lucide.createIcons();
+
+  // Bairro: popula o select do cadastro; se o bairro do evento não estiver lá, usa "Outro" + texto livre
+  await popularSelectBairros('edit-bairro');
+  const selBairro = document.getElementById('edit-bairro');
+  const inputOutro = document.getElementById('edit-bairro_outro');
+  const bairroVal = evt.bairro || '';
+  if (bairroVal && [...selBairro.options].some(o => o.value === bairroVal)) {
+    selBairro.value = bairroVal;
+    inputOutro.classList.add('hidden'); inputOutro.value = '';
+  } else if (bairroVal) {
+    selBairro.value = '__outro__';
+    inputOutro.classList.remove('hidden'); inputOutro.value = bairroVal;
+  } else {
+    selBairro.value = '';
+    inputOutro.classList.add('hidden'); inputOutro.value = '';
+  }
+};
+
+async function handleSalvarEdicaoEvento(e) {
+  e.preventDefault();
+  const id = state.currentEventId;
+  if (!id) return;
+
+  const selBairro = document.getElementById('edit-bairro');
+  const bairro = selBairro.value === '__outro__'
+    ? document.getElementById('edit-bairro_outro').value.trim()
+    : selBairro.value;
+
+  const payload = {
+    num_oficio: document.getElementById('edit-num_oficio').value.trim(),
+    num_os_manual: document.getElementById('edit-num_os_manual').value.trim(),
+    num_sei: document.getElementById('edit-num_sei').value.trim(),
+    tipo_evento: document.getElementById('edit-tipo_evento').value,
+    nome_evento: document.getElementById('edit-nome_evento').value.trim(),
+    demandante: document.getElementById('edit-demandante').value.trim(),
+    data_inicio: document.getElementById('edit-data_inicio').value,
+    data_termino: document.getElementById('edit-data_termino').value,
+    horario_inicio: document.getElementById('edit-horario_inicio').value,
+    local_itinerario: document.getElementById('edit-local_itinerario').value.trim(),
+    bairro: bairro
+  };
+
+  await comBotaoCarregando(e.submitter, async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/eventos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const dados = await res.json();
+      if (res.ok) {
+        document.getElementById('modal-editar-evento').classList.add('hidden');
+        showToast('Evento atualizado com sucesso.', 'success');
+        await fetchData();                 // atualiza listas/estado em memória
+        if (state.currentEventId === id) await fetchEventDetails(id); // atualiza a gaveta aberta
+      } else {
+        showToast(esc(dados.error) || 'Falha ao salvar o evento.', 'danger');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar edição de evento:', error);
+      showToast('Falha na comunicação com o servidor.', 'danger');
+    }
+  });
 }
 
 function renderAlocacoesList(list) {
