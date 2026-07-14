@@ -1088,8 +1088,8 @@ app.get('/api/viaturas', asyncRoute(async (req, res) => {
   res.json((db.viaturas || []).sort((a, b) => a.prefixo.localeCompare(b.prefixo)));
 }));
 
-// Criar viatura (P3)
-app.post('/api/viaturas', exigirP3, asyncRoute(async (req, res) => {
+// Criar viatura (qualquer perfil autenticado — P3, Adjunto ou Oficial). Só a exclusão é P3-only.
+app.post('/api/viaturas', asyncRoute(async (req, res) => {
   const valid = validarCampos(req.body, {
     prefixo: { obrigatorio: true, tipo: 'string', max: 30, label: 'Prefixo' },
     companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VALIDAS, padrao: '', label: 'Companhia' },
@@ -1119,8 +1119,8 @@ app.post('/api/viaturas', exigirP3, asyncRoute(async (req, res) => {
   res.status(201).json(novaViatura);
 }));
 
-// Atualizar viatura (P3)
-app.put('/api/viaturas/:id', exigirP3, asyncRoute(async (req, res) => {
+// Atualizar viatura (qualquer perfil autenticado — P3, Adjunto ou Oficial). Só a exclusão é P3-only.
+app.put('/api/viaturas/:id', asyncRoute(async (req, res) => {
   const db = await readDB();
   const viatura = db.viaturas.find(v => v.id === req.params.id);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada.' });

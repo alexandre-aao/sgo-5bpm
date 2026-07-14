@@ -187,9 +187,13 @@ function applyRolePermissions(user) {
     btnPlanejador.classList.add('hidden-role');
     btnUsuarios.classList.add('hidden-role');
     btnPessoal.classList.add('hidden-role');
-    btnViaturas.classList.add('hidden-role');
     btnTurno.classList.remove('hidden-role');
     secoesSomenteP3.forEach(el => el.classList.add('hidden-role'));
+
+    // Cadastro de Viaturas é aberto a Adjunto/Oficial (cadastrar e editar; excluir segue P3-only,
+    // ver renderViaturasTab e o DELETE no server). Reexibe o botão e o rótulo "Administração".
+    btnViaturas.classList.remove('hidden-role');
+    document.getElementById('nav-section-administracao').classList.remove('hidden-role');
 
     // Oculta botões admin no drawer (Modo Leitura)
     document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden-role'));
@@ -4352,9 +4356,10 @@ async function renderViaturasTab() {
             <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" data-action="editar-viatura" data-id="${v.id}">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
+            ${state.user && state.user.role === 'P3' ? `
             <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" data-action="excluir-viatura" data-id="${v.id}">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
-            </button>
+            </button>` : ''}
           </div>
         </td>
       </tr>
