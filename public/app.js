@@ -382,6 +382,46 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-reset').addEventListener('click', fecharModalReset);
   document.getElementById('form-reset-senha').addEventListener('submit', handleResetarSenha);
 
+  // Delegação de eventos: um único listener em document trata TODOS os botões
+  // renderizados dinamicamente (data-action + data-*). Substitui os antigos
+  // onclick="" inline, que a CSP (script-src sem 'unsafe-inline', server.js) bloqueia.
+  // document é o pai estável — os containers têm innerHTML reescrito a cada render,
+  // então um listener por container morreria junto. Ler os valores via el.dataset
+  // devolve a string já decodificada, então nomes com aspas/apóstrofo funcionam.
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const d = el.dataset;
+    switch (d.action) {
+      // Item 2 — Usuários
+      case 'editar-usuario': abrirModalUsuario(d.usuario, d.nome, d.role); break;
+      case 'reset-senha': abrirModalResetSenha(d.usuario, d.nome); break;
+      case 'excluir-usuario': handleExcluirUsuario(d.usuario); break;
+      // Item 1 — Cartão Programa (templates, viaturas, itens do roteiro)
+      case 'importar-template': handleImportarClonarTemplate(d.id); break;
+      case 'abrir-template': handleAbrirTemplate(d.id); break;
+      case 'excluir-template': handleExcluirTemplate(d.id); break;
+      case 'abrir-cartao-historico': handleAbrirCartaoHistorico(d.data); break;
+      case 'add-cartao-item': handleAddCartaoItem(d.vtrId); break;
+      case 'editar-vtr': abrirModalEditarVtr(d.vtrId); break;
+      case 'excluir-cartao-vtr': handleDeleteCartaoVtr(d.vtrId); break;
+      case 'excluir-cartao-item': handleDeleteCartaoItem(d.vtrId, d.itemId); break;
+      // Gaveta de evento / operação
+      case 'excluir-alocacao': handleDeleteAlocacao(d.id); break;
+      case 'excluir-escala': handleDeleteEscala(d.id); break;
+      // Bairros / Pessoal / Viaturas
+      case 'editar-bairro': abrirEdicaoBairro(d.id, d.nome, d.lat, d.lon); break;
+      case 'excluir-bairro': handleExcluirBairro(d.id); break;
+      case 'editar-pessoa': abrirModalPessoa(d.id); break;
+      case 'excluir-pessoa': handleExcluirPessoa(d.id); break;
+      case 'editar-viatura': abrirModalViatura(d.id); break;
+      case 'excluir-viatura': handleExcluirViatura(d.id); break;
+      // Dashboard (markup estático em index.html)
+      case 'ir-cartao-hoje': handleIrParaCartaoHoje(); break;
+      case 'dashboard-card': handleDashboardCardClick(d.nav); break;
+    }
+  });
+
 
   // Submissão do Formulário de Cadastro de Evento
   document.getElementById('form-evento').addEventListener('submit', handleCreateEvento);
@@ -1789,10 +1829,10 @@ async function renderGerenciarBairrosTab() {
         <td>${b.longitude}</td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirEdicaoBairro('${b.id}', '${esc(b.nome_bairro)}', ${b.latitude}, ${b.longitude})">
+            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" data-action="editar-bairro" data-id="${b.id}" data-nome="${esc(b.nome_bairro)}" data-lat="${b.latitude}" data-lon="${b.longitude}">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirBairro('${b.id}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" data-action="excluir-bairro" data-id="${b.id}">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>
           </div>
@@ -2053,7 +2093,7 @@ function renderAlocacoesList(list) {
         <p><strong>Comando:</strong> ${esc(item.comando_servico) || '-'} | <strong>Prefixos:</strong> ${esc(item.prefixos_vtr) || '-'}</p>
       </div>
       ${isAdmin ? `
-      <button class="btn-icon btn-danger btn-sm" title="Remover alocação" aria-label="Remover alocação" onclick="handleDeleteAlocacao('${item.id}')">
+      <button class="btn-icon btn-danger btn-sm" title="Remover alocação" aria-label="Remover alocação" data-action="excluir-alocacao" data-id="${item.id}">
         <i data-lucide="trash" style="width:12px;height:12px;"></i>
       </button>` : ''}
     `;
@@ -2084,7 +2124,7 @@ function renderEscalasList(list) {
         <p><strong>Aparições:</strong> ${item.qtd_aparicoes} | <strong>Total de Diárias:</strong> <span style="color:#f59e0b;font-weight:600;">${item.total_diarias} un.</span></p>
       </div>
       ${isAdmin ? `
-      <button class="btn-icon btn-danger btn-sm" title="Remover militar da escala" aria-label="Remover militar da escala" onclick="handleDeleteEscala('${item.id}')">
+      <button class="btn-icon btn-danger btn-sm" title="Remover militar da escala" aria-label="Remover militar da escala" data-action="excluir-escala" data-id="${item.id}">
         <i data-lucide="trash" style="width:12px;height:12px;"></i>
       </button>` : ''}
     `;
@@ -3304,7 +3344,7 @@ async function handleBuscarTemplateSugerido() {
         <div class="template-sugerido-box encontrado">
           <span><i data-lucide="layout-template" style="width:14px;height:14px;vertical-align:middle;"></i>
           Cartão padrão sugerido: <strong>${esc(tpl.nome_template)}</strong> (${tpl.qtd_viaturas} viatura(s) cadastradas)</span>
-          <button class="btn btn-primary btn-sm" onclick="handleImportarClonarTemplate('${tpl.id}')">
+          <button class="btn btn-primary btn-sm" data-action="importar-template" data-id="${tpl.id}">
             <i data-lucide="copy-plus"></i> Importar e Clonar
           </button>
         </div>`;
@@ -3368,10 +3408,10 @@ async function renderTemplatesTab() {
         <td class="text-center">${t.qtd_viaturas_base}</td>
         <td class="text-center">${t.qtd_viaturas}</td>
         <td class="text-right">
-          <button class="btn btn-secondary btn-sm" onclick="handleAbrirTemplate('${t.id}')">
+          <button class="btn btn-secondary btn-sm" data-action="abrir-template" data-id="${t.id}">
             <i data-lucide="folder-open" style="width:12px;height:12px;"></i> Abrir
           </button>
-          <button class="btn btn-danger btn-sm" onclick="handleExcluirTemplate('${t.id}')">
+          <button class="btn btn-danger btn-sm" data-action="excluir-template" data-id="${t.id}">
             <i data-lucide="trash-2" style="width:12px;height:12px;"></i> Excluir
           </button>
         </td>
@@ -3488,7 +3528,7 @@ async function renderHistoricoRecente() {
           <td>${esc(c.adjunto) || '-'}</td>
           <td class="text-center">${c.qtd_viaturas}</td>
           <td class="text-right">
-            <button class="btn btn-secondary btn-sm" onclick="handleAbrirCartaoHistorico('${c.data}')">
+            <button class="btn btn-secondary btn-sm" data-action="abrir-cartao-historico" data-data="${c.data}">
               <i data-lucide="folder-open" style="width:12px;height:12px;"></i> Abrir
             </button>
           </td>
@@ -3585,7 +3625,7 @@ function renderCartaoVtrGrid() {
         <td>${esc(item.local)}</td>
         <td><span class="badge ${atividadeBadgeClass(item.atividade)}">${esc(item.atividade)}</span></td>
         <td style="width:30px;">
-          <button class="btn-icon btn-sm" title="Remover item" aria-label="Remover item" onclick="handleDeleteCartaoItem('${vtr.id}', '${item.id}')">
+          <button class="btn-icon btn-sm" title="Remover item" aria-label="Remover item" data-action="excluir-cartao-item" data-vtr-id="${vtr.id}" data-item-id="${item.id}">
             <i data-lucide="x" style="width:12px;height:12px;"></i>
           </button>
         </td>
@@ -3609,10 +3649,10 @@ function renderCartaoVtrGrid() {
           </div>
         </div>
         <div style="display:flex;gap:6px;">
-          <button class="btn-icon btn-sm" title="Editar viatura" aria-label="Editar viatura" onclick="abrirModalEditarVtr('${vtr.id}')">
+          <button class="btn-icon btn-sm" title="Editar viatura" aria-label="Editar viatura" data-action="editar-vtr" data-vtr-id="${vtr.id}">
             <i data-lucide="pencil" style="width:14px;height:14px;"></i>
           </button>
-          <button class="btn-icon btn-sm" title="Remover viatura" aria-label="Remover viatura" onclick="handleDeleteCartaoVtr('${vtr.id}')">
+          <button class="btn-icon btn-sm" title="Remover viatura" aria-label="Remover viatura" data-action="excluir-cartao-vtr" data-vtr-id="${vtr.id}">
             <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
           </button>
         </div>
@@ -3644,7 +3684,7 @@ function renderCartaoVtrGrid() {
             <label>Atividade</label>
             <select id="item-atividade-${vtr.id}">${opcoesAtividade}</select>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="handleAddCartaoItem('${vtr.id}')">
+          <button class="btn btn-primary btn-sm" data-action="add-cartao-item" data-vtr-id="${vtr.id}">
             <i data-lucide="plus" style="width:12px;height:12px;"></i> Incluir
           </button>
         </div>
@@ -3937,13 +3977,13 @@ async function renderUsuariosTab() {
         <td><span class="badge ${roleBadgeClass(u.role)}">${esc(u.role)}</span></td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirModalUsuario('${esc(u.usuario)}', '${esc(u.nome)}', '${esc(u.role)}')">
+            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" data-action="editar-usuario" data-usuario="${esc(u.usuario)}" data-nome="${esc(u.nome)}" data-role="${esc(u.role)}">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-sm" title="Resetar Senha" aria-label="Resetar Senha" onclick="abrirModalResetSenha('${esc(u.usuario)}', '${esc(u.nome)}')">
+            <button class="btn-icon btn-sm" title="Resetar Senha" aria-label="Resetar Senha" data-action="reset-senha" data-usuario="${esc(u.usuario)}" data-nome="${esc(u.nome)}">
               <i data-lucide="key-round" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirUsuario('${esc(u.usuario)}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" data-action="excluir-usuario" data-usuario="${esc(u.usuario)}">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>
           </div>
@@ -4126,10 +4166,10 @@ async function renderPessoalTab() {
         <td>${p.categorias.length > 0 ? p.categorias.map(c => `<span class="badge ${categoriaPessoalBadgeClass(c)}" style="margin:2px;">${esc(c)}</span>`).join('') : '<span style="color:var(--text-muted);">Sem categoria</span>'}</td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirModalPessoa('${p.id}')">
+            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" data-action="editar-pessoa" data-id="${p.id}">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirPessoa('${p.id}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" data-action="excluir-pessoa" data-id="${p.id}">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>
           </div>
@@ -4273,10 +4313,10 @@ async function renderViaturasTab() {
         <td>${esc(v.observacao) || '-'}</td>
         <td class="text-right">
           <div style="display:flex;gap:6px;justify-content:flex-end;">
-            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" onclick="abrirModalViatura('${v.id}')">
+            <button class="btn-icon btn-sm" title="Editar" aria-label="Editar" data-action="editar-viatura" data-id="${v.id}">
               <i data-lucide="pencil" style="width:14px;height:14px;"></i>
             </button>
-            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onclick="handleExcluirViatura('${v.id}')">
+            <button class="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" data-action="excluir-viatura" data-id="${v.id}">
               <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
             </button>
           </div>

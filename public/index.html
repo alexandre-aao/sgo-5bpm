@@ -215,7 +215,7 @@
               <span class="stat-tendencia" id="stat-diarias-mes-tendencia"></span>
             </div>
           </div>
-          <div class="stat-card" id="stat-card-cartao-hoje" style="cursor:pointer;" onclick="handleIrParaCartaoHoje()" title="Ir para o Cartão Programa de hoje">
+          <div class="stat-card" id="stat-card-cartao-hoje" style="cursor:pointer;" data-action="ir-cartao-hoje" title="Ir para o Cartão Programa de hoje">
             <div class="stat-icon alert" id="stat-cartao-hoje-icon">
               <i data-lucide="route"></i>
             </div>
@@ -253,7 +253,7 @@
 
         <!-- Grid de cards-resumo do período selecionado, cada um clicável levando à aba correspondente -->
         <div class="dashboard-grid">
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-eventos')" title="Ir para Listar Eventos">
+          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-eventos" title="Ir para Listar Eventos">
             <div class="stat-icon"><i data-lucide="calendar-range"></i></div>
             <div class="stat-info">
               <h3>Eventos</h3>
@@ -261,7 +261,7 @@
               <span class="stat-sub" id="dash-resumo-eventos-sub"></span>
             </div>
           </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-planejador')" title="Ir para o Planejador de Diárias">
+          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-planejador" title="Ir para o Planejador de Diárias">
             <div class="stat-icon info"><i data-lucide="wallet"></i></div>
             <div class="stat-info">
               <h3>Diárias no Período / Cota</h3>
@@ -269,14 +269,14 @@
               <div class="stat-bar"><div class="mini-bar-track"><div class="mini-bar-fill" id="dash-resumo-diarias-bar" style="width:0%"></div></div></div>
             </div>
           </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-cartao')" title="Ir para o Cartão Programa">
+          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-cartao" title="Ir para o Cartão Programa">
             <div class="stat-icon alert" id="dash-resumo-cartao-icon"><i data-lucide="route"></i></div>
             <div class="stat-info">
               <h3>Cartão Programa</h3>
               <p id="dash-resumo-cartao">Carregando...</p>
             </div>
           </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-eventos')" title="Ir para Listar Eventos">
+          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-eventos" title="Ir para Listar Eventos">
             <div class="stat-icon info"><i data-lucide="users"></i></div>
             <div class="stat-info">
               <h3>Efetivo Total Empregado</h3>
@@ -284,7 +284,7 @@
               <span class="stat-sub">militares no período</span>
             </div>
           </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-pessoal')" title="Ir para o Cadastro de Pessoal">
+          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-pessoal" title="Ir para o Cadastro de Pessoal">
             <div class="stat-icon info"><i data-lucide="contact"></i></div>
             <div class="stat-info">
               <h3>Cadastro de Pessoal</h3>
@@ -292,7 +292,7 @@
               <div class="stat-badges" id="dash-resumo-pessoal-badges"></div>
             </div>
           </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="handleDashboardCardClick('nav-btn-usuarios')" title="Ir para Usuários">
+          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-usuarios" title="Ir para Usuários">
             <div class="stat-icon"><i data-lucide="users-round"></i></div>
             <div class="stat-info">
               <h3>Usuários</h3>
@@ -343,7 +343,7 @@
               <i data-lucide="route"></i>
               <h2>Patrulhamento de Hoje</h2>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="handleIrParaCartaoHoje()">
+            <button class="btn btn-secondary btn-sm" data-action="ir-cartao-hoje">
               <i data-lucide="arrow-right"></i> Ver Cartão Completo
             </button>
           </div>
@@ -352,7 +352,7 @@
             <i data-lucide="clipboard-x"></i>
             <h3>Nenhum Cartão Programa lançado para hoje</h3>
             <p>Lance o cartão de patrulhamento para orientar as viaturas do dia.</p>
-            <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="handleIrParaCartaoHoje()">
+            <button class="btn btn-primary btn-sm" style="margin-top:12px;" data-action="ir-cartao-hoje">
               <i data-lucide="plus"></i> Lançar Cartão de Hoje
             </button>
           </div>
