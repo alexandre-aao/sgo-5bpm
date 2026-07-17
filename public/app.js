@@ -867,13 +867,32 @@ async function fetchData() {
       apiFetch(`${API_BASE_URL}/api/pessoal`).then(r => r.json()),
       apiFetch(`${API_BASE_URL}/api/viaturas`).then(r => r.json()),
     ]);
-    state.eventos = eventos;
-    state.operacoes = operacoes;
-    state.alocacoes = alocacoes;
-    state.escalas = escalas;
-    state.config = config;
-    state.pessoal = pessoal;
-    state.viaturas = viaturas;
+    // Guarda de resiliência: uma resposta que não é array indica falha da rota (ex.: o
+    // Supabase devolve erro e a rota responde {error} com status 500, ou um 522 sob carga).
+    // Não sobrescreve o estado bom com lixo — mantém o valor anterior (se já era array) ou
+    // cai para [] — evitando o "state.eventos.filter is not a function" que quebrava a tela.
+    let houveFalhaParcial = false;
+    const usarLista = (novo, atual) => {
+      if (Array.isArray(novo)) return novo;
+      houveFalhaParcial = true;
+      return Array.isArray(atual) ? atual : [];
+    };
+    state.eventos = usarLista(eventos, state.eventos);
+    state.operacoes = usarLista(operacoes, state.operacoes);
+    state.alocacoes = usarLista(alocacoes, state.alocacoes);
+    state.escalas = usarLista(escalas, state.escalas);
+    state.pessoal = usarLista(pessoal, state.pessoal);
+    state.viaturas = usarLista(viaturas, state.viaturas);
+    // config é objeto (não lista): só aceita se veio com o campo esperado.
+    if (config && typeof config === 'object' && !Array.isArray(config) && 'cota_mensal_diarias' in config) {
+      state.config = config;
+    } else {
+      houveFalhaParcial = true;
+      if (!state.config) state.config = { cota_mensal_diarias: 0 };
+    }
+    if (houveFalhaParcial) {
+      showToast('Parte dos dados não carregou (servidor lento). Recarregue se algo parecer incompleto.', 'warning');
+    }
     popularDatalistViaturas();
 
     // Cadastro de Bairros — alimenta o select de Bairro em Novo Evento
@@ -907,7 +926,11 @@ async function fetchData() {
       await fetchOperacaoDetails(state.currentOperacaoId);
     }
   } catch (error) {
+    // Falha total (ex.: Promise.all rejeitado porque uma rota devolveu HTML de erro 522
+    // e o r.json() estourou). O estado anterior é preservado — a tela não quebra, só não
+    // atualiza; avisa o usuário em vez de falhar em silêncio.
     console.error("Erro ao buscar dados do servidor:", error);
+    showToast('Falha ao carregar dados do servidor. Verifique a conexão e recarregue.', 'danger');
   } finally {
     document.body.classList.remove('sgo-sincronizando');
   }
