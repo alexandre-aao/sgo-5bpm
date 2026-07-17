@@ -1823,15 +1823,14 @@
           <div id="form-escala-container" class="sub-form-panel hidden">
             <form id="form-escala">
               <div class="form-row">
-                <div class="form-group col-md-5">
+                <div class="form-group col-md-5 autocomplete-wrap">
                   <label for="esc_militar_nome">Nome Completo *</label>
-                  <input type="text" id="esc_militar_nome" placeholder="Ex: Sgt PM Silva" list="datalist-pessoal-nome" autocomplete="off" required>
-                  <datalist id="datalist-pessoal-nome"></datalist>
+                  <input type="text" id="esc_militar_nome" placeholder="Buscar por nome, nome de guerra ou matrícula" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" required>
+                  <div id="escala-autocomplete-results" class="autocomplete-results hidden" role="listbox"></div>
                 </div>
                 <div class="form-group col-md-4">
                   <label for="esc_militar_id">Matrícula / ID *</label>
-                  <input type="text" id="esc_militar_id" placeholder="Ex: 123.456-7" list="datalist-pessoal-matricula" autocomplete="off" required>
-                  <datalist id="datalist-pessoal-matricula"></datalist>
+                  <input type="text" id="esc_militar_id" placeholder="Ex: 123.456-7" autocomplete="off" required>
                 </div>
                 <div class="form-group col-md-3">
                   <label for="esc_qtd_aparicoes">Nº Aparições *</label>

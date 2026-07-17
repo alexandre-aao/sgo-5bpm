@@ -1085,6 +1085,8 @@ body.sgo-sincronizando .topbar::before {
 .col-md-4 { flex: 1 1 calc(33.33% - 11px); min-width: 180px; }
 .col-md-8 { flex: 1 1 calc(66.66% - 5px); min-width: 280px; }
 .col-md-3 { flex: 1 1 calc(25% - 12px); min-width: 100px; }
+.col-md-5 { flex: 1 1 calc(41.66% - 9px); min-width: 200px; }
+.col-md-1 { flex: 1 1 calc(8.33% - 15px); min-width: 60px; }
 
 .form-actions {
   display: flex;
@@ -1526,6 +1528,26 @@ body.sgo-sincronizando .topbar::before {
 .sub-form-panel.hidden {
   display: none;
 }
+
+/* Autocomplete customizado de militar (form Escalar Militar) */
+.autocomplete-wrap { position: relative; }
+.autocomplete-results {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 60;
+  margin-top: 4px; background: var(--bg-panel);
+  border: 1px solid var(--border-color); border-radius: 8px;
+  box-shadow: var(--shadow-md); max-height: 240px; overflow-y: auto;
+}
+.autocomplete-results.hidden { display: none; }
+.autocomplete-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 12px; cursor: pointer; font-size: 0.8rem;
+  color: var(--text-main); border-bottom: 1px solid var(--border-color);
+}
+.autocomplete-item:last-child { border-bottom: none; }
+.autocomplete-item:hover, .autocomplete-item.active { background: var(--primary); color: #fff; }
+.autocomplete-item .ac-nome { font-weight: 600; }
+.autocomplete-item .ac-sub { font-size: 0.72rem; color: var(--text-muted); }
+.autocomplete-item:hover .ac-sub, .autocomplete-item.active .ac-sub { color: rgba(255,255,255,0.85); }
 
 .calculation-preview {
   background-color: rgba(79, 70, 229, 0.05);

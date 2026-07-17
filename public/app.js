@@ -397,6 +397,8 @@ function setupEventListeners() {
     if (!el) return;
     const d = el.dataset;
     switch (d.action) {
+      // Autocomplete customizado de militar (form Escalar Militar)
+      case 'selecionar-militar-escala': selecionarMilitarEscala(d.nome, d.id); break;
       // Item 2 — Usuários
       case 'editar-usuario': abrirModalUsuario(d.usuario, d.nome, d.role); break;
       case 'reset-senha': abrirModalResetSenha(d.usuario, d.nome); break;
@@ -467,20 +469,52 @@ function setupEventListeners() {
     document.getElementById('form-escala-container').classList.add('hidden');
     document.getElementById('form-escala').reset();
     document.getElementById('diarias-calc-preview').textContent = '2';
+    limparAutocompleteEscala();
   });
   document.getElementById('form-escala').addEventListener('submit', handleCreateEscala);
 
-  // Autocomplete de militar (Item 5): ao casar exatamente uma matrícula do Cadastro de Pessoal,
-  // preenche o nome, e vice-versa. Correspondência exata só — digitação livre continua valendo.
+  // Autocomplete customizado de militar (form Escalar Militar): dropdown próprio, busca por
+  // nome / nome de guerra / matrícula, navegação por teclado. Lê state.pessoal ao vivo.
   const escNomeInput = document.getElementById('esc_militar_nome');
-  const escMatInput = document.getElementById('esc_militar_id');
-  escMatInput.addEventListener('change', () => {
-    const p = (state.pessoal || []).find(p => p.matricula && p.matricula === escMatInput.value.trim());
-    if (p && p.nome) escNomeInput.value = p.nome;
+  escNomeInput.addEventListener('input', (e) => {
+    escAcIdx = -1;
+    renderAutocompleteEscala(e.target.value);
+    if (!e.target.value.trim()) {
+      document.getElementById('esc_militar_id').readOnly = false;
+    }
   });
-  escNomeInput.addEventListener('change', () => {
-    const p = (state.pessoal || []).find(p => p.nome === escNomeInput.value.trim());
-    if (p && p.matricula) escMatInput.value = p.matricula;
+  escNomeInput.addEventListener('keydown', (e) => {
+    const box = document.getElementById('escala-autocomplete-results');
+    const aberto = box && !box.classList.contains('hidden');
+    const itens = box ? Array.from(box.querySelectorAll('.autocomplete-item')) : [];
+    if (e.key === 'ArrowDown') {
+      if (!aberto || itens.length === 0) return;
+      e.preventDefault();
+      escAcIdx = Math.min(escAcIdx + 1, itens.length - 1);
+      atualizarItemAtivoEscala(itens);
+    } else if (e.key === 'ArrowUp') {
+      if (!aberto || itens.length === 0) return;
+      e.preventDefault();
+      escAcIdx = Math.max(escAcIdx - 1, 0);
+      atualizarItemAtivoEscala(itens);
+    } else if (e.key === 'Enter') {
+      if (aberto && escAcIdx >= 0 && itens[escAcIdx]) {
+        e.preventDefault();
+        const it = itens[escAcIdx];
+        selecionarMilitarEscala(it.dataset.nome, it.dataset.id);
+      }
+    } else if (e.key === 'Escape') {
+      if (box) { box.classList.add('hidden'); }
+      escNomeInput.setAttribute('aria-expanded', 'false');
+    }
+  });
+  // Fecha o dropdown ao clicar fora do wrapper do autocomplete
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-wrap')) {
+      const box = document.getElementById('escala-autocomplete-results');
+      if (box) box.classList.add('hidden');
+      escNomeInput.setAttribute('aria-expanded', 'false');
+    }
   });
 
   // Preview de diárias no sub-formulário de Escala
@@ -841,7 +875,6 @@ async function fetchData() {
     state.pessoal = pessoal;
     state.viaturas = viaturas;
     popularDatalistViaturas();
-    popularDatalistPessoal();
 
     // Cadastro de Bairros — alimenta o select de Bairro em Novo Evento
     popularSelectBairros();
@@ -2140,6 +2173,76 @@ function renderAlocacoesList(list) {
   lucide.createIcons();
 }
 
+// -------------------------------------------------------------
+// AUTOCOMPLETE CUSTOMIZADO DE MILITAR (form Escalar Militar, gaveta de Operação)
+// Substitui o <datalist> nativo por um dropdown estilizado no dark theme, com busca por
+// nome / nome de guerra / matrícula e navegação por teclado. Lê state.pessoal ao vivo.
+// -------------------------------------------------------------
+let escAcIdx = -1; // índice do item ativo no dropdown (navegação por teclado)
+
+function renderAutocompleteEscala(termo) {
+  const box = document.getElementById('escala-autocomplete-results');
+  if (!box) return;
+  const nomeInput = document.getElementById('esc_militar_nome');
+  if (!termo || !termo.trim()) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    if (nomeInput) nomeInput.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  const t = normalizarTexto(termo);
+  const pessoal = Array.isArray(state.pessoal) ? state.pessoal : [];
+  const resultados = pessoal.filter(p =>
+    normalizarTexto(p.nome).includes(t) ||
+    normalizarTexto(p.nome_guerra).includes(t) ||
+    normalizarTexto(p.matricula).includes(t)
+  ).slice(0, 8);
+  if (resultados.length === 0) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    if (nomeInput) nomeInput.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  box.innerHTML = resultados.map((p, i) =>
+    `<div class="autocomplete-item" role="option" data-action="selecionar-militar-escala" data-nome="${esc(p.nome)}" data-id="${esc(p.matricula || '')}" data-idx="${i}"><span class="ac-nome">${esc(p.nome)}</span><span class="ac-sub">${esc([p.nome_guerra, p.matricula].filter(Boolean).join(' — '))}</span></div>`
+  ).join('');
+  box.classList.remove('hidden');
+  if (nomeInput) nomeInput.setAttribute('aria-expanded', 'true');
+  escAcIdx = -1;
+}
+
+// Aplica a classe .active ao item de índice escAcIdx e rola para ele
+function atualizarItemAtivoEscala(itens) {
+  itens.forEach((it, i) => it.classList.toggle('active', i === escAcIdx));
+  if (escAcIdx >= 0 && itens[escAcIdx]) {
+    itens[escAcIdx].scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function selecionarMilitarEscala(nome, id) {
+  document.getElementById('esc_militar_nome').value = nome;
+  const mat = document.getElementById('esc_militar_id');
+  mat.value = id;
+  // Só trava a matrícula se o cadastro tiver uma — militar sem matrícula (campo
+  // opcional no Cadastro de Pessoal) fica editável para digitar/completar à mão.
+  mat.readOnly = !!id;
+  const box = document.getElementById('escala-autocomplete-results');
+  if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+  const nomeInput = document.getElementById('esc_militar_nome');
+  if (nomeInput) nomeInput.setAttribute('aria-expanded', 'false');
+  escAcIdx = -1;
+}
+
+function limparAutocompleteEscala() {
+  const box = document.getElementById('escala-autocomplete-results');
+  if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+  const mat = document.getElementById('esc_militar_id');
+  if (mat) mat.readOnly = false;
+  const nomeInput = document.getElementById('esc_militar_nome');
+  if (nomeInput) nomeInput.setAttribute('aria-expanded', 'false');
+  escAcIdx = -1;
+}
+
 function renderEscalasList(list) {
   const container = document.getElementById('escalas-list');
   container.innerHTML = '';
@@ -2228,6 +2331,7 @@ async function handleCreateEscala(e) {
         document.getElementById('form-escala').reset();
         document.getElementById('form-escala-container').classList.add('hidden');
         document.getElementById('diarias-calc-preview').textContent = '2';
+        limparAutocompleteEscala();
 
         await fetchData(); // Atualiza escalas em cache
         fetchOperacaoDetails(state.currentOperacaoId);
@@ -2665,6 +2769,7 @@ function closeDrawerOperacao() {
   document.getElementById('form-escala-container').classList.add('hidden');
   document.getElementById('form-escala').reset();
   document.getElementById('diarias-calc-preview').textContent = '2';
+  limparAutocompleteEscala();
 }
 
 async function fetchOperacaoDetails(id) {
@@ -4185,7 +4290,6 @@ async function renderPessoalTab() {
     // Mantém a lista completa em memória para alimentar os seletores de Fiscal/Adjunto/Sobreaviso no Cartão Programa
     if (!pessoalFiltroCategoria) {
       state.pessoal = pessoal;
-      popularDatalistPessoal(); // mantém o autocomplete de escala em dia após CRUD de pessoal
     }
 
     if (filtroSemCategoria) pessoal = pessoal.filter(p => !p.categorias || p.categorias.length === 0);
@@ -4466,22 +4570,6 @@ function popularDatalistViaturas() {
   if (!datalist) return;
   const viaturas = Array.isArray(state.viaturas) ? state.viaturas : [];
   datalist.innerHTML = viaturas.map(v => `<option value="${esc(v.prefixo)}"></option>`).join('');
-}
-
-// Preenche os <datalist> de sugestão do form "Escalar Militar" (gaveta de Operação) a partir
-// do Cadastro de Pessoal. A matrícula mostra o nome como rótulo e vice-versa; os campos seguem
-// texto livre (autofill só em correspondência exata, ver listeners no init).
-function popularDatalistPessoal() {
-  const dlNome = document.getElementById('datalist-pessoal-nome');
-  const dlMat = document.getElementById('datalist-pessoal-matricula');
-  if (!dlNome || !dlMat) return;
-  const pessoal = Array.isArray(state.pessoal) ? state.pessoal : [];
-  dlNome.innerHTML = pessoal
-    .filter(p => p.nome)
-    .map(p => `<option value="${esc(p.nome)}">${esc(p.matricula) || ''}</option>`).join('');
-  dlMat.innerHTML = pessoal
-    .filter(p => p.matricula)
-    .map(p => `<option value="${esc(p.matricula)}">${esc(p.nome)}</option>`).join('');
 }
 
 // -------------------------------------------------------------
