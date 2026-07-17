@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const crypto = require('crypto');
@@ -86,8 +87,16 @@ function limparFalhasLogin(usuario) {
   tentativasLoginPorUsuario.delete(String(usuario || '').toLowerCase().trim());
 }
 
+app.use(compression());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1h',
+  setHeaders(res, filePath) {
+    // index.html sempre revalidado: garante que o HTML que referencia app.js/style.css
+    // seja sempre o mais novo (os assets é que ficam em cache de 1h).
+    if (filePath.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache');
+  }
+}));
 
 // -------------------------------------------------------------
 // CAMADA DE DADOS (SUPABASE) — substitui o antigo readDB()/writeDB() de arquivo JSON
@@ -124,6 +133,28 @@ async function readDB() {
   if (erroConfig) throw new Error(`Falha ao ler "config" do Supabase: ${erroConfig.message}`);
   db.config = configRow || { cota_mensal_diarias: 0 };
   return db;
+}
+
+// Lê UMA tabela inteira (SELECT *), opcionalmente filtrada por igualdade (.eq) em uma ou
+// mais colunas. Substitui readDB() nas rotas GET de tabela única — evita baixar as outras
+// 9 tabelas à toa (é o que causa dezenas de SELECTs por request). Só para tabelas-lista;
+// `config` é linha única/objeto — usar buscarConfig().
+async function readTabela(tabela, filtros = {}) {
+  let query = supabase.from(tabela).select('*');
+  for (const [coluna, valor] of Object.entries(filtros)) {
+    if (valor !== undefined && valor !== null && valor !== '') query = query.eq(coluna, valor);
+  }
+  const { data, error } = await query;
+  if (error) throw new Error(`Falha ao ler "${tabela}" do Supabase: ${error.message}`);
+  return data || [];
+}
+
+// config é linha única (objeto, não lista) — consulta pontual dedicada, mesmo SELECT que readDB faz.
+async function buscarConfig() {
+  const { data, error } = await supabase.from('config')
+    .select('cota_mensal_diarias').eq('id', 1).maybeSingle();
+  if (error) throw new Error(`Falha ao ler "config" do Supabase: ${error.message}`);
+  return data || { cota_mensal_diarias: 0 };
 }
 
 // `tabelas`: lista explícita das tabelas realmente alteradas por essa escrita (evita
@@ -596,8 +627,8 @@ app.delete('/api/usuarios/:usuario', exigirP3, asyncRoute(async (req, res) => {
 
 // Listar (todos os perfis podem ler, para alimentar os seletores do Cartão Programa); filtro opcional por categoria
 app.get('/api/pessoal', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  let pessoal = db.pessoal || [];
+  let pessoal = await readTabela('pessoal');
+  // filtro por categoria continua em JS: categorias é array (containment), não igualdade simples
   if (req.query.categoria) {
     pessoal = pessoal.filter(p => (p.categorias || []).includes(req.query.categoria));
   }
@@ -678,8 +709,7 @@ app.delete('/api/pessoal/:id', exigirP3, asyncRoute(async (req, res) => {
 
 // Listar todos os eventos
 app.get('/api/eventos', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  res.json(db.eventos || []);
+  res.json(await readTabela('eventos'));
 }));
 
 // Criar novo evento
@@ -779,8 +809,7 @@ function diariaDaOperacao(op, escalasDaOp) {
 }
 
 app.get('/api/operacoes', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  res.json(db.operacoes || []);
+  res.json(await readTabela('operacoes'));
 }));
 
 // Criar nova operação. Mínimo para nascer como reserva de cota: nome, data_inicio,
@@ -890,14 +919,11 @@ app.delete('/api/operacoes/:id', exigirP3, asyncRoute(async (req, res) => {
 
 // Listar alocações (permite filtro por evento_id OU operacao_id)
 app.get('/api/alocacoes', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  let result = db.alocacoes || [];
-  if (req.query.evento_id) {
-    result = result.filter(a => a.evento_id === req.query.evento_id);
-  } else if (req.query.operacao_id) {
-    result = result.filter(a => a.operacao_id === req.query.operacao_id);
-  }
-  res.json(result);
+  // precedência evento_id > operacao_id, igual ao else-if original
+  const filtros = req.query.evento_id
+    ? { evento_id: req.query.evento_id }
+    : (req.query.operacao_id ? { operacao_id: req.query.operacao_id } : {});
+  res.json(await readTabela('alocacoes', filtros));
 }));
 
 // Adicionar alocação — vinculada a UM evento OU a UMA operação (nunca aos dois, nunca a nenhum),
@@ -948,12 +974,7 @@ app.delete('/api/alocacoes/:id', exigirP3, asyncRoute(async (req, res) => {
 
 // Listar escalas (permite filtro por operacao_id)
 app.get('/api/escalas', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  let result = db.escalas || [];
-  if (req.query.operacao_id) {
-    result = result.filter(s => s.operacao_id === req.query.operacao_id);
-  }
-  res.json(result);
+  res.json(await readTabela('escalas', { operacao_id: req.query.operacao_id }));
 }));
 
 // Adicionar militar na escala (trata a automação de diárias: qtd_aparicoes * 2). Sem trava por
@@ -1020,8 +1041,7 @@ app.delete('/api/escalas/:id', exigirP3, asyncRoute(async (req, res) => {
 // ROTAS DE COORDENADAS DE BAIRROS (USADAS PELO MAPA E PELO CADASTRO DE EVENTOS)
 // -------------------------------------------------------------
 app.get('/api/bairros-coordenadas', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  res.json(db.bairros_coordenadas || []);
+  res.json(await readTabela('bairros_coordenadas'));
 }));
 
 // Criar bairro (P3)
@@ -1084,8 +1104,8 @@ app.delete('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res)
 // que continua aceitando texto livre para reservas rotativas não cadastradas aqui)
 // -------------------------------------------------------------
 app.get('/api/viaturas', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  res.json((db.viaturas || []).sort((a, b) => a.prefixo.localeCompare(b.prefixo)));
+  const viaturas = await readTabela('viaturas');
+  res.json(viaturas.sort((a, b) => a.prefixo.localeCompare(b.prefixo)));
 }));
 
 // Criar viatura (qualquer perfil autenticado — P3, Adjunto ou Oficial). Só a exclusão é P3-only.
@@ -1170,8 +1190,7 @@ app.delete('/api/viaturas/:id', exigirP3, asyncRoute(async (req, res) => {
 // ROTAS DE CONFIGURAÇÃO (COTA MENSAL DE DIÁRIAS)
 // -------------------------------------------------------------
 app.get('/api/config', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  res.json(db.config || { cota_mensal_diarias: 0 });
+  res.json(await buscarConfig());
 }));
 
 app.put('/api/config', exigirP3, asyncRoute(async (req, res) => {
