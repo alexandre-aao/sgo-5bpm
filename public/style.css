@@ -2693,6 +2693,22 @@ body.sgo-sincronizando .topbar::before {
   font-size: 0.8rem;
 }
 
+.lista-sei-texto {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 55vh;
+  overflow-y: auto;
+  background: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-main);
+  margin: 0;
+}
+
 .sei-cabecalho {
   display: flex;
   flex-direction: column;

@@ -573,6 +573,12 @@ function setupEventListeners() {
   document.getElementById('btn-copiar-relatorio-sei').addEventListener('click', handleCopiarRelatorioSei);
   document.getElementById('btn-exportar-pdf-sei').addEventListener('click', () => window.print());
 
+  // Lista para o SEI (texto puro numerado, por período/filtro ativo)
+  document.getElementById('btn-gerar-lista-sei').addEventListener('click', abrirModalListaSei);
+  document.getElementById('btn-copiar-lista-sei').addEventListener('click', handleCopiarListaSei);
+  document.getElementById('btn-fechar-modal-lista-sei').addEventListener('click', () => document.getElementById('modal-lista-sei').classList.add('hidden'));
+  document.getElementById('btn-fechar-lista-sei-2').addEventListener('click', () => document.getElementById('modal-lista-sei').classList.add('hidden'));
+
   // Filtros e ações do Planejador de Diárias
   document.getElementById('plan-filter-mes').addEventListener('change', renderPlanejadorTab);
   document.getElementById('plan-filter-ano').addEventListener('change', renderPlanejadorTab);
@@ -1400,38 +1406,35 @@ function createTurnoCard(evt) {
 // -------------------------------------------------------------
 // TELA 4: LISTAR EVENTOS (COM FILTRO DE DATAS POR PERÍODO)
 // -------------------------------------------------------------
-function renderEventosTab() {
-  const tableBody = document.getElementById('table-eventos-body');
+// Aplica os filtros ativos da aba Listar Eventos (data inicial/final/texto) sobre state.eventos.
+// Usada tanto pela tabela quanto pela "Lista para SEI" — mesmo conjunto filtrado.
+function getEventosFiltrados() {
   const dataInicioFiltro = document.getElementById('filter-eventos-inicio').value;
   const dataFimFiltro = document.getElementById('filter-eventos-fim').value;
   const searchText = document.getElementById('filter-eventos-search').value.toLowerCase().trim();
+  let lista = [...state.eventos];
+  if (dataInicioFiltro) lista = lista.filter(e => e.data_inicio >= dataInicioFiltro);
+  if (dataFimFiltro) lista = lista.filter(e => e.data_inicio <= dataFimFiltro);
+  if (searchText) {
+    lista = lista.filter(e =>
+      e.nome_evento.toLowerCase().includes(searchText) ||
+      e.bairro.toLowerCase().includes(searchText) ||
+      e.local_itinerario.toLowerCase().includes(searchText) ||
+      e.demandante.toLowerCase().includes(searchText) ||
+      (e.num_os_manual && e.num_os_manual.toLowerCase().includes(searchText)) ||
+      (e.num_sei && e.num_sei.toLowerCase().includes(searchText))
+    );
+  }
+  return lista;
+}
+
+function renderEventosTab() {
+  const tableBody = document.getElementById('table-eventos-body');
 
   tableBody.innerHTML = '';
 
-  // Filtra coleções de acordo com os inputs
-  let eventosFiltrados = [...state.eventos];
-
-  // Filtro de data inicial
-  if (dataInicioFiltro) {
-    eventosFiltrados = eventosFiltrados.filter(e => e.data_inicio >= dataInicioFiltro);
-  }
-
-  // Filtro de data final
-  if (dataFimFiltro) {
-    eventosFiltrados = eventosFiltrados.filter(e => e.data_inicio <= dataFimFiltro);
-  }
-
-  // Filtro de busca textual
-  if (searchText) {
-    eventosFiltrados = eventosFiltrados.filter(e => {
-      return e.nome_evento.toLowerCase().includes(searchText) ||
-             e.bairro.toLowerCase().includes(searchText) ||
-             e.local_itinerario.toLowerCase().includes(searchText) ||
-             e.demandante.toLowerCase().includes(searchText) ||
-             (e.num_os_manual && e.num_os_manual.toLowerCase().includes(searchText)) ||
-             (e.num_sei && e.num_sei.toLowerCase().includes(searchText));
-    });
-  }
+  // Filtra coleções de acordo com os inputs (mesmo filtro usado pela Lista para SEI)
+  let eventosFiltrados = getEventosFiltrados();
 
   if (eventosFiltrados.length === 0) {
     tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhum evento localizado com os filtros aplicados.</td></tr>`;
@@ -1606,6 +1609,44 @@ async function handleCopiarRelatorioSei() {
     showToast('Texto do relatório copiado para a área de transferência.', 'success');
   } catch (error) {
     console.error('Erro ao copiar relatório:', error);
+    showToast('Não foi possível copiar automaticamente. Selecione o texto manualmente.', 'danger');
+  }
+}
+
+// Monta a lista numerada em texto puro para o SEI a partir dos eventos filtrados.
+// Ordem cronológica ascendente (natural para um documento de período).
+function montarTextoListaSei() {
+  const eventos = getEventosFiltrados().sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
+  if (eventos.length === 0) return '';
+  return eventos.map((e, i) => {
+    const nn = String(i + 1).padStart(2, '0');
+    const os = (e.num_os_manual || '').trim() || '-';
+    const nome = (e.nome_evento || '').trim() || '-';
+    const local = (e.local_itinerario || '').trim() || (e.bairro || '').trim() || '-';
+    const sei = (e.num_sei || '').trim() || '-';
+    return `${nn} – ${os} – ${nome} – ${local} – ${sei}`;
+  }).join('\n');
+}
+
+function abrirModalListaSei() {
+  const texto = montarTextoListaSei();
+  if (!texto) {
+    showToast('Nenhum evento no filtro ativo para gerar a lista.', 'warning');
+    return;
+  }
+  document.getElementById('lista-sei-texto').textContent = texto;
+  document.getElementById('modal-lista-sei').classList.remove('hidden');
+  lucide.createIcons();
+}
+
+async function handleCopiarListaSei() {
+  const texto = document.getElementById('lista-sei-texto').textContent;
+  if (!texto) return;
+  try {
+    await navigator.clipboard.writeText(texto);
+    showToast('Lista copiada para a área de transferência.', 'success');
+  } catch (error) {
+    console.error('Erro ao copiar lista:', error);
     showToast('Não foi possível copiar automaticamente. Selecione o texto manualmente.', 'danger');
   }
 }
