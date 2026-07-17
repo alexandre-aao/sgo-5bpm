@@ -4,10 +4,14 @@
 -- (Supabase Dashboard > SQL Editor > New Query > colar > Run).
 --
 -- Segurança: o app acessa o Supabase SOMENTE pelo backend (server.js),
--- usando a Service Role Key, que ignora RLS. A autorização (P3 x Adjunto
--- x Oficial) continua sendo feita no Express, como já era com o JSON.
--- Por isso as tabelas abaixo não têm RLS/políticas — nenhum cliente do
--- navegador fala diretamente com o Supabase.
+-- usando a Service Role Key, que ignora RLS (service_role tem BYPASSRLS).
+-- A autorização (P3 x Adjunto x Oficial) continua sendo feita no Express,
+-- como já era com o JSON — nenhum cliente do navegador fala diretamente
+-- com o Supabase.
+-- RLS: todas as tabelas públicas têm RLS HABILITADO, sem policies (ver
+-- bloco no final deste arquivo). Sem policy, os roles anon/authenticated
+-- ficam bloqueados; o service_role do backend passa por cima. Isso fecha
+-- o alerta rls_disabled_in_public do Supabase sem afetar o app.
 -- =================================================================
 
 create table if not exists eventos (
@@ -162,3 +166,22 @@ create unique index if not exists cartoes_data_unica
   on cartoes (data)
   where is_template = false;
 
+
+-- =================================================================
+-- RLS: habilita Row Level Security em TODAS as tabelas públicas, sem
+-- policies. Migration "ativar_rls_tabelas_publicas" (2026-07). Idempotente.
+-- O backend usa service_role (BYPASSRLS), então isto não afeta o app;
+-- apenas bloqueia acesso direto via anon/authenticated e fecha o alerta
+-- rls_disabled_in_public do Supabase.
+-- =================================================================
+alter table if exists eventos             enable row level security;
+alter table if exists alocacoes           enable row level security;
+alter table if exists escalas             enable row level security;
+alter table if exists usuarios            enable row level security;
+alter table if exists sessoes             enable row level security;
+alter table if exists config              enable row level security;
+alter table if exists bairros_coordenadas enable row level security;
+alter table if exists pessoal             enable row level security;
+alter table if exists cartoes             enable row level security;
+alter table if exists operacoes           enable row level security;
+alter table if exists viaturas            enable row level security;
