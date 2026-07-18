@@ -1574,6 +1574,7 @@ async function renderMapaTab() {
   try {
     const resCoords = await apiFetch(`${API_BASE_URL}/api/bairros-coordenadas`);
     const bairrosCoordenadas = await resCoords.json();
+    if (!Array.isArray(bairrosCoordenadas)) return; // servidor lento: não renderiza marcadores de bairro desta vez
 
     // Semana corrente (segunda a domingo), mesmo critério do card "Eventos na Semana" do Dashboard
     const hoje = new Date();
@@ -1737,6 +1738,7 @@ async function popularSelectBairros(selectId = 'bairro') {
   try {
     const res = await apiFetch(`${API_BASE_URL}/api/bairros-coordenadas`);
     const bairros = await res.json();
+    if (!Array.isArray(bairros)) return; // servidor lento devolveu não-array: mantém o select como está
 
     const opcoesFixas = `<option value="">Selecione...</option><option value="__outro__">Outro (não cadastrado)</option>`;
     const opcoesBairros = bairros
@@ -1765,6 +1767,10 @@ async function renderGerenciarBairrosTab() {
   try {
     const res = await apiFetch(`${API_BASE_URL}/api/bairros-coordenadas`);
     const bairros = await res.json();
+    if (!Array.isArray(bairros)) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);padding:24px;">Falha ao carregar bairros (servidor lento). Recarregue.</td></tr>`;
+      return;
+    }
 
     if (bairros.length === 0) {
       tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhum bairro cadastrado ainda.</td></tr>`;
