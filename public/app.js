@@ -535,6 +535,7 @@ function setupEventListeners() {
 
   // Exportar relatório
   document.getElementById('btn-export').addEventListener('click', exportRelatorioToCSV);
+  document.getElementById('btn-relatorio-pdf-consolidado').addEventListener('click', gerarRelatorioPdfConsolidado);
 
   // Relatório Diário de Diárias (por data / por operação + copiar)
   document.getElementById('btn-rel-diario-data').addEventListener('click', () => { relDiarioModo = 'data'; renderRelatorioDiario(); });
@@ -2513,6 +2514,52 @@ async function gerarRelatorioPdfDiario() {
     abrirRelatorioPdf(html);
   } catch (e) {
     console.error('Erro no relatório PDF diário:', e);
+    showToast('Falha ao gerar o relatório.', 'danger');
+  }
+}
+
+// Relatório PDF Consolidado de Diárias por Militar (aba Relatório Diárias) — mesmo layout SGEPM
+// dos demais relatórios (cabecalhoRelatorioPdf + .rel-pdf-tabela + .rel-pdf-rodape). Fonte:
+// /api/relatorio-diarias, respeitando mês/ano e o filtro de busca de militar ativo na tela.
+async function gerarRelatorioPdfConsolidado() {
+  const mes = document.getElementById('filter-mes').value;
+  const ano = document.getElementById('filter-ano').value;
+  const busca = document.getElementById('filter-search-input').value.toLowerCase().trim();
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/relatorio-diarias?mes=${mes}&ano=${ano}`);
+    const dados = await res.json();
+    if (!res.ok) { showToast((dados && dados.error) || 'Falha ao gerar o relatório.', 'danger'); return; }
+    const lista = (Array.isArray(dados) ? dados : []).filter(item =>
+      item.militar_nome.toLowerCase().includes(busca) || item.militar_id.toLowerCase().includes(busca));
+    if (lista.length === 0) { showToast('Nenhum militar no período/filtro selecionado.', 'warning'); return; }
+    let sub = `${nomeMes(mes)}/${ano}`;
+    if (busca) sub += ` — filtro: "${busca}"`;
+    const totalDiarias = lista.reduce((s, m) => s + (Number(m.total_diarias) || 0), 0);
+    const linhas = lista.map((m, i) => `
+      <tr>
+        <td>${String(i + 1).padStart(2, '0')}</td>
+        <td>${esc(m.militar_id) || '-'}</td>
+        <td>${esc(m.militar_nome)}</td>
+        <td style="text-align:center;">${m.escalas_count}</td>
+        <td style="text-align:center;">${m.qtd_aparicoes}</td>
+        <td style="text-align:right;">${m.total_diarias}</td>
+      </tr>`).join('');
+    const html = `
+      ${cabecalhoRelatorioPdf('Relatório Consolidado de Diárias por Militar', sub)}
+      <table class="rel-pdf-tabela">
+        <thead><tr>
+          <th style="width:34px;">Nº</th><th style="width:110px;">Matrícula</th>
+          <th>Nome do Militar</th>
+          <th style="width:90px;text-align:center;">Escalas</th>
+          <th style="width:90px;text-align:center;">Aparições</th>
+          <th style="width:120px;text-align:right;">Total de Diárias</th>
+        </tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+      <div class="rel-pdf-rodape">Total de militares: ${lista.length} — Total de diárias: ${totalDiarias}</div>`;
+    abrirRelatorioPdf(html);
+  } catch (e) {
+    console.error('Erro no relatório PDF consolidado:', e);
     showToast('Falha ao gerar o relatório.', 'danger');
   }
 }
