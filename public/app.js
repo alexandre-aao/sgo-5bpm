@@ -723,6 +723,7 @@ function setupEventListeners() {
     atualizarCampoSobreavisoPrint();
     handleSalvarCabecalhoCartao();
   });
+  document.getElementById('cartao-tipo-periodo').addEventListener('change', handleSalvarCabecalhoCartao);
 
   // Modal de Edição de Viatura do Cartão Programa
   const fecharModalEditarVtr = () => document.getElementById('modal-editar-vtr').classList.add('hidden');
@@ -3561,6 +3562,8 @@ function exibirCartaoNoEditor(cartao) {
     popularSelectPessoal('cartao-fiscal', 'Fiscal de Operações', cartao.fiscal);
     popularSelectPessoal('cartao-adjunto', 'Adjunto', cartao.adjunto);
     popularSelectPessoal('cartao-sobreaviso', 'Oficial de Sobreaviso', cartao.oficial_sobreaviso);
+    const selTipo = document.getElementById('cartao-tipo-periodo');
+    if (selTipo) selTipo.value = cartao.tipo_periodo || '';
     if (headerFieldsEl) headerFieldsEl.classList.remove('hidden');
     atualizarCampoSobreavisoPrint();
   }
@@ -3592,24 +3595,11 @@ function atualizarCampoSobreavisoPrint() {
   }
 }
 
-// Atualiza o badge Dia Útil / Fim de Semana e limpa o resultado da busca de template anterior
+// Limpa a sugestão de template anterior quando a data muda. O tipo (Dia Útil/Fim de Semana)
+// é escolhido manualmente no select #sugestao-tipo-periodo — sem inferência por data.
 function atualizarSugestaoTemplateUI() {
   const resultadoEl = document.getElementById('cartao-sugestao-resultado');
   if (resultadoEl) resultadoEl.innerHTML = '';
-
-  const dataSelecionada = document.getElementById('cartao-data').value;
-  const badge = document.getElementById('cartao-sugestao-badge-periodo');
-  if (!badge) return;
-
-  if (!dataSelecionada) {
-    badge.textContent = '-';
-    return;
-  }
-  const diaSemana = new Date(dataSelecionada + 'T00:00:00').getDay(); // 0=Dom .. 6=Sáb
-  const fimDeSemana = diaSemana === 0 || diaSemana === 6;
-  badge.textContent = fimDeSemana ? 'Fim de Semana' : 'Dia Útil';
-  badge.style.backgroundColor = fimDeSemana ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)';
-  badge.style.color = fimDeSemana ? 'var(--warning)' : 'var(--primary)';
 }
 
 // Busca o template cadastrado para o período (dia útil/fim de semana) + quantidade de viaturas da data selecionada
@@ -3620,8 +3610,7 @@ async function handleBuscarTemplateSugerido() {
     return;
   }
 
-  const diaSemana = new Date(dataSelecionada + 'T00:00:00').getDay();
-  const tipoPeriodo = (diaSemana === 0 || diaSemana === 6) ? 'fim_de_semana' : 'semana';
+  const tipoPeriodo = document.getElementById('sugestao-tipo-periodo').value;
   const qtdViaturas = document.getElementById('sugestao-qtd-viaturas').value;
   const resultadoEl = document.getElementById('cartao-sugestao-resultado');
 
@@ -4012,7 +4001,8 @@ async function handleCriarCartao(copiarAnterior) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         data: dataSelecionada,
-        copiar_de: copiarAnterior ? 'ultimo' : undefined
+        copiar_de: copiarAnterior ? 'ultimo' : undefined,
+        tipo_periodo: (document.getElementById('sugestao-tipo-periodo') || {}).value || ''
       })
     });
 
@@ -4084,7 +4074,8 @@ async function handleSalvarCabecalhoCartao() {
       body: JSON.stringify({
         fiscal: document.getElementById('cartao-fiscal').value,
         adjunto: document.getElementById('cartao-adjunto').value,
-        oficial_sobreaviso: document.getElementById('cartao-sobreaviso').value
+        oficial_sobreaviso: document.getElementById('cartao-sobreaviso').value,
+        tipo_periodo: (document.getElementById('cartao-tipo-periodo') || {}).value || ''
       })
     });
     if (res.ok) {

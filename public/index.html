@@ -1017,7 +1017,13 @@
 
           <div class="cartao-sugestao-template">
             <div class="cartao-sugestao-linha">
-              <span id="cartao-sugestao-badge-periodo" class="badge">-</span>
+              <div class="filter-group">
+                <label for="sugestao-tipo-periodo">Tipo de Cartão</label>
+                <select id="sugestao-tipo-periodo">
+                  <option value="semana">Dia Útil</option>
+                  <option value="fim_de_semana">Fim de Semana</option>
+                </select>
+              </div>
               <div class="filter-group">
                 <label for="sugestao-qtd-viaturas">Quantidade de Viaturas</label>
                 <select id="sugestao-qtd-viaturas">
@@ -1054,6 +1060,14 @@
               <span id="cartao-subtitulo-print">Policiamento Ostensivo Diário</span>
             </div>
             <div class="cartao-header-fields">
+              <div class="form-group">
+                <label for="cartao-tipo-periodo">Tipo de Cartão</label>
+                <select id="cartao-tipo-periodo">
+                  <option value="">Selecione...</option>
+                  <option value="semana">Dia Útil</option>
+                  <option value="fim_de_semana">Fim de Semana</option>
+                </select>
+              </div>
               <div class="form-group">
                 <label for="cartao-fiscal">Fiscal de Operações</label>
                 <select id="cartao-fiscal">

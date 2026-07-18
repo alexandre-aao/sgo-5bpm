@@ -1970,7 +1970,7 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
     oficial_sobreaviso: req.body.oficial_sobreaviso || '',
     is_template: false,
     nome_template: null,
-    tipo_periodo: null,
+    tipo_periodo: ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo) ? req.body.tipo_periodo : null,
     qtd_viaturas_base: null,
     origem_template_id: null,
     viaturas: []
@@ -2078,6 +2078,11 @@ app.put('/api/cartoes/:id', asyncRoute(async (req, res) => {
   if (req.body.fiscal !== undefined) cartao.fiscal = v.valores.fiscal;
   if (req.body.adjunto !== undefined) cartao.adjunto = v.valores.adjunto;
   if (req.body.oficial_sobreaviso !== undefined) cartao.oficial_sobreaviso = v.valores.oficial_sobreaviso;
+
+  // tipo_periodo escolhido manualmente (Dia Útil / Fim de Semana). String vazia limpa (null).
+  if (req.body.tipo_periodo !== undefined) {
+    cartao.tipo_periodo = ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo) ? req.body.tipo_periodo : null;
+  }
 
   await writeRow('cartoes', cartao);
   res.json(cartao);
