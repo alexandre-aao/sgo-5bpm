@@ -2690,41 +2690,6 @@ body.sgo-sincronizando .topbar::before {
 
   .cartao-vtr-grid { display: block; }
 
-  /* Impressão do Relatório SEI: some com o resto, mostra só o conteúdo do modal */
-  body:has(#modal-relatorio-sei:not(.hidden)) .app-container,
-  body:has(#modal-relatorio-sei:not(.hidden)) .toast-container {
-    display: none !important;
-  }
-  body:has(#modal-relatorio-sei:not(.hidden)) #modal-relatorio-sei {
-    position: static;
-    background: none;
-    backdrop-filter: none;
-    display: block;
-    animation: none;
-  }
-  body:has(#modal-relatorio-sei:not(.hidden)) .modal-box {
-    box-shadow: none;
-    border: none;
-    width: auto;
-    max-width: none;
-    max-height: none;
-    overflow: visible;
-    background: #fff;
-    padding: 0;
-  }
-  body:has(#modal-relatorio-sei:not(.hidden)) .modal-header,
-  body:has(#modal-relatorio-sei:not(.hidden)) .form-actions {
-    display: none !important;
-  }
-
-  .sei-print-area,
-  .sei-print-area * {
-    background: #fff !important;
-    color: #000 !important;
-    border-color: #333 !important;
-  }
-  .sei-lista-efetivo li::before { color: #000 !important; }
-
   /* Relatório PDF: some com o resto, mostra só a área do relatório, em paisagem */
   body:has(#modal-relatorio-pdf:not(.hidden)) .app-container,
   body:has(#modal-relatorio-pdf:not(.hidden)) .toast-container { display: none !important; }
@@ -2747,17 +2712,6 @@ body.sgo-sincronizando .topbar::before {
   body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area { page: relatorioPdfLandscape; }
 }
 
-/* -------------------------------------------------------------
-   RELATÓRIO SEI
-   ------------------------------------------------------------- */
-.sei-print-area {
-  background-color: var(--bg-app);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 20px;
-  font-size: 0.8rem;
-}
-
 .lista-sei-texto {
   white-space: pre-wrap;
   word-break: break-word;
@@ -2772,91 +2726,6 @@ body.sgo-sincronizando .topbar::before {
   line-height: 1.6;
   color: var(--text-main);
   margin: 0;
-}
-
-.sei-cabecalho {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 2px;
-  padding-bottom: 12px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--border-color);
-  font-size: 0.75rem;
-}
-
-.sei-cabecalho strong { font-size: 0.85rem; }
-
-#sei-titulo {
-  text-align: center;
-  font-family: var(--font-title);
-  font-size: 1rem;
-  margin-bottom: 2px;
-}
-
-.sei-subtitulo {
-  text-align: center;
-  color: var(--text-muted);
-  margin-bottom: 16px;
-}
-
-.sei-resumo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.sei-resumo-item {
-  background-color: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 10px;
-  text-align: center;
-}
-
-.sei-resumo-item strong {
-  display: block;
-  font-size: 1.1rem;
-  font-family: var(--font-title);
-}
-
-.sei-resumo-item span {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.sei-secao { margin-bottom: 16px; }
-
-.sei-secao h5 {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-}
-
-.sei-lista-efetivo {
-  list-style: none;
-  counter-reset: sei-item;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sei-lista-efetivo li {
-  counter-increment: sei-item;
-  padding: 4px 0;
-  border-bottom: 1px dashed var(--border-color);
-}
-
-.sei-lista-efetivo li::before {
-  content: counter(sei-item, decimal-leading-zero) " – ";
-  font-weight: 600;
-  color: var(--primary);
 }
 
 /* -------------------------------------------------------------
