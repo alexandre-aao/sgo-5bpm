@@ -540,7 +540,13 @@ function setupEventListeners() {
   // Relatório Diário de Diárias (por data / por operação + copiar)
   document.getElementById('btn-rel-diario-data').addEventListener('click', () => { relDiarioModo = 'data'; renderRelatorioDiario(); });
   document.getElementById('btn-rel-diario-operacao').addEventListener('click', () => { relDiarioModo = 'operacao'; renderRelatorioDiario(); });
-  document.getElementById('btn-copiar-rel-diario').addEventListener('click', handleCopiarRelatorioDiario);
+  document.getElementById('btn-relatorio-pdf-diario').addEventListener('click', gerarRelatorioPdfDiario);
+
+  // Relatórios em PDF (estilo SGEPM) — Eventos + modal de pré-visualização/impressão
+  document.getElementById('btn-relatorio-pdf-eventos').addEventListener('click', gerarRelatorioPdfEventos);
+  document.getElementById('btn-imprimir-pdf').addEventListener('click', () => window.print());
+  document.getElementById('btn-fechar-modal-pdf').addEventListener('click', () => document.getElementById('modal-relatorio-pdf').classList.add('hidden'));
+  document.getElementById('btn-fechar-pdf-2').addEventListener('click', () => document.getElementById('modal-relatorio-pdf').classList.add('hidden'));
 
   // Excluir evento na Gaveta Lateral
   document.getElementById('btn-delete-evento').addEventListener('click', handleDeleteEvento);
@@ -567,15 +573,7 @@ function setupEventListeners() {
     showToast('Filtros redefinidos.', 'info');
   });
 
-  // Relatório para o SEI (por período, a partir de Listar Eventos, ou por evento, na gaveta)
-  document.getElementById('btn-gerar-relatorio-sei').addEventListener('click', () => {
-    const dataInicio = document.getElementById('filter-eventos-inicio').value;
-    const dataFim = document.getElementById('filter-eventos-fim').value;
-    abrirRelatorioSei({ dataInicio, dataFim });
-  });
-  document.getElementById('btn-drawer-relatorio-sei').addEventListener('click', () => {
-    if (state.currentEventId) abrirRelatorioSei({ eventoId: state.currentEventId });
-  });
+  // Modais SEI/Lista dormentes: só os fechamentos/cópias seguem ligados (os botões-gatilho saíram).
   const fecharModalSei = () => document.getElementById('modal-relatorio-sei').classList.add('hidden');
   document.getElementById('btn-fechar-modal-sei').addEventListener('click', fecharModalSei);
   document.getElementById('btn-fechar-modal-sei-footer').addEventListener('click', fecharModalSei);
@@ -583,7 +581,6 @@ function setupEventListeners() {
   document.getElementById('btn-exportar-pdf-sei').addEventListener('click', () => window.print());
 
   // Lista para o SEI (texto puro numerado, por período/filtro ativo)
-  document.getElementById('btn-gerar-lista-sei').addEventListener('click', abrirModalListaSei);
   document.getElementById('btn-copiar-lista-sei').addEventListener('click', handleCopiarListaSei);
   document.getElementById('btn-fechar-modal-lista-sei').addEventListener('click', () => document.getElementById('modal-lista-sei').classList.add('hidden'));
   document.getElementById('btn-fechar-lista-sei-2').addEventListener('click', () => document.getElementById('modal-lista-sei').classList.add('hidden'));
@@ -636,9 +633,6 @@ function setupEventListeners() {
   document.getElementById('btn-op-marcar-executada').addEventListener('click', handleMarcarOperacaoExecutada);
   document.getElementById('btn-op-delete').addEventListener('click', handleDeleteOperacao);
   document.getElementById('btn-op-editar').addEventListener('click', () => { if (state.currentOperacaoId) abrirModalOperacao(state.currentOperacaoId); });
-  document.getElementById('btn-op-relatorio-sei').addEventListener('click', () => {
-    if (state.currentOperacaoId) abrirRelatorioSei({ operacaoId: state.currentOperacaoId });
-  });
 
   // Filtro de período do Dashboard (reprocessa os cards-resumo + donut de distribuição por tipo)
   document.getElementById('dashboard-filtro-mes').addEventListener('change', renderDashboardResumo);
@@ -2610,6 +2604,102 @@ async function handleCopiarRelatorioDiario() {
   } catch (error) {
     console.error('Erro ao copiar relatório diário:', error);
     showToast('Não foi possível copiar automaticamente. Selecione o texto manualmente.', 'danger');
+  }
+}
+
+// Cabeçalho oficial padrão dos relatórios PDF (estilo SGEPM).
+function cabecalhoRelatorioPdf(titulo, subtitulo) {
+  const a = new Date();
+  const p2 = n => String(n).padStart(2, '0');
+  const ger = `${p2(a.getDate())}/${p2(a.getMonth() + 1)}/${a.getFullYear()}, ${p2(a.getHours())}:${p2(a.getMinutes())}`;
+  return `
+    <div class="rel-pdf-cabecalho">
+      <div class="rpc-brasao">POLÍCIA MILITAR DO RIO GRANDE DO NORTE</div>
+      <div class="rpc-sub">5º BATALHÃO DE POLÍCIA MILITAR — SEÇÃO DE PLANEJAMENTO E OPERAÇÕES (P3)</div>
+    </div>
+    <div class="rel-pdf-titulobar">
+      <div>
+        <div class="rel-pdf-titulo">${esc(titulo)}</div>
+        <div class="rel-pdf-gerado">${esc(subtitulo || '')}</div>
+      </div>
+      <div class="rel-pdf-gerado">Gerado em: ${ger}</div>
+    </div>`;
+}
+
+function abrirRelatorioPdf(html) {
+  document.getElementById('relatorio-pdf-area').innerHTML = html;
+  document.getElementById('modal-relatorio-pdf').classList.remove('hidden');
+  lucide.createIcons();
+}
+
+// Relatório PDF de Eventos (aba Listar Eventos) — respeita o filtro ativo; colunas Nº/Data/Nº OS/Nome/Local/Nº SEI.
+function gerarRelatorioPdfEventos() {
+  const eventos = getEventosFiltrados().sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
+  if (eventos.length === 0) {
+    showToast('Nenhum evento no filtro ativo para gerar o relatório.', 'warning');
+    return;
+  }
+  const ini = document.getElementById('filter-eventos-inicio').value;
+  const fim = document.getElementById('filter-eventos-fim').value;
+  const br = iso => iso ? iso.split('-').reverse().join('/') : '';
+  let periodo = 'Todos os eventos cadastrados';
+  if (ini && fim) periodo = `Período: ${br(ini)} a ${br(fim)}`;
+  else if (ini) periodo = `A partir de ${br(ini)}`;
+  else if (fim) periodo = `Até ${br(fim)}`;
+  const linhas = eventos.map((e, i) => `
+    <tr>
+      <td>${String(i + 1).padStart(2, '0')}</td>
+      <td>${esc(br(e.data_inicio))}</td>
+      <td>${esc(e.num_os_manual) || '-'}</td>
+      <td>${esc(e.nome_evento)}</td>
+      <td>${esc(e.local_itinerario) || esc(e.bairro) || '-'}</td>
+      <td>${esc(e.num_sei) || '-'}</td>
+    </tr>`).join('');
+  const html = `
+    ${cabecalhoRelatorioPdf('Relatório de Eventos', periodo)}
+    <table class="rel-pdf-tabela">
+      <thead><tr>
+        <th style="width:34px;">Nº</th><th style="width:78px;">Data</th><th style="width:150px;">Nº OS</th>
+        <th>Nome do Evento</th><th>Endereço/Local</th><th style="width:150px;">Nº SEI</th>
+      </tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>
+    <div class="rel-pdf-rodape">Total de eventos: ${eventos.length}</div>`;
+  abrirRelatorioPdf(html);
+}
+
+// Relatório PDF Diário de Diárias (aba Relatório Diárias) — usa /api/relatorio-diario no modo atual (relDiarioModo).
+async function gerarRelatorioPdfDiario() {
+  const mes = document.getElementById('filter-mes').value;
+  const ano = document.getElementById('filter-ano').value;
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/relatorio-diario?mes=${mes}&ano=${ano}&agrupar=${relDiarioModo}`);
+    const dados = await res.json();
+    if (!res.ok) { showToast((dados && dados.error) || 'Falha ao gerar o relatório.', 'danger'); return; }
+    if (!dados.grupos || dados.grupos.length === 0) { showToast('Nenhuma diária no período selecionado.', 'warning'); return; }
+    const sub = `${nomeMes(dados.mes)}/${dados.ano} — ${dados.agrupar === 'operacao' ? 'por operação' : 'por data'}`;
+    let corpo = '';
+    dados.grupos.forEach(g => {
+      const cab = dados.agrupar === 'operacao'
+        ? `${esc(g.operacao)} — ${esc(dataBrHifen(g.data))}${g.tipo ? ' (' + esc(g.tipo) + ')' : ''}`
+        : esc(dataBrHifen(g.data));
+      corpo += `<tr class="rel-pdf-grupo-linha"><td colspan="3">${cab}</td></tr>`;
+      g.militares.forEach((m, i) => {
+        corpo += `<tr><td>${String(i + 1).padStart(2, '0')}</td><td>${esc(nomeExibicaoMilitarDiario(m))}</td><td>${m.diarias} diárias</td></tr>`;
+      });
+      corpo += `<tr class="rel-pdf-total-linha"><td></td><td>${dados.agrupar === 'operacao' ? 'Total da operação' : 'Total do dia'}</td><td>${g.total} diárias</td></tr>`;
+    });
+    corpo += `<tr class="rel-pdf-total-linha rel-pdf-total-mes"><td></td><td>TOTAL DO MÊS</td><td>${dados.total_mes} diárias</td></tr>`;
+    const html = `
+      ${cabecalhoRelatorioPdf('Relatório Diário de Diárias', sub)}
+      <table class="rel-pdf-tabela">
+        <thead><tr><th style="width:40px;">Nº</th><th>Militar</th><th style="width:130px;">Diárias</th></tr></thead>
+        <tbody>${corpo}</tbody>
+      </table>`;
+    abrirRelatorioPdf(html);
+  } catch (e) {
+    console.error('Erro no relatório PDF diário:', e);
+    showToast('Falha ao gerar o relatório.', 'danger');
   }
 }
 

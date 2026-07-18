@@ -2555,6 +2555,40 @@ body.sgo-sincronizando .topbar::before {
 }
 
 /* -------------------------------------------------------------
+   RELATÓRIOS PDF (estilo SGEPM) — área impressa via window.print()
+   ------------------------------------------------------------- */
+.relatorio-pdf-area {
+  background: #fff;
+  color: #111;
+  font-family: Helvetica, Arial, sans-serif;
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.rel-pdf-cabecalho { background: #002145; color: #fff; padding: 14px 18px; }
+.rel-pdf-cabecalho .rpc-brasao { font-size: 13px; font-weight: 700; letter-spacing: .3px; }
+.rel-pdf-cabecalho .rpc-sub { font-size: 10px; opacity: .92; margin-top: 2px; }
+.rel-pdf-titulobar {
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  padding: 10px 18px; border-bottom: 2px solid #002145;
+}
+.rel-pdf-titulo { font-size: 13px; font-weight: 700; color: #002145; }
+.rel-pdf-gerado { font-size: 9.5px; color: #555; }
+.rel-pdf-tabela { width: 100%; border-collapse: collapse; font-size: 10px; }
+.rel-pdf-tabela thead { display: table-header-group; }
+.rel-pdf-tabela th { background: #002145; color: #fff; text-align: left; padding: 6px 8px; font-weight: 700; }
+.rel-pdf-tabela td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; color: #111; vertical-align: top; }
+.rel-pdf-tabela tbody tr { break-inside: avoid; }
+.rel-pdf-tabela tbody tr:nth-child(even) { background: #F5F7FA; }
+.rel-pdf-grupo-linha td { background: #dbe4f0 !important; color: #002145; font-weight: 700; }
+.rel-pdf-total-linha td { background: #eef2f7 !important; font-weight: 700; }
+.rel-pdf-total-mes td { background: #002145 !important; color: #fff !important; }
+.rel-pdf-rodape { padding: 8px 18px; font-size: 9px; color: #555; border-top: 1px solid #e2e8f0; }
+
+@page relatorioPdfLandscape { size: A4 landscape; margin: 10mm; }
+
+/* -------------------------------------------------------------
    IMPRESSÃO DO CARTÃO PROGRAMA
    ------------------------------------------------------------- */
 @media print {
@@ -2690,6 +2724,27 @@ body.sgo-sincronizando .topbar::before {
     border-color: #333 !important;
   }
   .sei-lista-efetivo li::before { color: #000 !important; }
+
+  /* Relatório PDF: some com o resto, mostra só a área do relatório, em paisagem */
+  body:has(#modal-relatorio-pdf:not(.hidden)) .app-container,
+  body:has(#modal-relatorio-pdf:not(.hidden)) .toast-container { display: none !important; }
+  body:has(#modal-relatorio-pdf:not(.hidden)) #modal-relatorio-pdf {
+    position: static; background: none; backdrop-filter: none; display: block; animation: none;
+  }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .modal-box {
+    box-shadow: none; border: none; width: auto; max-width: none; max-height: none; overflow: visible; background: #fff; padding: 0;
+  }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .modal-header,
+  body:has(#modal-relatorio-pdf:not(.hidden)) #modal-relatorio-pdf > .modal-box > p,
+  body:has(#modal-relatorio-pdf:not(.hidden)) .form-actions { display: none !important; }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area {
+    max-height: none; overflow: visible; border-radius: 0;
+  }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area,
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area * {
+    -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+  }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area { page: relatorioPdfLandscape; }
 }
 
 /* -------------------------------------------------------------
