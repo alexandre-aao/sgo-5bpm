@@ -109,7 +109,7 @@ Os antigos botões de texto "SEI" (Gerar Relatório para SEI / Lista para SEI em
 
 Ambos injetam HTML em `#relatorio-pdf-area` (dentro do modal único `#modal-relatorio-pdf`) via `abrirRelatorioPdf()` + `cabecalhoRelatorioPdf(titulo, sub)`. Impressão isolada com o mesmo padrão do antigo modal SEI: `@media print { body:has(#modal-relatorio-pdf:not(.hidden)) ... }` esconde `.app-container` e mostra só a área, com `@page relatorioPdfLandscape { size: A4 landscape }` e `print-color-adjust: exact` (para o cabeçalho marinho/zebra saírem coloridos).
 
-**Código SEI legado dormente:** o modal `#modal-relatorio-sei` (+ `abrirRelatorioSei`/`renderRelatorioSei`/`montarTextoRelatorioSei`/`handleCopiarRelatorioSei`), o modal `#modal-lista-sei` (+ suas funções) e a rota `GET /api/relatorio-sei` continuam no código mas **sem gatilho na UI** (os botões foram removidos). Podem ser apagados numa limpeza futura se o usuário confirmar.
+**Código SEI legado removido:** os modais `#modal-relatorio-sei` e `#modal-lista-sei`, as funções `abrirRelatorioSei`/`renderRelatorioSei`/`montarTextoRelatorioSei`/`handleCopiarRelatorioSei`/`abrirModalListaSei`/`montarTextoListaSei`/`handleCopiarListaSei`, a rota `GET /api/relatorio-sei` (+ helper `consolidarEfetivoSei`) e o CSS `.sei-*` foram **apagados** (não existem mais). Preservado: a classe `.lista-sei-texto` (ainda estiliza o `#rel-diario-texto` do Relatório Diário on-screen) e `getEventosFiltrados`.
 
 ## Fluxo de trabalho recomendado ao editar
 
