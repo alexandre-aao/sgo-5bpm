@@ -250,6 +250,7 @@ function setupNavigation() {
       // Dispara renderizações sob demanda
       if (targetId === 'tab-relatorio') {
         renderRelatorioTable();
+        renderRelatorioDiario();
       } else if (targetId === 'tab-turno') {
         renderTurnoTab();
       } else if (targetId === 'tab-eventos') {
@@ -529,12 +530,17 @@ function setupEventListeners() {
   });
 
   // Filtros de Relatório
-  document.getElementById('filter-mes').addEventListener('change', renderRelatorioTable);
-  document.getElementById('filter-ano').addEventListener('change', renderRelatorioTable);
+  document.getElementById('filter-mes').addEventListener('change', () => { renderRelatorioTable(); renderRelatorioDiario(); });
+  document.getElementById('filter-ano').addEventListener('change', () => { renderRelatorioTable(); renderRelatorioDiario(); });
   document.getElementById('filter-search-input').addEventListener('input', renderRelatorioTable);
 
   // Exportar relatório
   document.getElementById('btn-export').addEventListener('click', exportRelatorioToCSV);
+
+  // Relatório Diário de Diárias (por data / por operação + copiar)
+  document.getElementById('btn-rel-diario-data').addEventListener('click', () => { relDiarioModo = 'data'; renderRelatorioDiario(); });
+  document.getElementById('btn-rel-diario-operacao').addEventListener('click', () => { relDiarioModo = 'operacao'; renderRelatorioDiario(); });
+  document.getElementById('btn-copiar-rel-diario').addEventListener('click', handleCopiarRelatorioDiario);
 
   // Excluir evento na Gaveta Lateral
   document.getElementById('btn-delete-evento').addEventListener('click', handleDeleteEvento);
@@ -2535,6 +2541,74 @@ function exportRelatorioToCSV() {
   showToast('Planilha CSV gerada e baixada.', 'success');
 }
 
+// -------------------------------------------------------------
+// RELATÓRIO DIÁRIO DE DIÁRIAS (por data / por operação)
+// -------------------------------------------------------------
+function abreviarPosto(posto) { return ABREV_POSTO[posto] || posto || ''; }
+function dataBrHifen(iso) { return (iso || '').split('-').reverse().join('-'); } // 2026-07-01 -> 01-07-2026
+function nomeMes(mm) { return MESES_NOMES[parseInt(mm, 10)] || ''; }
+
+function nomeExibicaoMilitarDiario(m) {
+  const nome = (m.nome_guerra || '').trim() || (m.militar_nome || '').trim() || 'Militar';
+  const grad = abreviarPosto(m.posto_graduacao);
+  return grad ? `${grad} ${nome}` : nome;
+}
+
+function montarTextoRelatorioDiario(dados) {
+  const cabMes = `${nomeMes(dados.mes)}/${dados.ano}`;
+  if (!dados || !Array.isArray(dados.grupos) || dados.grupos.length === 0) {
+    return `RELATÓRIO DE DIÁRIAS — ${cabMes}\n\nNenhuma diária lançada no período.`;
+  }
+  const linhas = [`RELATÓRIO DE DIÁRIAS — ${cabMes} (${dados.agrupar === 'operacao' ? 'por operação' : 'por data'})`, ''];
+  dados.grupos.forEach(g => {
+    const militaresTxt = g.militares.map(m => `${nomeExibicaoMilitarDiario(m)} ${m.diarias} diárias`).join(', ');
+    if (dados.agrupar === 'operacao') {
+      linhas.push(`${g.operacao} — ${dataBrHifen(g.data)}${g.tipo ? ' (' + g.tipo + ')' : ''}: ${militaresTxt} — Total: ${g.total} diárias`);
+    } else {
+      linhas.push(`${dataBrHifen(g.data)}: ${militaresTxt} — Total do dia: ${g.total} diárias`);
+    }
+  });
+  linhas.push('', `TOTAL DO MÊS: ${dados.total_mes} diárias`);
+  return linhas.join('\n');
+}
+
+async function renderRelatorioDiario() {
+  const pre = document.getElementById('rel-diario-texto');
+  if (!pre) return;
+  const mes = document.getElementById('filter-mes').value;
+  const ano = document.getElementById('filter-ano').value;
+  // estado visual do toggle
+  const btnData = document.getElementById('btn-rel-diario-data');
+  const btnOp = document.getElementById('btn-rel-diario-operacao');
+  if (btnData && btnOp) {
+    btnData.className = 'btn btn-sm ' + (relDiarioModo === 'data' ? 'btn-primary' : 'btn-secondary');
+    btnOp.className = 'btn btn-sm ' + (relDiarioModo === 'operacao' ? 'btn-primary' : 'btn-secondary');
+  }
+  pre.textContent = 'Carregando...';
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/relatorio-diario?mes=${mes}&ano=${ano}&agrupar=${relDiarioModo}`);
+    const dados = await res.json();
+    if (!res.ok) { pre.textContent = (dados && dados.error) || 'Falha ao carregar o relatório diário.'; relDiarioTextoAtual = ''; return; }
+    relDiarioTextoAtual = montarTextoRelatorioDiario(dados);
+    pre.textContent = relDiarioTextoAtual;
+  } catch (e) {
+    console.error('Erro no relatório diário:', e);
+    pre.textContent = 'Falha ao carregar o relatório diário.';
+    relDiarioTextoAtual = '';
+  }
+}
+
+async function handleCopiarRelatorioDiario() {
+  if (!relDiarioTextoAtual) return;
+  try {
+    await navigator.clipboard.writeText(relDiarioTextoAtual);
+    showToast('Relatório diário copiado para a área de transferência.', 'success');
+  } catch (error) {
+    console.error('Erro ao copiar relatório diário:', error);
+    showToast('Não foi possível copiar automaticamente. Selecione o texto manualmente.', 'danger');
+  }
+}
+
 // Baixa um backup JSON com todas as tabelas de negócio (não inclui a trilha de auditoria).
 // Usa Blob + URL.createObjectURL em vez do esquema data: do CSV acima — mais robusto para
 // payloads maiores, que têm limite de tamanho em alguns navegadores com data:.
@@ -3212,6 +3286,18 @@ function renderSparkline(elementId, valores) {
 // TELA 8: CARTÃO PROGRAMA (PATRULHAMENTO DIÁRIO POR VIATURA)
 // -------------------------------------------------------------
 const ATIVIDADES_CARTAO = ['PB', 'Patrulhamento', 'QTL Almoço', 'QTL Jantar', 'Corredor Seguro', 'Barreira Itinerante', 'Outros'];
+
+// Abreviação de posto/graduação para o Relatório Diário (estilo usado nos nomes de login do batalhão).
+const ABREV_POSTO = {
+  'Soldado PM': 'Sd', 'Cabo PM': 'Cb',
+  '3º Sargento PM': '3º Sgt', '2º Sargento PM': '2º Sgt', '1º Sargento PM': '1º Sgt',
+  'Subtenente PM': 'Subten', 'Aspirante a Oficial PM': 'Asp',
+  '2º Tenente PM': '2º Ten', '1º Tenente PM': '1º Ten',
+  'Capitão PM': 'Cap', 'Major PM': 'Maj', 'Tenente-Coronel PM': 'Ten Cel', 'Coronel PM': 'Cel'
+};
+const MESES_NOMES = ['', 'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+let relDiarioModo = 'data'; // 'data' | 'operacao'
+let relDiarioTextoAtual = ''; // texto atual para o botão Copiar
 
 // Item de roteiro em edição inline de atividade (Mudar atividade): { vtrId, itemId } ou null.
 let editandoAtividadeItem = null;

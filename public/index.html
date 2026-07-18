@@ -705,6 +705,23 @@
             </table>
           </div>
         </div>
+        <div class="panel report-panel" style="margin-top:16px;">
+          <div class="panel-header flex-column-mobile">
+            <div class="panel-title">
+              <i data-lucide="calendar-days"></i>
+              <h2>Relatório Diário de Diárias</h2>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button id="btn-rel-diario-data" class="btn btn-sm btn-primary">Por Data</button>
+              <button id="btn-rel-diario-operacao" class="btn btn-sm btn-secondary">Por Operação</button>
+              <button id="btn-copiar-rel-diario" class="btn btn-secondary btn-sm">
+                <i data-lucide="clipboard-copy"></i> Copiar Texto Formatado
+              </button>
+            </div>
+          </div>
+          <p style="font-size:0.78rem;color:var(--text-muted);padding:0 4px 8px;">Usa o mês/ano selecionados acima. Fonte: operações + escalas (diária = aparições × 2).</p>
+          <pre id="rel-diario-texto" class="lista-sei-texto">Selecione o mês/ano acima.</pre>
+        </div>
       </section>
 
       <!-- Aba 6: Planejador Mensal de Diárias (Apenas P3) -->

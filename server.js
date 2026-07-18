@@ -1407,6 +1407,84 @@ app.get('/api/relatorio-diarias', asyncRoute(async (req, res) => {
 
 
 // -------------------------------------------------------------
+// RELATÓRIO DIÁRIO DE DIÁRIAS (por data ou por operação) — fonte: operacoes + escalas
+// -------------------------------------------------------------
+app.get('/api/relatorio-diario', exigirP3, asyncRoute(async (req, res) => {
+  const db = await readDB();
+  const mes = req.query.mes;
+  const ano = req.query.ano || String(new Date().getFullYear());
+  const agrupar = req.query.agrupar === 'operacao' ? 'operacao' : 'data';
+  if (!mes) return res.status(400).json({ error: 'Parâmetro mês é obrigatório (ex: ?mes=07)' });
+
+  const operacoesPeriodo = (db.operacoes || []).filter(o => {
+    const partes = o.data_inicio.split('-'); // YYYY-MM-DD
+    return partes[0] === ano && partes[1] === mes;
+  });
+  const opPorId = new Map(operacoesPeriodo.map(o => [o.id, o]));
+  const idsOp = new Set(opPorId.keys());
+  const escalas = (db.escalas || []).filter(s => idsOp.has(s.operacao_id));
+
+  // índice de pessoal por matrícula, para resolver posto + nome de guerra
+  const pessoalPorMat = new Map();
+  (db.pessoal || []).forEach(p => { if (p.matricula) pessoalPorMat.set(String(p.matricula), p); });
+
+  const resolver = (esc) => {
+    const p = pessoalPorMat.get(String(esc.militar_id));
+    return {
+      posto_graduacao: p ? (p.posto_graduacao || '') : '',
+      nome_guerra: p ? (p.nome_guerra || '') : '',
+      militar_nome: esc.militar_nome || '',
+      matricula: esc.militar_id || '',
+      diarias: esc.total_diarias || 0
+    };
+  };
+  // agrega escalas por militar dentro de um grupo (soma diárias se o mesmo militar repetir)
+  const agregarMilitares = (lista) => {
+    const mmap = new Map();
+    lista.forEach(esc => {
+      const chave = esc.militar_id || esc.militar_nome;
+      const m = resolver(esc);
+      if (mmap.has(chave)) mmap.get(chave).diarias += m.diarias;
+      else mmap.set(chave, m);
+    });
+    return [...mmap.values()];
+  };
+
+  let grupos = [];
+  let total_mes = 0;
+
+  if (agrupar === 'data') {
+    const porData = new Map(); // data -> array de escalas
+    escalas.forEach(esc => {
+      const data = opPorId.get(esc.operacao_id).data_inicio;
+      if (!porData.has(data)) porData.set(data, []);
+      porData.get(data).push(esc);
+    });
+    grupos = [...porData.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([data, escs]) => {
+        const militares = agregarMilitares(escs);
+        const total = militares.reduce((s, x) => s + x.diarias, 0);
+        total_mes += total;
+        return { data, total, militares };
+      });
+  } else {
+    grupos = operacoesPeriodo
+      .filter(o => escalas.some(s => s.operacao_id === o.id)) // só operações com escala (diária real)
+      .sort((a, b) => a.data_inicio.localeCompare(b.data_inicio))
+      .map(o => {
+        const militares = agregarMilitares(escalas.filter(s => s.operacao_id === o.id));
+        const total = militares.reduce((s, x) => s + x.diarias, 0);
+        total_mes += total;
+        return { operacao: o.nome_operacao, data: o.data_inicio, tipo: o.tipo_operacao, total, militares };
+      });
+  }
+
+  res.json({ mes, ano, agrupar, total_mes, grupos });
+}));
+
+
+// -------------------------------------------------------------
 // ROTA DO RELATÓRIO PARA O SEI (POR OPERAÇÃO, POR EVENTO OU POR PERÍODO)
 // -------------------------------------------------------------
 // Consolida um efetivo nominal por militar (agrupador `esc` -> {militar, aparições, diárias}).
