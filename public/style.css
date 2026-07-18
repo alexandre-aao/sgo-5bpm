@@ -2778,8 +2778,10 @@ body.sgo-sincronizando .topbar::before {
     top: 0;
     left: 0;
     height: 100vh;
+    height: 100dvh; /* acompanha a barra dinâmica do navegador; navegadores sem dvh mantêm o 100vh */
     width: 280px;
     max-width: 85vw;
+    padding-bottom: max(24px, env(safe-area-inset-bottom)); /* rodapé acima da home indicator (iOS) */
     z-index: 200;
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
