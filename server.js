@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -89,8 +90,43 @@ function limparFalhasLogin(usuario) {
 
 app.use(compression());
 app.use(express.json());
+
+// -------------------------------------------------------------
+// CACHE-BUSTING DOS ASSETS
+// -------------------------------------------------------------
+// app.js/style.css ficam em cache de 1h no navegador (maxAge abaixo). Sem versão na URL,
+// um deploy novo poderia servir JS/CSS de até 1h atrás. Solução: injetar ?v=<versão> nas
+// referências dentro do index.html. Versão = SHA do commit (a Vercel expõe
+// VERCEL_GIT_COMMIT_SHA por deploy -> muda a cada deploy automaticamente); local, cai no
+// mtime do app.js (muda quando o arquivo muda). O index.html continua no-cache, então o
+// HTML novo (com a nova ?v=) chega na hora e o navegador refetcha os assets versionados.
+const ASSET_VERSION = (() => {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (sha) return sha.slice(0, 8);
+  try {
+    return String(Math.floor(fs.statSync(path.join(__dirname, 'public', 'app.js')).mtimeMs));
+  } catch {
+    return String(Date.now());
+  }
+})();
+let INDEX_HTML;
+try {
+  INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8')
+    .replace('href="style.css"', `href="style.css?v=${ASSET_VERSION}"`)
+    .replace('src="app.js"', `src="app.js?v=${ASSET_VERSION}"`);
+} catch (e) {
+  INDEX_HTML = null;
+  console.error('Não foi possível pré-carregar o index.html para cache-busting:', e.message);
+}
+app.get(['/', '/index.html'], (req, res) => {
+  if (!INDEX_HTML) return res.status(500).send('Erro ao carregar a página.');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('html').send(INDEX_HTML);
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '1h',
+  index: false, // index.html é servido pela rota acima (com ?v= nos assets), não pelo static
   setHeaders(res, filePath) {
     // index.html sempre revalidado: garante que o HTML que referencia app.js/style.css
     // seja sempre o mais novo (os assets é que ficam em cache de 1h).
