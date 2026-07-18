@@ -2357,6 +2357,16 @@ body.sgo-sincronizando .topbar::before {
   color: #a5b4fc;
 }
 
+.cartao-edit-atividade-select {
+  max-width: 170px;
+  font-size: 0.78rem;
+  padding: 3px 6px;
+  background: var(--bg-app);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
 /* Badges por tipo de atividade */
 .badge.atv-pb { background-color: var(--primary); color: #fff; }
 .badge.atv-patrulhamento { background-color: var(--info); color: #fff; }

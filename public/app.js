@@ -412,6 +412,9 @@ function setupEventListeners() {
       case 'editar-vtr': abrirModalEditarVtr(d.vtrId); break;
       case 'excluir-cartao-vtr': handleDeleteCartaoVtr(d.vtrId); break;
       case 'excluir-cartao-item': handleDeleteCartaoItem(d.vtrId, d.itemId); break;
+      case 'mudar-atividade-item': iniciarEdicaoAtividade(d.vtrId, d.itemId); break;
+      case 'salvar-atividade-item': salvarAtividadeItem(d.vtrId, d.itemId); break;
+      case 'cancelar-atividade-item': cancelarEdicaoAtividade(); break;
       // Gaveta de evento / operação
       case 'excluir-alocacao': handleDeleteAlocacao(d.id); break;
       case 'excluir-escala': handleDeleteEscala(d.id); break;
@@ -3210,6 +3213,9 @@ function renderSparkline(elementId, valores) {
 // -------------------------------------------------------------
 const ATIVIDADES_CARTAO = ['PB', 'Patrulhamento', 'QTL Almoço', 'QTL Jantar', 'Corredor Seguro', 'Barreira Itinerante', 'Outros'];
 
+// Item de roteiro em edição inline de atividade (Mudar atividade): { vtrId, itemId } ou null.
+let editandoAtividadeItem = null;
+
 function atividadeBadgeClass(atividade) {
   const slug = (atividade || 'Outros').toLowerCase().replace(/ /g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return `atv-${slug}`;
@@ -3825,18 +3831,24 @@ function renderCartaoVtrGrid() {
         </div>
       </div>` : '';
 
-    const itensHtml = (vtr.itens || []).map(item => `
+    const itensHtml = (vtr.itens || []).map(item => {
+      const emEdicao = editandoAtividadeItem && editandoAtividadeItem.vtrId === vtr.id && editandoAtividadeItem.itemId === item.id;
+      const atividadeCell = emEdicao
+        ? `<select id="edit-atividade-${esc(vtr.id)}-${esc(item.id)}" class="cartao-edit-atividade-select">${ATIVIDADES_CARTAO.map(a => `<option value="${esc(a)}"${a === item.atividade ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select>`
+        : `<span class="badge ${atividadeBadgeClass(item.atividade)}">${esc(item.atividade)}</span>`;
+      const acoesCell = emEdicao
+        ? `<button class="btn-icon btn-sm" title="Salvar atividade" aria-label="Salvar atividade" data-action="salvar-atividade-item" data-vtr-id="${esc(vtr.id)}" data-item-id="${esc(item.id)}"><i data-lucide="check" style="width:12px;height:12px;"></i></button>
+           <button class="btn-icon btn-sm" title="Cancelar" aria-label="Cancelar" data-action="cancelar-atividade-item"><i data-lucide="x" style="width:12px;height:12px;"></i></button>`
+        : `<button class="btn-icon btn-sm" title="Mudar atividade" aria-label="Mudar atividade" data-action="mudar-atividade-item" data-vtr-id="${esc(vtr.id)}" data-item-id="${esc(item.id)}"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>
+           <button class="btn-icon btn-sm" title="Remover item" aria-label="Remover item" data-action="excluir-cartao-item" data-vtr-id="${esc(vtr.id)}" data-item-id="${esc(item.id)}"><i data-lucide="x" style="width:12px;height:12px;"></i></button>`;
+      return `
       <tr>
         <td class="cartao-item-hora">${formatHoraCartao(esc(item.inicio))}${item.fim ? ' às ' + formatHoraCartao(esc(item.fim)) : ''}</td>
         <td>${esc(item.local)}</td>
-        <td><span class="badge ${atividadeBadgeClass(item.atividade)}">${esc(item.atividade)}</span></td>
-        <td style="width:30px;">
-          <button class="btn-icon btn-sm" title="Remover item" aria-label="Remover item" data-action="excluir-cartao-item" data-vtr-id="${vtr.id}" data-item-id="${item.id}">
-            <i data-lucide="x" style="width:12px;height:12px;"></i>
-          </button>
-        </td>
-      </tr>
-    `).join('');
+        <td>${atividadeCell}</td>
+        <td style="width:64px;white-space:nowrap;">${acoesCell}</td>
+      </tr>`;
+    }).join('');
 
     const opcoesAtividade = ATIVIDADES_CARTAO.map(a => `<option value="${a}">${a}</option>`).join('');
 
@@ -4138,6 +4150,39 @@ window.handleDeleteCartaoItem = async function(vtrId, itemId) {
     console.error(error);
   }
 };
+
+// Edição inline rápida só da Atividade de um item de roteiro (sem abrir o form completo).
+function iniciarEdicaoAtividade(vtrId, itemId) {
+  editandoAtividadeItem = { vtrId, itemId };
+  renderCartaoVtrGrid();
+  lucide.createIcons();
+}
+
+function cancelarEdicaoAtividade() {
+  editandoAtividadeItem = null;
+  renderCartaoVtrGrid();
+  lucide.createIcons();
+}
+
+async function salvarAtividadeItem(vtrId, itemId) {
+  const sel = document.getElementById(`edit-atividade-${vtrId}-${itemId}`);
+  if (!sel) return;
+  const atividade = sel.value;
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/cartoes/${state.cartaoAtual.id}/viaturas/${vtrId}/itens/${itemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ atividade })
+    });
+    if (res.ok) {
+      showToast('Atividade atualizada.', 'success');
+      editandoAtividadeItem = null;
+      recarregarCartaoAtual();
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
 
 window.handleDeleteCartaoVtr = async function(vtrId) {
   if (!confirm('Remover esta viatura e todo o seu roteiro do cartão?')) return;
