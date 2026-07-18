@@ -1976,16 +1976,22 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
     viaturas: []
   };
 
-  // Copia a estrutura do cartão mais recente anterior à nova data
-  if (req.body.copiar_de === 'ultimo') {
-    const anteriores = db.cartoes
-      .filter(c => !c.is_template && c.data < dataCartao)
-      .sort((a, b) => b.data.localeCompare(a.data));
-
-    if (anteriores.length > 0) {
-      const base = anteriores[0];
+  // Copia a estrutura de um cartão de origem: 'ultimo' = mais recente anterior; ou um id específico
+  // (o operador escolhe qualquer cartão no modal "Copiar").
+  if (req.body.copiar_de) {
+    let base = null;
+    if (req.body.copiar_de === 'ultimo') {
+      const anteriores = db.cartoes
+        .filter(c => !c.is_template && c.data < dataCartao)
+        .sort((a, b) => b.data.localeCompare(a.data));
+      base = anteriores[0] || null;
+    } else {
+      base = (db.cartoes || []).find(c => c.id === req.body.copiar_de && !c.is_template) || null;
+    }
+    if (base) {
       novoCartao.fiscal = novoCartao.fiscal || base.fiscal;
       novoCartao.adjunto = novoCartao.adjunto || base.adjunto;
+      if (!novoCartao.tipo_periodo) novoCartao.tipo_periodo = base.tipo_periodo || null;
       novoCartao.viaturas = (base.viaturas || []).map(v => ({
         id: generateId('cpv'),
         prefixo: v.prefixo,

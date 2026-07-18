@@ -647,7 +647,10 @@ function setupEventListeners() {
   // Cartão Programa
   document.getElementById('cartao-data').addEventListener('change', renderCartaoTab);
   document.getElementById('btn-novo-cartao').addEventListener('click', () => handleCriarCartao(false));
-  document.getElementById('btn-copiar-cartao').addEventListener('click', () => handleCriarCartao(true));
+  document.getElementById('btn-copiar-cartao').addEventListener('click', abrirModalCopiarCartao);
+  document.getElementById('btn-fechar-modal-copiar').addEventListener('click', () => document.getElementById('modal-copiar-cartao').classList.add('hidden'));
+  document.getElementById('btn-cancelar-copia-cartao').addEventListener('click', () => document.getElementById('modal-copiar-cartao').classList.add('hidden'));
+  document.getElementById('btn-confirmar-copia-cartao').addEventListener('click', handleConfirmarCopiaCartao);
   document.getElementById('btn-imprimir-cartao').addEventListener('click', () => {
     if (!state.cartaoAtual) {
       showToast('Não há Cartão Programa nesta data para imprimir.', 'warning');
@@ -3986,6 +3989,71 @@ function renderCartaoVtrGrid() {
 
     grid.appendChild(card);
   });
+}
+
+// Abre o modal "Copiar": lista todos os cartões do dia existentes (exceto o da data-alvo) para
+// o operador escolher a origem da cópia. A data-alvo é a selecionada em #cartao-data.
+async function abrirModalCopiarCartao() {
+  const alvo = document.getElementById('cartao-data').value;
+  if (!alvo) {
+    showToast('Selecione a data do Cartão Programa (destino da cópia).', 'warning');
+    return;
+  }
+  const select = document.getElementById('copiar-origem-select');
+  document.getElementById('copiar-data-alvo').textContent = alvo.split('-').reverse().join('/');
+  select.innerHTML = '<option value="">Carregando...</option>';
+  document.getElementById('modal-copiar-cartao').classList.remove('hidden');
+  lucide.createIcons();
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/cartoes`);
+    const lista = await res.json();
+    if (!res.ok || !Array.isArray(lista)) {
+      select.innerHTML = '<option value="">Falha ao carregar cartões.</option>';
+      return;
+    }
+    const origens = lista.filter(c => c.data && c.data !== alvo).sort((a, b) => b.data.localeCompare(a.data));
+    if (origens.length === 0) {
+      select.innerHTML = '<option value="">Nenhum outro cartão disponível para copiar.</option>';
+      return;
+    }
+    select.innerHTML = origens.map(c => {
+      const dataBr = c.data.split('-').reverse().join('/');
+      const qtd = (c.qtd_viaturas != null ? c.qtd_viaturas : (c.viaturas ? c.viaturas.length : 0));
+      return `<option value="${esc(c.id)}">${dataBr} — ${qtd} viatura(s)</option>`;
+    }).join('');
+  } catch (error) {
+    console.error('Erro ao listar cartões para cópia:', error);
+    select.innerHTML = '<option value="">Falha ao carregar cartões.</option>';
+  }
+}
+
+async function handleConfirmarCopiaCartao() {
+  const alvo = document.getElementById('cartao-data').value;
+  const origemId = document.getElementById('copiar-origem-select').value;
+  if (!origemId) {
+    showToast('Escolha um cartão de origem para copiar.', 'warning');
+    return;
+  }
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/cartoes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: alvo, copiar_de: origemId })
+    });
+    if (res.status === 409) {
+      showToast('Já existe um Cartão Programa para esta data.', 'warning');
+      return;
+    }
+    if (res.ok) {
+      const criado = await res.json();
+      document.getElementById('modal-copiar-cartao').classList.add('hidden');
+      showToast(`Cópia criada com <strong>${(criado.viaturas || []).length}</strong> viatura(s).`, 'success');
+      renderCartaoTab();
+    }
+  } catch (error) {
+    console.error('Erro ao copiar cartão:', error);
+    showToast('Falha ao criar a cópia do Cartão Programa.', 'danger');
+  }
 }
 
 async function handleCriarCartao(copiarAnterior) {
