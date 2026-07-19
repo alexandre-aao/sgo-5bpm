@@ -864,21 +864,8 @@ async function handleAlterarSenha(e) {
 async function fetchData() {
   document.body.classList.add('sgo-sincronizando');
   try {
-    // Os 7 carregamentos são independentes entre si (nenhum usa o resultado do outro),
-    // então rodam em paralelo — reduz o tempo de carga de ~7 round-trips em série para ~1.
-    // Alocações/escalas alimentam as métricas rápidas dos cards do Turno; pessoal e viaturas
-    // alimentam os seletores/sugestões do Cartão Programa.
-    const [eventos, operacoes, alocacoes, escalas, config, pessoal, viaturas] = await Promise.all([
-      apiFetch(`${API_BASE_URL}/api/eventos`).then(r => r.json()),
-      apiFetch(`${API_BASE_URL}/api/operacoes`).then(r => r.json()),
-      apiFetch(`${API_BASE_URL}/api/alocacoes`).then(r => r.json()),
-      apiFetch(`${API_BASE_URL}/api/escalas`).then(r => r.json()),
-      apiFetch(`${API_BASE_URL}/api/config`).then(r => r.json()),
-      apiFetch(`${API_BASE_URL}/api/pessoal`).then(r => r.json()),
-      apiFetch(`${API_BASE_URL}/api/viaturas`).then(r => r.json()),
-    ]);
-    // Guarda de resiliência: uma resposta que não é array indica falha da rota (ex.: o
-    // Supabase devolve erro e a rota responde {error} com status 500, ou um 522 sob carga).
+    // Guarda de resiliência compartilhada pelas duas ondas: uma resposta que não é array
+    // indica falha da rota (ex.: o Supabase devolve erro/{error} 500, ou um 522 sob carga).
     // Não sobrescreve o estado bom com lixo — mantém o valor anterior (se já era array) ou
     // cai para [] — evitando o "state.eventos.filter is not a function" que quebrava a tela.
     let houveFalhaParcial = false;
@@ -887,12 +874,23 @@ async function fetchData() {
       houveFalhaParcial = true;
       return Array.isArray(atual) ? atual : [];
     };
+
+    // 1ª onda (núcleo): só o que Dashboard/Turno/Eventos/Planejador precisam para a primeira
+    // pintura. pessoal (244 linhas — o payload mais pesado) e viaturas ficam de fora daqui:
+    // não são usados na tela de entrada de nenhum perfil (só no Cartão, no autocomplete de
+    // escala e no fallback de setor do Mapa), então não devem competir por banda no celular
+    // durante o 1º paint — vão na 2ª onda logo abaixo, sem travar a pintura.
+    const [eventos, operacoes, alocacoes, escalas, config] = await Promise.all([
+      apiFetch(`${API_BASE_URL}/api/eventos`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/operacoes`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/alocacoes`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/escalas`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/config`).then(r => r.json()),
+    ]);
     state.eventos = usarLista(eventos, state.eventos);
     state.operacoes = usarLista(operacoes, state.operacoes);
     state.alocacoes = usarLista(alocacoes, state.alocacoes);
     state.escalas = usarLista(escalas, state.escalas);
-    state.pessoal = usarLista(pessoal, state.pessoal);
-    state.viaturas = usarLista(viaturas, state.viaturas);
     // config é objeto (não lista): só aceita se veio com o campo esperado.
     if (config && typeof config === 'object' && !Array.isArray(config) && 'cota_mensal_diarias' in config) {
       state.config = config;
@@ -900,17 +898,15 @@ async function fetchData() {
       houveFalhaParcial = true;
       if (!state.config) state.config = { cota_mensal_diarias: 0 };
     }
-    if (houveFalhaParcial) {
-      showToast('Parte dos dados não carregou (servidor lento). Recarregue se algo parecer incompleto.', 'warning');
-    }
-    popularDatalistViaturas();
 
-    // Cadastro de Bairros — alimenta o select de Bairro em Novo Evento
+    // Cadastro de Bairros (fetch próprio, independente) — alimenta o select de Bairro
     popularSelectBairros();
 
     updateStats();
 
-    // Atualiza aba atual
+    // 1ª pintura da aba ativa já com o núcleo carregado — não espera a 2ª onda. Nenhuma aba
+    // de entrada padrão (Dashboard/Turno) depende de pessoal/viaturas; onde há uso (Mapa),
+    // o fallback degrada sem quebrar.
     const activeTab = document.querySelector('.nav-btn.active').getAttribute('data-target');
     if (activeTab === 'tab-dashboard') {
       renderDashboardResumo();
@@ -925,6 +921,22 @@ async function fetchData() {
       renderOperacoesTab();
     } else if (activeTab === 'tab-planejador') {
       renderPlanejadorTab();
+    }
+
+    // 2ª onda: pessoal + viaturas (seletores do Cartão, autocomplete de escala, fallback de
+    // setor no Mapa). Carregam logo após o núcleo, sem travar a 1ª pintura, mas ainda dentro
+    // do try p/ a mesma resiliência. As abas que os consomem (Cartão/Operações/Mapa/Pessoal/
+    // Viaturas) leem state ao vivo no próprio render, então não é preciso re-renderizar aqui.
+    const [pessoal, viaturas] = await Promise.all([
+      apiFetch(`${API_BASE_URL}/api/pessoal`).then(r => r.json()),
+      apiFetch(`${API_BASE_URL}/api/viaturas`).then(r => r.json()),
+    ]);
+    state.pessoal = usarLista(pessoal, state.pessoal);
+    state.viaturas = usarLista(viaturas, state.viaturas);
+    popularDatalistViaturas();
+
+    if (houveFalhaParcial) {
+      showToast('Parte dos dados não carregou (servidor lento). Recarregue se algo parecer incompleto.', 'warning');
     }
 
     // Se a gaveta lateral de detalhes do evento estiver aberta, recarrega
