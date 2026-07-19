@@ -129,7 +129,15 @@ Repositório Git local, remoto `alexandre-aao/sgo-5bpm` no GitHub, conectado à 
 
 ## Pendências em aberto 
 
-Nenhuma pendência de arquitetura em aberto no momento. Cadastro de Viaturas/Frota já existe (ver seção "Módulos principais"), e o Cadastro de Pessoal já foi populado com o efetivo geral do batalhão (244 militares importados do relatório SGEPM em 2026-07, com campo `matricula`) — a maioria sem `categorias` (efetivo geral sem papel operacional ainda; ver nota em "Modelo de dados").
+Nenhuma pendência de arquitetura estrutural em aberto no momento. Cadastro de Viaturas/Frota já existe (ver seção "Módulos principais"), e o Cadastro de Pessoal já foi populado com o efetivo geral do batalhão (244 militares importados do relatório SGEPM em 2026-07, com campo `matricula`) — a maioria sem `categorias` (efetivo geral sem papel operacional ainda; ver nota em "Modelo de dados").
+
+**Itens de auditoria de segurança/performance adiados (2026-07):** uma auditoria aplicou correções em 4 lotes (backup sem senha/sessão + leituras pontuais; trust proxy + senha mínima de 8; sanitização de badge + `tipo_evento` fechado + indexação das agregações; SRI nos CDNs + polling pausado com aba oculta). Ficaram **deliberadamente fora de escopo** desta rodada, para fases próprias:
+- **S1 — CORS sem `Origin`:** `origemPermitida` devolve `true` quando não há header `Origin` (curl/apps nativos). Comportamento mantido de propósito; a autorização real é por token, não por CORS.
+- **S2 — token em `localStorage`:** migrar o token de sessão de `localStorage` para cookie `HttpOnly` é mudança estrutural de auth (fase própria).
+- **S4 — `'unsafe-inline'` no `style-src`:** só sai depois de migrar dezenas de `style=` inline para classes (junto da fase de design/Plano 3).
+- **P2 — aposentar `writeDB` de vez:** as rotas de escrita de tabela única já usam `writeRow`/`readTabela`, mas as agregadoras e as demais ainda usam o shim `readDB()`/`writeDB()`. Substituição total fica para a fase de performance.
+- **P5 — índices/paginação no Supabase:** sem índices dedicados nem paginação nas listagens grandes; fase de performance.
+- **S10 — confirmar RLS em produção:** verificar via `get_advisors` (Supabase MCP) que o `rls_disabled_in_public` está fechado — exige aprovação manual do tool call, apenas reportar, sem alterar nada.
 
 **Separação Eventos/Operações (concluída em 2026-07):** a diária saiu dos eventos e passou para a nova entidade `operacoes` (registro único planejamento→execução). A antiga `missoes_planejadas` foi migrada para `operacoes` e a tabela ficou **órfã no banco** (dados migrados, sem `DROP` — rede de segurança, mesmo padrão da antiga tabela de auditoria; não recriar dependência nela). O `data/db.json` legado segue preservado. Se algum dia for dar `DROP TABLE missoes_planejadas`, confirmar antes com o usuário.
 
