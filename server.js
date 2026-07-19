@@ -248,6 +248,16 @@ async function deleteRow(tabela, id) {
   if (error) throw new Error(`Falha ao apagar "${tabela}" no Supabase: ${error.message}`);
 }
 
+// Lê UMA linha por id (SELECT * ... WHERE chave = id). Para PUT/validações que só precisam
+// do registro atual — evita o readDB() inteiro (11 SELECTs) só para achar uma linha. Retorna
+// o objeto ou null se não existir.
+async function buscarRow(tabela, id) {
+  const chave = chavePrimariaDe(tabela);
+  const { data, error } = await supabase.from(tabela).select('*').eq(chave, id).maybeSingle();
+  if (error) throw new Error(`Falha ao ler "${tabela}" do Supabase: ${error.message}`);
+  return data || null;
+}
+
 // Valida e normaliza um payload contra um schema simples, sem biblioteca externa.
 // schema: { campo: { obrigatorio, tipo: 'string'|'number'|'boolean', max, valores: [...], label } }
 // Campo ausente/vazio e não obrigatório recebe `padrao` (ou fica undefined). Strings já
@@ -797,7 +807,6 @@ app.post('/api/eventos', exigirP3, asyncRoute(async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
-  const db = await readDB();
   const novoEvento = {
     id: generateId('evt'),
     num_oficio: v.valores.num_oficio,
@@ -813,17 +822,14 @@ app.post('/api/eventos', exigirP3, asyncRoute(async (req, res) => {
     bairro: v.valores.bairro
   };
 
-  db.eventos.push(novoEvento);
   await writeRow('eventos', novoEvento);
   res.status(201).json(novoEvento);
 }));
 
 // Atualizar evento
 app.put('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const index = db.eventos.findIndex(e => e.id === req.params.id);
-
-  if (index === -1) {
+  const eventoAtual = await buscarRow('eventos', req.params.id);
+  if (!eventoAtual) {
     return res.status(404).json({ error: 'Evento não encontrado' });
   }
 
@@ -842,8 +848,7 @@ app.put('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
-  const eventoAtualizado = { ...db.eventos[index], ...v.valores };
-  db.eventos[index] = eventoAtualizado;
+  const eventoAtualizado = { ...eventoAtual, ...v.valores };
   await writeRow('eventos', eventoAtualizado);
   res.json(eventoAtualizado);
 }));
@@ -905,7 +910,6 @@ app.post('/api/operacoes', exigirP3, asyncRoute(async (req, res) => {
     return res.status(400).json({ error: 'Quantidade de diárias estimada inválida.' });
   }
 
-  const db = await readDB();
   const novaOperacao = {
     id: generateId('op'),
     num_oficio: v.valores.num_oficio,
@@ -924,16 +928,14 @@ app.post('/api/operacoes', exigirP3, asyncRoute(async (req, res) => {
     tipo_recorrencia: v.valores.tipo_recorrencia || null
   };
 
-  db.operacoes.push(novaOperacao);
   await writeRow('operacoes', novaOperacao);
   res.status(201).json(novaOperacao);
 }));
 
 // Atualizar operação (inclui o "Marcar como Executada", que só muda situacao)
 app.put('/api/operacoes/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const index = db.operacoes.findIndex(o => o.id === req.params.id);
-  if (index === -1) {
+  const operacaoAtual = await buscarRow('operacoes', req.params.id);
+  if (!operacaoAtual) {
     return res.status(404).json({ error: 'Operação não encontrada' });
   }
 
@@ -954,7 +956,7 @@ app.put('/api/operacoes/:id', exigirP3, asyncRoute(async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
-  const operacaoAtualizada = { ...db.operacoes[index], ...v.valores };
+  const operacaoAtualizada = { ...operacaoAtual, ...v.valores };
   if (req.body.qtd_diarias_estimada !== undefined) {
     const qtdEstimada = parseInt(req.body.qtd_diarias_estimada, 10);
     if (isNaN(qtdEstimada) || qtdEstimada < 0) {
@@ -963,7 +965,6 @@ app.put('/api/operacoes/:id', exigirP3, asyncRoute(async (req, res) => {
     operacaoAtualizada.qtd_diarias_estimada = qtdEstimada;
   }
 
-  db.operacoes[index] = operacaoAtualizada;
   await writeRow('operacoes', operacaoAtualizada);
   res.json(operacaoAtualizada);
 }));
