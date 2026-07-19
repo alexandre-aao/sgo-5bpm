@@ -9,6 +9,14 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
+// Na Vercel (e atrás de qualquer proxy reverso) o IP real do cliente chega em X-Forwarded-For;
+// sem trust proxy, req.ip vira o IP do proxy e o rate limit de login por IP colapsa num único
+// bucket compartilhado por todos os clientes (além de o express-rate-limit v8 acusar erro de
+// validação do X-Forwarded-For). `1` = confia em um único hop de proxy (o da Vercel).
+// Obs.: o bloqueio progressivo por usuário é estado EM MEMÓRIA e zera a cada cold start da
+// função serverless — limitação conhecida e aceita nesta fase; estado externo (ex: Redis)
+// fica para uma fase futura e NÃO deve ser introduzido agora.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -415,13 +423,16 @@ function verificarSenha(senha, armazenada) {
     const { data: usuarios, error: erroUsuarios } = await supabase.from('usuarios').select('usuario');
     if (erroUsuarios) throw erroUsuarios;
     if (!usuarios || usuarios.length === 0) {
+      // Só num banco vazio (primeiro boot). Senha aleatória forte gerada aqui e exibida UMA
+      // única vez neste log — não fica hardcoded no código. Anote-a e troque no primeiro login.
+      const senhaInicial = crypto.randomBytes(12).toString('base64url'); // ~16 chars, URL-safe
       await supabase.from('usuarios').insert({
         usuario: 'p3',
-        senha: hashSenha('123'),
+        senha: hashSenha(senhaInicial),
         role: 'P3',
         nome: 'Planejamento (P3 / 5º BPM)'
       });
-      console.log('Usuário administrador padrão criado: login "p3", senha "123" — troque assim que possível.');
+      console.log(`Usuário administrador padrão criado: login "p3", senha inicial "${senhaInicial}" — anote agora (não será exibida de novo) e troque no primeiro acesso.`);
     }
 
     const { data: bairros, error: erroBairros } = await supabase.from('bairros_coordenadas').select('id');
@@ -536,8 +547,8 @@ app.post('/api/alterar-senha', asyncRoute(async (req, res) => {
   if (!senha_atual || !senha_nova) {
     return res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });
   }
-  if (String(senha_nova).length < 3) {
-    return res.status(400).json({ error: 'A nova senha deve ter pelo menos 3 caracteres.' });
+  if (String(senha_nova).length < 8) {
+    return res.status(400).json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' });
   }
 
   const user = await buscarUsuarioPorLogin(req.user.usuario);
@@ -576,8 +587,8 @@ app.post('/api/usuarios', exigirP3, asyncRoute(async (req, res) => {
   // Senha não passa por validarCampos: não deve ser trimada (espaços podem ser intencionais)
   // e a regra é comprimento mínimo, não máximo.
   const senha = req.body.senha;
-  if (!senha || String(senha).length < 3) {
-    return res.status(400).json({ error: 'A senha deve ter pelo menos 3 caracteres.' });
+  if (!senha || String(senha).length < 8) {
+    return res.status(400).json({ error: 'A senha deve ter pelo menos 8 caracteres.' });
   }
 
   const usuarios = await readTabela('usuarios');
@@ -624,8 +635,8 @@ app.post('/api/usuarios/:usuario/resetar-senha', exigirP3, asyncRoute(async (req
   if (!alvo) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   const novaSenha = req.body.senha_nova;
-  if (!novaSenha || String(novaSenha).length < 3) {
-    return res.status(400).json({ error: 'A nova senha deve ter pelo menos 3 caracteres.' });
+  if (!novaSenha || String(novaSenha).length < 8) {
+    return res.status(400).json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' });
   }
 
   alvo.senha = hashSenha(novaSenha);
