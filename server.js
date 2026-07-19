@@ -561,8 +561,8 @@ function usuarioPublico(u) {
 
 // Listar usuários (sem senha)
 app.get('/api/usuarios', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  res.json((db.usuarios || []).map(usuarioPublico));
+  const usuarios = await readTabela('usuarios');
+  res.json(usuarios.map(usuarioPublico));
 }));
 
 // Criar novo usuário
@@ -580,21 +580,20 @@ app.post('/api/usuarios', exigirP3, asyncRoute(async (req, res) => {
     return res.status(400).json({ error: 'A senha deve ter pelo menos 3 caracteres.' });
   }
 
-  const db = await readDB();
-  if (db.usuarios.some(u => u.usuario.toLowerCase() === v.valores.usuario.toLowerCase())) {
+  const usuarios = await readTabela('usuarios');
+  if (usuarios.some(u => u.usuario.toLowerCase() === v.valores.usuario.toLowerCase())) {
     return res.status(409).json({ error: 'Já existe um usuário com esse login.' });
   }
 
   const novoUsuario = { usuario: v.valores.usuario, senha: hashSenha(senha), nome: v.valores.nome, role: v.valores.role };
-  db.usuarios.push(novoUsuario);
-  await writeDB(db, ['usuarios']);
+  await writeRow('usuarios', novoUsuario);
   res.status(201).json(usuarioPublico(novoUsuario));
 }));
 
 // Atualizar nome e/ou perfil de um usuário
 app.put('/api/usuarios/:usuario', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const alvo = db.usuarios.find(u => u.usuario === req.params.usuario);
+  const usuarios = await readTabela('usuarios');
+  const alvo = usuarios.find(u => u.usuario === req.params.usuario);
 
   if (!alvo) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
@@ -604,7 +603,7 @@ app.put('/api/usuarios/:usuario', exigirP3, asyncRoute(async (req, res) => {
     }
     // Impede remover o último administrador P3 do sistema
     const seriaUltimoP3 = alvo.role === 'P3' && req.body.role !== 'P3'
-      && db.usuarios.filter(u => u.role === 'P3').length <= 1;
+      && usuarios.filter(u => u.role === 'P3').length <= 1;
     if (seriaUltimoP3) {
       return res.status(400).json({ error: 'Não é possível rebaixar o último usuário com perfil P3.' });
     }
@@ -613,14 +612,14 @@ app.put('/api/usuarios/:usuario', exigirP3, asyncRoute(async (req, res) => {
 
   if (req.body.nome !== undefined) alvo.nome = String(req.body.nome).trim();
 
-  await writeDB(db, ['usuarios']);
+  await writeRow('usuarios', alvo);
   res.json(usuarioPublico(alvo));
 }));
 
 // Resetar a senha de um usuário (ação administrativa do P3, sem exigir a senha atual)
 app.post('/api/usuarios/:usuario/resetar-senha', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const alvo = db.usuarios.find(u => u.usuario === req.params.usuario);
+  const usuarios = await readTabela('usuarios');
+  const alvo = usuarios.find(u => u.usuario === req.params.usuario);
 
   if (!alvo) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
@@ -630,30 +629,33 @@ app.post('/api/usuarios/:usuario/resetar-senha', exigirP3, asyncRoute(async (req
   }
 
   alvo.senha = hashSenha(novaSenha);
+  await writeRow('usuarios', alvo);
 
-  // Encerra todas as sessões ativas desse usuário por segurança
-  db.sessoes = (db.sessoes || []).filter(s => s.usuario !== alvo.usuario);
+  // Encerra todas as sessões ativas desse usuário por segurança (delete pontual por usuario,
+  // igual ao delete de alocações órfãs por evento_id — não precisa ler a tabela sessoes inteira).
+  const { error: erroSessoes } = await supabase.from('sessoes').delete().eq('usuario', alvo.usuario);
+  if (erroSessoes) throw new Error(`Falha ao encerrar sessões no Supabase: ${erroSessoes.message}`);
 
-  await writeDB(db, ['usuarios','sessoes']);
   res.json({ message: `Senha de ${alvo.usuario} redefinida com sucesso.` });
 }));
 
 // Excluir usuário
 app.delete('/api/usuarios/:usuario', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const alvo = db.usuarios.find(u => u.usuario === req.params.usuario);
+  const usuarios = await readTabela('usuarios');
+  const alvo = usuarios.find(u => u.usuario === req.params.usuario);
 
   if (!alvo) return res.status(404).json({ error: 'Usuário não encontrado.' });
   if (alvo.usuario === req.user.usuario) {
     return res.status(400).json({ error: 'Você não pode excluir o seu próprio usuário.' });
   }
-  if (alvo.role === 'P3' && db.usuarios.filter(u => u.role === 'P3').length <= 1) {
+  if (alvo.role === 'P3' && usuarios.filter(u => u.role === 'P3').length <= 1) {
     return res.status(400).json({ error: 'Não é possível excluir o último usuário com perfil P3.' });
   }
 
-  db.usuarios = db.usuarios.filter(u => u.usuario !== alvo.usuario);
-  db.sessoes = (db.sessoes || []).filter(s => s.usuario !== alvo.usuario);
-  await writeDB(db, ['usuarios','sessoes']);
+  await deleteRow('usuarios', alvo.usuario);
+  // Encerra as sessões do usuário excluído (delete pontual por usuario, sem ler sessoes inteira).
+  const { error: erroSessoes } = await supabase.from('sessoes').delete().eq('usuario', alvo.usuario);
+  if (erroSessoes) throw new Error(`Falha ao encerrar sessões no Supabase: ${erroSessoes.message}`);
   res.json({ message: 'Usuário excluído.' });
 }));
 
@@ -679,7 +681,6 @@ app.post('/api/pessoal', exigirP3, asyncRoute(async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
-  const db = await readDB();
   const { nome, posto_graduacao } = v.valores;
   const { categorias, matricula, subunidade } = req.body;
   const postoInfo = POSTOS_GRADUACAO.find(p => p.posto === posto_graduacao);
@@ -700,15 +701,14 @@ app.post('/api/pessoal', exigirP3, asyncRoute(async (req, res) => {
     matricula: matricula ? String(matricula).trim().slice(0, 30) : '',
     subunidade: SUBUNIDADES_PESSOAL.includes(subunidade) ? subunidade : ''
   };
-  db.pessoal.push(novaPessoa);
-  await writeDB(db, ['pessoal']);
+  await writeRow('pessoal', novaPessoa);
   res.status(201).json(novaPessoa);
 }));
 
 // Atualizar cadastro de pessoal (P3)
 app.put('/api/pessoal/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const pessoa = db.pessoal.find(p => p.id === req.params.id);
+  const { data: pessoa, error: erroBusca } = await supabase.from('pessoal').select('*').eq('id', req.params.id).maybeSingle();
+  if (erroBusca) throw new Error(`Falha ao ler "pessoal" do Supabase: ${erroBusca.message}`);
   if (!pessoa) return res.status(404).json({ error: 'Cadastro não encontrado.' });
 
   if (req.body.nome !== undefined) pessoa.nome = String(req.body.nome).trim();
@@ -726,16 +726,16 @@ app.put('/api/pessoal/:id', exigirP3, asyncRoute(async (req, res) => {
   if (req.body.subunidade !== undefined) pessoa.subunidade = SUBUNIDADES_PESSOAL.includes(req.body.subunidade) ? req.body.subunidade : '';
   if (req.body.ativo !== undefined) pessoa.ativo = !!req.body.ativo;
 
-  await writeDB(db, ['pessoal']);
+  await writeRow('pessoal', pessoa);
   res.json(pessoa);
 }));
 
 // Excluir cadastro de pessoal (P3)
 app.delete('/api/pessoal/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const pessoa = db.pessoal.find(p => p.id === req.params.id);
-  db.pessoal = (db.pessoal || []).filter(p => p.id !== req.params.id);
-  await writeDB(db, ['pessoal']);
+  const { data: pessoa, error: erroBusca } = await supabase.from('pessoal').select('id').eq('id', req.params.id).maybeSingle();
+  if (erroBusca) throw new Error(`Falha ao ler "pessoal" do Supabase: ${erroBusca.message}`);
+  if (!pessoa) return res.status(404).json({ error: 'Cadastro não encontrado.' });
+  await deleteRow('pessoal', req.params.id);
   res.json({ message: 'Cadastro excluído.' });
 }));
 
@@ -978,7 +978,6 @@ app.post('/api/alocacoes', exigirP3, asyncRoute(async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
-  const db = await readDB();
   const novaAlocacao = {
     id: generateId('aloc'),
     evento_id: eventoId || null,
@@ -990,16 +989,13 @@ app.post('/api/alocacoes', exigirP3, asyncRoute(async (req, res) => {
     comando_servico: v.valores.comando_servico
   };
 
-  db.alocacoes.push(novaAlocacao);
-  await writeDB(db, ['alocacoes']);
+  await writeRow('alocacoes', novaAlocacao);
   res.status(201).json(novaAlocacao);
 }));
 
 // Remover alocação
 app.delete('/api/alocacoes/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  db.alocacoes = db.alocacoes.filter(a => a.id !== req.params.id);
-  await writeDB(db, ['alocacoes']);
+  await deleteRow('alocacoes', req.params.id);
   res.json({ message: 'Alocação excluída' });
 }));
 
@@ -1087,27 +1083,27 @@ app.post('/api/bairros-coordenadas', exigirP3, asyncRoute(async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
-  const db = await readDB();
   const { latitude, longitude } = req.body;
   const lat = parseFloat(latitude);
   const lon = parseFloat(longitude);
   if (isNaN(lat) || isNaN(lon)) {
     return res.status(400).json({ error: 'Latitude e longitude devem ser números válidos.' });
   }
-  if (db.bairros_coordenadas.some(b => normalizarTextoServer(b.nome_bairro) === normalizarTextoServer(v.valores.nome_bairro))) {
+  // Checagem de nome duplicado só na tabela bairros_coordenadas (não no banco inteiro).
+  const bairros = await readTabela('bairros_coordenadas');
+  if (bairros.some(b => normalizarTextoServer(b.nome_bairro) === normalizarTextoServer(v.valores.nome_bairro))) {
     return res.status(409).json({ error: 'Já existe um bairro cadastrado com esse nome.' });
   }
 
   const novoBairro = { id: generateId('bco'), nome_bairro: v.valores.nome_bairro, latitude: lat, longitude: lon };
-  db.bairros_coordenadas.push(novoBairro);
-  await writeDB(db, ['bairros_coordenadas']);
+  await writeRow('bairros_coordenadas', novoBairro);
   res.status(201).json(novoBairro);
 }));
 
 // Atualizar bairro (P3)
 app.put('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const bairro = db.bairros_coordenadas.find(b => b.id === req.params.id);
+  const { data: bairro, error: erroBusca } = await supabase.from('bairros_coordenadas').select('*').eq('id', req.params.id).maybeSingle();
+  if (erroBusca) throw new Error(`Falha ao ler "bairros_coordenadas" do Supabase: ${erroBusca.message}`);
   if (!bairro) return res.status(404).json({ error: 'Bairro não encontrado.' });
 
   if (req.body.nome_bairro !== undefined) bairro.nome_bairro = String(req.body.nome_bairro).trim();
@@ -1122,16 +1118,16 @@ app.put('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res) =>
     bairro.longitude = lon;
   }
 
-  await writeDB(db, ['bairros_coordenadas']);
+  await writeRow('bairros_coordenadas', bairro);
   res.json(bairro);
 }));
 
 // Excluir bairro (P3)
 app.delete('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const bairro = db.bairros_coordenadas.find(b => b.id === req.params.id);
-  db.bairros_coordenadas = (db.bairros_coordenadas || []).filter(b => b.id !== req.params.id);
-  await writeDB(db, ['bairros_coordenadas']);
+  const { data: bairro, error: erroBusca } = await supabase.from('bairros_coordenadas').select('id').eq('id', req.params.id).maybeSingle();
+  if (erroBusca) throw new Error(`Falha ao ler "bairros_coordenadas" do Supabase: ${erroBusca.message}`);
+  if (!bairro) return res.status(404).json({ error: 'Bairro não encontrado.' });
+  await deleteRow('bairros_coordenadas', req.params.id);
   res.json({ message: 'Bairro excluído.' });
 }));
 
@@ -1156,8 +1152,9 @@ app.post('/api/viaturas', asyncRoute(async (req, res) => {
   });
   if (!valid.ok) return res.status(400).json({ error: valid.erro });
 
-  const db = await readDB();
-  if (db.viaturas.some(x => normalizarTextoServer(x.prefixo) === normalizarTextoServer(valid.valores.prefixo))) {
+  // Checagem de prefixo duplicado só na tabela viaturas (não no banco inteiro).
+  const viaturas = await readTabela('viaturas');
+  if (viaturas.some(x => normalizarTextoServer(x.prefixo) === normalizarTextoServer(valid.valores.prefixo))) {
     return res.status(409).json({ error: 'Já existe uma viatura cadastrada com esse prefixo.' });
   }
 
@@ -1170,20 +1167,20 @@ app.post('/api/viaturas', asyncRoute(async (req, res) => {
     observacao: valid.valores.observacao,
     setor: valid.valores.setor
   };
-  db.viaturas.push(novaViatura);
-  await writeDB(db, ['viaturas']);
+  await writeRow('viaturas', novaViatura);
   res.status(201).json(novaViatura);
 }));
 
 // Atualizar viatura (qualquer perfil autenticado — P3, Adjunto ou Oficial). Só a exclusão é P3-only.
 app.put('/api/viaturas/:id', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const viatura = db.viaturas.find(v => v.id === req.params.id);
+  // Lê só a tabela viaturas: serve tanto para achar a linha quanto para a checagem de prefixo duplicado.
+  const viaturas = await readTabela('viaturas');
+  const viatura = viaturas.find(v => v.id === req.params.id);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada.' });
 
   if (req.body.prefixo !== undefined) {
     if (!req.body.prefixo) return res.status(400).json({ error: 'O prefixo da viatura é obrigatório.' });
-    if (db.viaturas.some(v => v.id !== viatura.id && normalizarTextoServer(v.prefixo) === normalizarTextoServer(req.body.prefixo))) {
+    if (viaturas.some(v => v.id !== viatura.id && normalizarTextoServer(v.prefixo) === normalizarTextoServer(req.body.prefixo))) {
       return res.status(409).json({ error: 'Já existe uma viatura cadastrada com esse prefixo.' });
     }
     viatura.prefixo = String(req.body.prefixo).trim();
@@ -1209,16 +1206,16 @@ app.put('/api/viaturas/:id', asyncRoute(async (req, res) => {
   if (req.body.observacao !== undefined) viatura.observacao = req.body.observacao;
   if (req.body.setor !== undefined) viatura.setor = String(req.body.setor).trim();
 
-  await writeDB(db, ['viaturas']);
+  await writeRow('viaturas', viatura);
   res.json(viatura);
 }));
 
 // Excluir viatura (P3)
 app.delete('/api/viaturas/:id', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const viatura = db.viaturas.find(v => v.id === req.params.id);
-  db.viaturas = (db.viaturas || []).filter(v => v.id !== req.params.id);
-  await writeDB(db, ['viaturas']);
+  const { data: viatura, error: erroBusca } = await supabase.from('viaturas').select('id').eq('id', req.params.id).maybeSingle();
+  if (erroBusca) throw new Error(`Falha ao ler "viaturas" do Supabase: ${erroBusca.message}`);
+  if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada.' });
+  await deleteRow('viaturas', req.params.id);
   res.json({ message: 'Viatura excluída.' });
 }));
 
@@ -2176,10 +2173,15 @@ app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, r
 // -------------------------------------------------------------
 // ROTA DE BACKUP (P3) — exporta todas as tabelas de TABELAS + config num único JSON.
 // Não inclui "auditoria": é log operacional, não dado de negócio a restaurar.
+// SEGURANÇA: usuarios sai sem o campo `senha` (hash scrypt) — via usuarioPublico() — e a
+// tabela `sessoes` é omitida por inteiro (tokens de sessão ativos, válidos por 12h; não são
+// dado de negócio restaurável e não devem trafegar num export baixável).
 // -------------------------------------------------------------
 app.get('/api/backup', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
-  res.json(db);
+  const { sessoes, ...backup } = db;
+  backup.usuarios = (db.usuarios || []).map(usuarioPublico);
+  res.json(backup);
 }));
 
 
