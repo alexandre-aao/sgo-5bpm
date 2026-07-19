@@ -168,6 +168,23 @@ create unique index if not exists cartoes_data_unica
 
 
 -- =================================================================
+-- ÍNDICES DE PERFORMANCE (fase de performance, 2026-07). Idempotentes.
+-- Cobrem os filtros por igualdade/ordenação mais usados pelas rotas
+-- (readTabela .eq() e as agregadoras). Não alteram comportamento — o
+-- Postgres passa a usá-los sozinho. alocacoes é filtrada por evento_id
+-- OU operacao_id separadamente (nunca as duas juntas) -> dois índices
+-- simples, não um composto.
+-- =================================================================
+create index if not exists idx_operacoes_data_inicio on operacoes(data_inicio);
+create index if not exists idx_escalas_operacao_id    on escalas(operacao_id);
+create index if not exists idx_cartoes_data           on cartoes(data);
+create index if not exists idx_eventos_data_inicio    on eventos(data_inicio);
+create index if not exists idx_pessoal_nome_guerra    on pessoal(nome_guerra);
+create index if not exists idx_alocacoes_evento_id    on alocacoes(evento_id);
+create index if not exists idx_alocacoes_operacao_id  on alocacoes(operacao_id);
+
+
+-- =================================================================
 -- RLS: habilita Row Level Security em TODAS as tabelas públicas, sem
 -- policies. Migration "ativar_rls_tabelas_publicas" (2026-07). Idempotente.
 -- O backend usa service_role (BYPASSRLS), então isto não afeta o app;
