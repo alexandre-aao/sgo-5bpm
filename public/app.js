@@ -104,12 +104,21 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   checkAuth();
   
-  // Atualiza dados automaticamente a cada 60 segundos para sincronização online
+  // Atualiza dados automaticamente a cada 60 segundos para sincronização online.
+  // Não busca com a aba em segundo plano (document.hidden): evita bater na API à toa
+  // enquanto ninguém está olhando. Ao voltar o foco, dispara um refresh imediato para
+  // recuperar o que mudou durante o período oculto.
   setInterval(() => {
-    if (state.user) {
+    if (state.user && !document.hidden) {
       fetchData();
     }
   }, 60000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && state.user) {
+      fetchData();
+    }
+  });
 });
 
 // -------------------------------------------------------------
