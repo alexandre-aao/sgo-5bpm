@@ -1370,7 +1370,7 @@ function createTurnoCard(evt) {
   card.className = 'turno-card';
   card.addEventListener('click', () => openDrawer(evt.id));
 
-  const typeClass = evt.tipo_evento.toLowerCase().replace(' ', '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const typeClass = slugBadge(evt.tipo_evento);
 
   // Calcular métricas
   const alocacoesEvt = state.alocacoes.filter(a => a.evento_id === evt.id);
@@ -1444,7 +1444,7 @@ function renderEventosTab() {
     tr.style.cursor = 'pointer';
     tr.addEventListener('click', () => openDrawer(evt.id));
 
-    const typeClass = evt.tipo_evento.toLowerCase().replace(' ', '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const typeClass = slugBadge(evt.tipo_evento);
     const dateBr = evt.data_inicio.split('-').reverse().join('/');
 
     tr.innerHTML = `
@@ -1921,7 +1921,7 @@ async function fetchEventDetails(id) {
     document.getElementById('drawer-event-title').textContent = evt.nome_evento;
     document.getElementById('drawer-event-badge').textContent = evt.tipo_evento;
     
-    const badgeClass = evt.tipo_evento.toLowerCase().replace(' ', '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const badgeClass = slugBadge(evt.tipo_evento);
     document.getElementById('drawer-event-badge').className = `badge ${badgeClass}`;
 
     document.getElementById('detail-oficio').textContent = evt.num_oficio || 'Sem ofício informado';
@@ -3257,14 +3257,26 @@ let relDiarioTextoAtual = ''; // texto atual para o botão Copiar
 // Item de roteiro em edição inline de atividade (Mudar atividade): { vtrId, itemId } ou null.
 let editandoAtividadeItem = null;
 
+// Sanitiza um valor livre para uso seguro como classe CSS de badge: min\u00fasculo, sem acento,
+// espa\u00e7os viram h\u00edfen e QUALQUER caractere fora de [a-z0-9-] \u00e9 REMOVIDO. Sem essa whitelist,
+// um valor com aspas/sinais (ex: tipo_evento vindo de dado legado) injetaria atributo no
+// class="..." (XSS) \u2014 o esc() s\u00f3 protege o conte\u00fado de texto do badge, n\u00e3o o slug da classe.
+// Para valores v\u00e1lidos (listas fechadas de espa\u00e7o \u00fanico) o resultado \u00e9 id\u00eantico ao slug antigo,
+// ent\u00e3o as classes CSS j\u00e1 existentes em style.css continuam casando.
+function slugBadge(valor) {
+  return String(valor || '')
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, "");
+}
+
 function atividadeBadgeClass(atividade) {
-  const slug = (atividade || 'Outros').toLowerCase().replace(/ /g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return `atv-${slug}`;
+  return `atv-${slugBadge(atividade || 'Outros')}`;
 }
 
 function categoriaBadgeClass(categoria) {
-  const slug = (categoria || 'Ordin\u00e1ria').toLowerCase().replace(/ /g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return `cat-${slug}`;
+  return `cat-${slugBadge(categoria || 'Ordin\u00e1ria')}`;
 }
 
 // Mapa fixo (em vez de transformar a string) porque as 5 categorias têm preposições/acentos
@@ -3281,8 +3293,7 @@ function categoriaPessoalBadgeClass(categoria) {
 }
 
 function statusViaturaBadgeClass(status) {
-  const slug = (status || 'Ativa').toLowerCase().replace(/ /g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return `status-${slug}`;
+  return `status-${slugBadge(status || 'Ativa')}`;
 }
 
 function formatHoraCartao(hora) {

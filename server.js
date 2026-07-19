@@ -286,6 +286,22 @@ function validarCampos(body, schema) {
   return { ok: true, valores };
 }
 
+// Indexa uma lista num Map<valorDaChave, item[]>. Usado nas rotas de agregação para evitar
+// varrer db.alocacoes/db.escalas inteiras dentro de um forEach de eventos/operações (O(n×m)):
+// o índice é construído UMA vez e cada grupo é lido em O(1). Não altera nenhum total — só
+// reorganiza a mesma soma. Chaves null/undefined (ex: alocação sem evento_id) caem num grupo
+// próprio que nunca é consultado por um id real, então são inofensivas.
+function indexarPor(lista, chave) {
+  const mapa = new Map();
+  for (const item of lista) {
+    const k = item[chave];
+    const grupo = mapa.get(k);
+    if (grupo) grupo.push(item);
+    else mapa.set(k, [item]);
+  }
+  return mapa;
+}
+
 // Consultas pontuais para o caminho mais quente (autenticação em toda requisição),
 // evitando pagar o custo de um readDB() completo a cada chamada autenticada.
 async function buscarSessaoPorToken(token) {
@@ -753,6 +769,11 @@ app.delete('/api/pessoal/:id', exigirP3, asyncRoute(async (req, res) => {
 // -------------------------------------------------------------
 // ROTAS DE EVENTOS
 // -------------------------------------------------------------
+// Lista fechada de tipos de evento — espelha os <option> dos selects #tipo_evento /
+// #edit-tipo_evento do index.html. Aplicada só na ESCRITA (POST/PUT): impede tipo arbitrário
+// (defesa em profundidade contra XSS via classe de badge no frontend) sem travar a leitura de
+// eventuais dados legados com tipo fora da lista.
+const TIPOS_EVENTO = ['Show', 'Futebol', 'Ato Público', 'Religioso', 'Cultural', 'Evento Junino', 'Missão Avulsa', 'Outros'];
 
 // Listar todos os eventos
 app.get('/api/eventos', asyncRoute(async (req, res) => {
@@ -763,7 +784,7 @@ app.get('/api/eventos', asyncRoute(async (req, res) => {
 app.post('/api/eventos', exigirP3, asyncRoute(async (req, res) => {
   const v = validarCampos(req.body, {
     nome_evento: { obrigatorio: true, tipo: 'string', max: 200, label: 'Nome do Evento' },
-    tipo_evento: { obrigatorio: true, tipo: 'string', max: 50, label: 'Tipo de Evento' },
+    tipo_evento: { obrigatorio: true, tipo: 'string', max: 50, valores: TIPOS_EVENTO, label: 'Tipo de Evento' },
     local_itinerario: { obrigatorio: true, tipo: 'string', max: 300, label: 'Local/Itinerário' },
     data_inicio: { obrigatorio: true, tipo: 'string', max: 10, label: 'Data de Início' },
     data_termino: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Término' },
@@ -808,7 +829,7 @@ app.put('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
 
   const v = validarCampos(req.body, {
     nome_evento: { obrigatorio: false, tipo: 'string', max: 200, label: 'Nome do Evento' },
-    tipo_evento: { obrigatorio: false, tipo: 'string', max: 50, label: 'Tipo de Evento' },
+    tipo_evento: { obrigatorio: false, tipo: 'string', max: 50, valores: TIPOS_EVENTO, label: 'Tipo de Evento' },
     local_itinerario: { obrigatorio: false, tipo: 'string', max: 300, label: 'Local/Itinerário' },
     data_inicio: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Início' },
     data_termino: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Término' },
@@ -1337,6 +1358,9 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   const planejadoPeriodo = operacoesPlanejadas.reduce((sum, o) => sum + (o.qtd_diarias_estimada || 0), 0);
   const cota = (db.config && db.config.cota_mensal_diarias) || 0;
 
+  // Índice alocações por evento — construído uma vez para não varrer db.alocacoes dentro do forEach abaixo.
+  const alocacoesPorEvento = indexarPor(db.alocacoes, 'evento_id');
+
   // Efetivo total empregado no período
   const alocacoesDoPeriodo = db.alocacoes.filter(a => idsEventosDoPeriodo.has(a.evento_id));
   const efetivoTotalPeriodo = alocacoesDoPeriodo.reduce((sum, a) => sum + a.qtd_policiais, 0);
@@ -1350,7 +1374,7 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
       mapaTipo[chave] = { tipo_evento: chave, total_eventos: 0, total_policiais: 0, total_viaturas: 0 };
     }
     mapaTipo[chave].total_eventos += 1;
-    db.alocacoes.filter(a => a.evento_id === evt.id).forEach(a => {
+    (alocacoesPorEvento.get(evt.id) || []).forEach(a => {
       mapaTipo[chave].total_policiais += a.qtd_policiais;
       mapaTipo[chave].total_viaturas += a.qtd_viaturas;
     });
@@ -1586,6 +1610,11 @@ app.get('/api/estatisticas', asyncRoute(async (req, res) => {
   const idsOperacoesDoAno = new Set(operacoesDoAno.map(o => o.id));
   const escalasDoAno = db.escalas.filter(s => idsOperacoesDoAno.has(s.operacao_id));
 
+  // Índices construídos uma vez para as agregações abaixo (evita varrer db.alocacoes/db.escalas
+  // dentro dos forEach/loop de meses — antes era O(eventos×alocacoes) e O(12×alocacoes/escalas)).
+  const alocacoesPorEvento = indexarPor(db.alocacoes, 'evento_id');
+  const escalasPorOperacao = indexarPor(db.escalas, 'operacao_id');
+
   const totalPoliciais = alocacoesDoAno.reduce((sum, a) => sum + a.qtd_policiais, 0);
   const totalViaturas = alocacoesDoAno.reduce((sum, a) => sum + a.qtd_viaturas, 0);
   const totalDiarias = escalasDoAno.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
@@ -1598,7 +1627,7 @@ app.get('/api/estatisticas', asyncRoute(async (req, res) => {
       mapaBairro[chave] = { bairro: chave, total_eventos: 0, total_policiais: 0, total_viaturas: 0 };
     }
     mapaBairro[chave].total_eventos += 1;
-    db.alocacoes.filter(a => a.evento_id === evt.id).forEach(a => {
+    (alocacoesPorEvento.get(evt.id) || []).forEach(a => {
       mapaBairro[chave].total_policiais += a.qtd_policiais;
       mapaBairro[chave].total_viaturas += a.qtd_viaturas;
     });
@@ -1613,7 +1642,7 @@ app.get('/api/estatisticas', asyncRoute(async (req, res) => {
       mapaTipo[chave] = { tipo_evento: chave, total_eventos: 0, total_policiais: 0, total_viaturas: 0 };
     }
     mapaTipo[chave].total_eventos += 1;
-    db.alocacoes.filter(a => a.evento_id === evt.id).forEach(a => {
+    (alocacoesPorEvento.get(evt.id) || []).forEach(a => {
       mapaTipo[chave].total_policiais += a.qtd_policiais;
       mapaTipo[chave].total_viaturas += a.qtd_viaturas;
     });
@@ -1645,17 +1674,20 @@ app.get('/api/estatisticas', asyncRoute(async (req, res) => {
   for (let mes = 1; mes <= 12; mes++) {
     const mesStr = String(mes).padStart(2, '0');
     const eventosDoMes = eventosDoAno.filter(e => e.data_inicio.split('-')[1] === mesStr);
-    const idsEventosDoMes = new Set(eventosDoMes.map(e => e.id));
-    const efetivoMes = db.alocacoes
-      .filter(a => idsEventosDoMes.has(a.evento_id))
-      .reduce((sum, a) => sum + a.qtd_policiais, 0);
-    const viaturasMes = db.alocacoes
-      .filter(a => idsEventosDoMes.has(a.evento_id))
-      .reduce((sum, a) => sum + a.qtd_viaturas, 0);
-    const idsOperacoesDoMes = new Set(operacoesDoAno.filter(o => o.data_inicio.split('-')[1] === mesStr).map(o => o.id));
-    const diariasMes = db.escalas
-      .filter(s => idsOperacoesDoMes.has(s.operacao_id))
-      .reduce((sum, s) => sum + (s.total_diarias || 0), 0);
+    // Soma efetivo/viaturas do mês pelos índices (mesma soma que filtrar db.alocacoes por evento do mês).
+    let efetivoMes = 0;
+    let viaturasMes = 0;
+    eventosDoMes.forEach(e => {
+      (alocacoesPorEvento.get(e.id) || []).forEach(a => {
+        efetivoMes += a.qtd_policiais;
+        viaturasMes += a.qtd_viaturas;
+      });
+    });
+    const operacoesDoMes = operacoesDoAno.filter(o => o.data_inicio.split('-')[1] === mesStr);
+    let diariasMes = 0;
+    operacoesDoMes.forEach(o => {
+      (escalasPorOperacao.get(o.id) || []).forEach(s => { diariasMes += (s.total_diarias || 0); });
+    });
     const realizadosMes = eventosDoMes.filter(e => (e.data_termino || e.data_inicio) < hojeStr).length;
     const planejadosMes = eventosDoMes.length - realizadosMes;
 
