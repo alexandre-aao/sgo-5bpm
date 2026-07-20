@@ -15,20 +15,29 @@ let state = {
 };
 
 // -------------------------------------------------------------
-// TEMA DE COR (Padrão / Escuro / Claro) — aplicado o mais cedo possível no boot,
+// TEMA DE COR (Claro / Escuro) — aplicado o mais cedo possível no boot,
 // antes de qualquer outra coisa, pra minimizar flash do tema errado.
+// O redesign é light-first: 'claro' é o padrão (sem classe no body).
+// 'padrao' é valor legado no localStorage (era o dark antigo) e cai em 'claro'.
 // -------------------------------------------------------------
 const TEMA_PREFS_KEY = 'sgo_tema';
 
 function carregarPrefsTema() {
   const salvo = localStorage.getItem(TEMA_PREFS_KEY);
-  return ['padrao', 'escuro', 'claro'].includes(salvo) ? salvo : 'padrao';
+  return salvo === 'escuro' ? 'escuro' : 'claro';
 }
 
 function aplicarTema(tema) {
-  document.body.classList.remove('tema-escuro', 'tema-claro');
-  if (tema === 'escuro') document.body.classList.add('tema-escuro');
-  else if (tema === 'claro') document.body.classList.add('tema-claro');
+  document.body.classList.toggle('tema-escuro', tema === 'escuro');
+}
+
+// Marca qual das duas opções do toggle segmentado está ativa (visual + aria).
+function sincronizarToggleTema(tema) {
+  document.querySelectorAll('.tema-opcao').forEach(btn => {
+    const ativo = btn.dataset.tema === tema;
+    btn.classList.toggle('ativo', ativo);
+    btn.setAttribute('aria-checked', String(ativo));
+  });
 }
 
 aplicarTema(carregarPrefsTema());
@@ -145,11 +154,61 @@ function checkAuth() {
   }
 }
 
+// Barra de abas inferior do celular (shell mobile do redesign). Os destinos
+// dependem do perfil: P3 entra pelo Dashboard e tem Operações; Adjunto/Oficial
+// entram por Meu Turno e não enxergam Operações nem Dashboard. O item "Mais"
+// abre o drawer de navegação, que continua sendo o acesso ao resto das abas.
+const BOTTOM_TABS_P3 = [
+  { nav: 'nav-btn-dashboard', icone: 'layout-dashboard', rotulo: 'Início' },
+  { nav: 'nav-btn-eventos', icone: 'calendar', rotulo: 'Eventos' },
+  { nav: 'nav-btn-operacoes', icone: 'shield-alert', rotulo: 'Operações' },
+  { nav: 'nav-btn-cartao', icone: 'clipboard-list', rotulo: 'Cartão' }
+];
+
+const BOTTOM_TABS_OPERACIONAL = [
+  { nav: 'nav-btn-turno', icone: 'user-check', rotulo: 'Meu Turno' },
+  { nav: 'nav-btn-cartao', icone: 'clipboard-list', rotulo: 'Cartão' },
+  { nav: 'nav-btn-eventos', icone: 'calendar', rotulo: 'Eventos' },
+  { nav: 'nav-btn-mapa', icone: 'map', rotulo: 'Mapa' }
+];
+
+function montarBottomTabs(role) {
+  const barra = document.getElementById('bottom-tabs');
+  if (!barra) return;
+
+  const itens = role === 'P3' ? BOTTOM_TABS_P3 : BOTTOM_TABS_OPERACIONAL;
+  barra.innerHTML = itens.map(t => `
+    <button type="button" class="bottom-tab" data-action="bottom-tab" data-nav="${t.nav}" data-target-nav="${t.nav}">
+      <i data-lucide="${t.icone}"></i><span>${esc(t.rotulo)}</span>
+    </button>`).join('') + `
+    <button type="button" class="bottom-tab" data-action="bottom-tab-mais">
+      <i data-lucide="menu"></i><span>Mais</span>
+    </button>`;
+
+  lucide.createIcons();
+  sincronizarBottomTabs();
+}
+
+// Marca como ativa a aba inferior correspondente à aba aberta (se houver).
+function sincronizarBottomTabs() {
+  const navAtivo = document.querySelector('.nav-btn.active');
+  const idAtivo = navAtivo ? navAtivo.id : null;
+  document.querySelectorAll('.bottom-tab').forEach(btn => {
+    const ativo = !!idAtivo && btn.dataset.targetNav === idAtivo;
+    btn.classList.toggle('ativo', ativo);
+    btn.setAttribute('aria-current', ativo ? 'page' : 'false');
+  });
+}
+
 function applyRolePermissions(user) {
-  // Atualiza rodapé da sidebar
-  document.getElementById('user-display-name').textContent = user.nome;
-  document.getElementById('user-display-role').textContent = `Perfil: ${user.role}`;
-  document.getElementById('avatar-display').textContent = user.role === 'P3' ? 'P3' : user.role.substring(0, 2).toUpperCase();
+  // Identidade do usuário: card de perfil no topo da sidebar + bloco da topbar
+  const sigla = user.role === 'P3' ? 'P3' : user.role.substring(0, 2).toUpperCase();
+  document.getElementById('perfil-card-nome').textContent = user.nome;
+  document.getElementById('perfil-card-role').textContent = `Perfil: ${user.role}`;
+  document.getElementById('perfil-card-avatar').textContent = sigla;
+  document.getElementById('avatar-display').textContent = sigla;
+  document.getElementById('profile-nome').textContent = user.nome;
+  document.getElementById('profile-role').textContent = user.role === 'P3' ? 'P3 — Planejamento' : user.role;
 
   // Elementos do Menu
   const btnDashboard = document.getElementById('nav-btn-dashboard');
@@ -180,6 +239,8 @@ function applyRolePermissions(user) {
     btnViaturas.classList.remove('hidden-role');
     btnTurno.classList.add('hidden-role'); // P3 foca no Dashboard Geral
     secoesSomenteP3.forEach(el => el.classList.remove('hidden-role'));
+    // Card de cota na sidebar: só P3, que é quem enxerga o Planejador de Diárias
+    document.getElementById('cota-sidebar-card').classList.remove('hidden-role');
 
     // Mostra botões admin no drawer
     document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden-role'));
@@ -197,6 +258,7 @@ function applyRolePermissions(user) {
     btnPessoal.classList.add('hidden-role');
     btnTurno.classList.remove('hidden-role');
     secoesSomenteP3.forEach(el => el.classList.add('hidden-role'));
+    document.getElementById('cota-sidebar-card').classList.add('hidden-role');
 
     // Cadastro de Viaturas é aberto a Adjunto/Oficial (cadastrar e editar; excluir segue P3-only,
     // ver renderViaturasTab e o DELETE no server). Reexibe o botão e o rótulo "Administração".
@@ -209,6 +271,10 @@ function applyRolePermissions(user) {
     // Abre por padrão a aba de Turno
     btnTurno.click();
   }
+
+  // A barra inferior do celular depende do perfil — montar depois de definir
+  // a visibilidade das abas e de abrir a aba padrão.
+  montarBottomTabs(user.role);
 }
 
 // -------------------------------------------------------------
@@ -248,6 +314,7 @@ function setupNavigation() {
 
       // Fecha o drawer de navegação mobile ao trocar de aba (sem efeito em desktop)
       fecharNavDrawer();
+      sincronizarBottomTabs();
 
       // Atualiza cabeçalho
       if (titles[targetId]) {
@@ -293,13 +360,23 @@ function setupEventListeners() {
     if (e.key === 'Escape') fecharNavDrawer();
   });
 
-  // Seletor de tema (aplicado ao body no boot, aqui só sincroniza o <select> e liga a troca)
-  const temaSelect = document.getElementById('tema-select');
-  temaSelect.value = carregarPrefsTema();
-  temaSelect.addEventListener('change', () => {
-    localStorage.setItem(TEMA_PREFS_KEY, temaSelect.value);
-    aplicarTema(temaSelect.value);
+  // Toggle segmentado de tema (o tema em si já foi aplicado ao body no boot;
+  // aqui só sincroniza qual botão aparece ativo e liga a troca)
+  sincronizarToggleTema(carregarPrefsTema());
+  document.querySelectorAll('.tema-opcao').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tema = btn.dataset.tema;
+      localStorage.setItem(TEMA_PREFS_KEY, tema);
+      aplicarTema(tema);
+      sincronizarToggleTema(tema);
+    });
   });
+
+  // Data de hoje na topbar
+  const agora = new Date();
+  const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  document.getElementById('topbar-data-dia').textContent = getLocalDateStr().split('-').reverse().join('/');
+  document.getElementById('topbar-data-semana').textContent = DIAS_SEMANA[agora.getDay()];
 
   // Login Form Submit
   document.getElementById('form-login').addEventListener('submit', handleLogin);
@@ -424,6 +501,16 @@ function setupEventListeners() {
       case 'mudar-atividade-item': iniciarEdicaoAtividade(d.vtrId, d.itemId); break;
       case 'salvar-atividade-item': salvarAtividadeItem(d.vtrId, d.itemId); break;
       case 'cancelar-atividade-item': cancelarEdicaoAtividade(); break;
+      // Meu Turno
+      case 'turno-dia': handleTurnoTrocarDia(d.dia); break;
+      case 'abrir-evento': openDrawer(d.id); break;
+      // Mapa
+      case 'focar-no-mapa': handleFocarNoMapa(d.lat, d.lng, d.id); break;
+      // Barra de abas do celular
+      case 'bottom-tab': document.getElementById(d.nav).click(); break;
+      case 'bottom-tab-mais': abrirNavDrawer(); break;
+      // Abas Viaturas | Roteiro do Cartão Programa
+      case 'cartao-aba': handleCartaoTrocarAba(d.aba); break;
       // Gaveta de evento / operação
       case 'excluir-alocacao': handleDeleteAlocacao(d.id); break;
       case 'excluir-escala': handleDeleteEscala(d.id); break;
@@ -637,6 +724,10 @@ function setupEventListeners() {
 
   // Cartão Programa
   document.getElementById('cartao-data').addEventListener('change', renderCartaoTab);
+
+  // Setas de dia anterior/seguinte do navegador de data (protótipo do redesign)
+  document.getElementById('btn-cartao-dia-anterior').addEventListener('click', () => deslocarDiaCartao(-1));
+  document.getElementById('btn-cartao-dia-seguinte').addEventListener('click', () => deslocarDiaCartao(1));
   document.getElementById('btn-novo-cartao').addEventListener('click', () => handleCriarCartao(false));
   document.getElementById('btn-copiar-cartao').addEventListener('click', abrirModalCopiarCartao);
   document.getElementById('btn-fechar-modal-copiar').addEventListener('click', () => document.getElementById('modal-copiar-cartao').classList.add('hidden'));
@@ -1042,10 +1133,89 @@ function updateStats() {
 
   const cota = state.config ? (state.config.cota_mensal_diarias || 0) : 0;
 
+  // KPI de diárias: número grande = consumido, sufixo = "de <cota>", rodapé = barra + %
   const statDiarias = document.getElementById('stat-diarias-mes');
-  statDiarias.textContent = `${consumidoMes} / ${cota}`;
-  statDiarias.style.color = (cota > 0 && consumidoMes > cota) ? 'var(--danger)' : '';
-  renderTendencia('stat-diarias-mes-tendencia', consumidoMes, consumidoMesAnterior);
+  statDiarias.textContent = consumidoMes;
+  statDiarias.style.color = (cota > 0 && consumidoMes > cota) ? 'var(--danger-fg)' : '';
+  document.getElementById('stat-diarias-mes-sufixo').textContent = `de ${cota}`;
+  const pctCotaMes = cota > 0 ? Math.min(100, Math.round((consumidoMes / cota) * 100)) : 0;
+  document.getElementById('stat-diarias-bar').style.width = `${pctCotaMes}%`;
+  document.getElementById('stat-diarias-pct').textContent = `${pctCotaMes}%`;
+
+  // KPI de operações do mês corrente (o protótipo tem esse card; o dado já estava no state)
+  const operacoesMes = (state.operacoes || []).filter(o => o.data_inicio.startsWith(prefixoMesAtual));
+  const executadas = operacoesMes.filter(o => o.situacao === 'Executada').length;
+  document.getElementById('stat-operacoes-periodo').textContent = operacoesMes.length;
+  document.getElementById('stat-operacoes-periodo-sub').textContent =
+    operacoesMes.length ? `${executadas} executada(s) · ${operacoesMes.length - executadas} planejada(s)` : 'nenhuma no mês';
+
+  renderDashboardOperacoesRecentes();
+  renderDashboardEventosProximos();
+}
+
+// Operações mais recentes (as 5 últimas por data), montadas do state — sem chamada nova à API.
+function renderDashboardOperacoesRecentes() {
+  const tbody = document.getElementById('dash-operacoes-lista');
+  if (!tbody) return;
+
+  const recentes = [...(state.operacoes || [])]
+    .sort((a, b) => (b.data_inicio || '').localeCompare(a.data_inicio || ''))
+    .slice(0, 5);
+
+  if (recentes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:var(--text-muted);padding:20px;">Nenhuma operação cadastrada.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = recentes.map(op => {
+    const escalasOp = (state.escalas || []).filter(s => s.operacao_id === op.id);
+    const temEscala = escalasOp.length > 0;
+    const diarias = temEscala
+      ? escalasOp.reduce((sum, s) => sum + (s.total_diarias || 0), 0)
+      : (op.qtd_diarias_estimada || 0);
+    return `
+      <tr>
+        <td data-label="Data">${esc((op.data_inicio || '').split('-').reverse().join('/'))}</td>
+        <td class="card-title-cell"><strong>${esc(op.nome_operacao)}</strong></td>
+        <td data-label="Tipo">${esc(op.tipo_operacao) || '-'}</td>
+        <td data-label="Situação">${badgeSituacaoOperacao(op.situacao)}</td>
+        <td class="text-center" data-label="Diárias" style="color:var(--warning-fg);font-weight:700;">${diarias}${temEscala ? '' : ' <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">(est.)</span>'}</td>
+        <td class="text-center" data-label="Escalados">${escalasOp.length}</td>
+      </tr>`;
+  }).join('');
+}
+
+// Próximos 5 eventos a partir de hoje — trilho lateral do Dashboard.
+function renderDashboardEventosProximos() {
+  const tbody = document.getElementById('dash-eventos-proximos-lista');
+  if (!tbody) return;
+
+  const hojeStr = getLocalDateStr();
+  const proximos = (state.eventos || [])
+    .filter(e => (e.data_inicio || '') >= hojeStr)
+    .sort((a, b) => (a.data_inicio || '').localeCompare(b.data_inicio || ''))
+    .slice(0, 5);
+
+  if (proximos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center" style="color:var(--text-muted);padding:20px;">Nenhum evento futuro.</td></tr>';
+    return;
+  }
+
+  const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  tbody.innerHTML = proximos.map(evt => {
+    const [ano, mes, dia] = evt.data_inicio.split('-');
+    const diaSemana = DIAS[new Date(evt.data_inicio + 'T00:00:00').getDay()];
+    // title nas células estreitas: o texto sai com reticências quando não cabe
+    return `
+      <tr>
+        <td>${esc(`${dia}/${mes} (${diaSemana})`)}</td>
+        <td title="${esc(evt.nome_evento)}">
+          <strong>${esc(evt.nome_evento)}</strong>
+          <span class="celula-sub">${esc(evt.bairro) || 'Bairro não informado'}</span>
+        </td>
+        <td title="${esc(evt.num_os_manual) || ''}"><code style="color:var(--primary);">${esc(evt.num_os_manual) || '-'}</code></td>
+      </tr>`;
+  }).join('');
 }
 
 // -------------------------------------------------------------
@@ -1103,26 +1273,12 @@ async function renderDashboardOperacional() {
     console.error("Erro ao verificar o Cartão Programa de hoje:", error);
   }
 
-  // Card de resumo "Cartão Programa de Hoje" (topo) + card do grid do Dashboard,
-  // ambos alimentados pela mesma consulta acima — sem fetch duplicado.
-  const iconCartaoHoje = document.getElementById('stat-cartao-hoje-icon');
-  const statCartaoHoje = document.getElementById('stat-cartao-hoje');
-  const iconDashResumoCartao = document.getElementById('dash-resumo-cartao-icon');
+  // Card de módulo "Cartão Programa" — alimentado pela mesma consulta acima, sem fetch duplicado.
   const dashResumoCartao = document.getElementById('dash-resumo-cartao');
-  if (cartaoHoje) {
-    statCartaoHoje.textContent = `${cartaoHoje.viaturas.length} viatura(s)`;
-    iconCartaoHoje.classList.remove('alert');
-    iconCartaoHoje.classList.add('success');
-    dashResumoCartao.textContent = `${cartaoHoje.viaturas.length} viatura(s) · Criado`;
-    iconDashResumoCartao.classList.remove('alert');
-    iconDashResumoCartao.classList.add('success');
-  } else {
-    statCartaoHoje.textContent = 'Não lançado';
-    iconCartaoHoje.classList.remove('success');
-    iconCartaoHoje.classList.add('alert');
-    dashResumoCartao.textContent = 'Pendente — nenhum cartão lançado hoje';
-    iconDashResumoCartao.classList.remove('success');
-    iconDashResumoCartao.classList.add('alert');
+  if (dashResumoCartao) {
+    dashResumoCartao.textContent = cartaoHoje
+      ? `${cartaoHoje.viaturas.length} viatura(s) hoje`
+      : 'Pendente — nada lançado hoje';
   }
 
   // Alertas consolidados: conflitos do cartão de hoje + eventos com OS pendente se aproximando
@@ -1130,19 +1286,47 @@ async function renderDashboardOperacional() {
   const alertasEventos = calcularAlertasEventosUrgentes();
   const todosAlertas = [...alertasCartao, ...alertasEventos];
 
-  const painelAlertas = document.getElementById('dashboard-alertas');
-  const listaAlertas = document.getElementById('dashboard-alertas-lista');
+  // KPI "Conflitos Hoje" — só os do cartão de hoje (os de evento não são conflito de turno).
+  const statConflitos = document.getElementById('stat-conflitos');
+  if (statConflitos) {
+    statConflitos.textContent = alertasCartao.length;
+    // sem conflito o card fica verde em vez de vermelho — evita alarme falso permanente
+    const semConflito = alertasCartao.length === 0;
+    const corFg = semConflito ? 'var(--success-fg)' : 'var(--danger-fg)';
+    const corBg = semConflito ? 'var(--success-bg)' : 'var(--danger-bg)';
+    document.getElementById('stat-conflitos-label').style.color = corFg;
+    const icone = document.getElementById('stat-conflitos-icone');
+    icone.style.background = corBg;
+    icone.style.color = corFg;
+    document.getElementById('stat-cartao-hoje').textContent = cartaoHoje
+      ? `Cartão de hoje: ${cartaoHoje.viaturas.length} viatura(s)`
+      : 'Cartão de hoje não lançado';
+  }
 
+  const listaAlertas = document.getElementById('dashboard-alertas-lista');
   if (todosAlertas.length === 0) {
-    painelAlertas.classList.add('hidden');
+    listaAlertas.innerHTML = `
+      <div class="dash-alertas-vazio">
+        <i data-lucide="check-circle"></i>
+        <span>Nenhum alerta operacional no momento.</span>
+      </div>`;
   } else {
-    painelAlertas.classList.remove('hidden');
-    listaAlertas.innerHTML = todosAlertas.map(a => `
-      <div class="cartao-alerta-item">
-        <i data-lucide="alert-triangle"></i>
-        <span>${esc(a.mensagem)}</span>
-      </div>
-    `).join('');
+    listaAlertas.innerHTML = todosAlertas.map(a => {
+      // conflito de cartão = âmbar; evento sem numeração = vermelho
+      const deCartao = a.tipo !== 'evento-sem-numeracao';
+      const cor = deCartao ? 'var(--warning-fg)' : 'var(--danger-fg)';
+      const bg = deCartao ? 'var(--warning-bg)' : 'var(--danger-bg)';
+      const icone = deCartao ? 'alert-triangle' : 'alert-circle';
+      const titulo = deCartao ? 'Conflito no Cartão Programa de hoje' : 'Evento próximo com pendência';
+      return `
+        <div class="dash-alerta-item">
+          <span class="dash-alerta-icone" style="background:${bg};color:${cor};"><i data-lucide="${icone}"></i></span>
+          <div class="dash-alerta-texto">
+            <div class="dash-alerta-titulo">${esc(titulo)}</div>
+            <div class="dash-alerta-sub">${esc(a.mensagem)}</div>
+          </div>
+        </div>`;
+    }).join('');
   }
 
   // Painel "Patrulhamento de Hoje"
@@ -1238,37 +1422,100 @@ async function renderDashboardResumo() {
     const resumo = await res.json();
     if (!res.ok) throw new Error(resumo.error || 'Falha ao carregar o resumo do Dashboard.');
 
-    // Eventos: número em destaque + sub-linha dos próximos 7 dias
-    document.getElementById('dash-resumo-eventos').textContent = resumo.eventos.total_periodo;
-    document.getElementById('dash-resumo-eventos-sub').textContent =
-      `${resumo.eventos.proximos_7_dias} nos próximos 7 dias`;
-
-    // Diárias: "consumido / cota" + barra de progresso do consumo da cota
+    // Os cards de Módulo do protótipo têm uma descrição fixa; aqui essa mesma linha
+    // carrega o número vivo do período, para não perder informação no redesign.
     const consumido = resumo.diarias.total_pago_periodo;
+    const planejado = resumo.diarias.planejado_periodo || 0;
     const cota = resumo.diarias.cota_mensal || 0;
-    document.getElementById('dash-resumo-diarias').textContent = `${consumido} / ${cota}`;
-    const pctCota = cota > 0 ? Math.min(100, (consumido / cota) * 100) : 0;
-    document.getElementById('dash-resumo-diarias-bar').style.width = `${pctCota}%`;
 
-    document.getElementById('dash-resumo-efetivo').textContent = resumo.efetivo_total_periodo;
+    document.getElementById('dash-resumo-eventos-sub').textContent =
+      `${resumo.eventos.total_periodo} no período · ${resumo.eventos.proximos_7_dias} em 7 dias`;
+    document.getElementById('dash-resumo-diarias').textContent = `${consumido} de ${cota} diárias`;
+    document.getElementById('dash-resumo-efetivo').textContent =
+      `${resumo.efetivo_total_periodo} militares empregados`;
+    document.getElementById('dash-resumo-pessoal').textContent =
+      `${resumo.pessoal.total} cadastrados · ${resumo.pessoal.pracas} praças / ${resumo.pessoal.oficiais} oficiais`;
+    document.getElementById('dash-resumo-usuarios').textContent = `${resumo.usuarios.total} contas do sistema`;
 
-    // Cadastro de Pessoal: total em destaque + composição em badges compactos
-    document.getElementById('dash-resumo-pessoal').textContent = resumo.pessoal.total;
-    document.getElementById('dash-resumo-pessoal-badges').innerHTML =
-      `<span class="badge tipo-praca">${esc(resumo.pessoal.pracas)} Praças</span>` +
-      `<span class="badge tipo-oficial">${esc(resumo.pessoal.oficiais)} Oficiais</span>`;
+    const rotuloPeriodo = document.getElementById('dash-diarias-periodo');
+    if (rotuloPeriodo) rotuloPeriodo.textContent = `${mes}/${ano}`;
 
-    document.getElementById('dash-resumo-usuarios').textContent = resumo.usuarios.total;
-
+    atualizarCotaSidebar(consumido, planejado, cota, `${mes}/${ano}`);
+    renderDashboardDonutDiarias(consumido, planejado, cota);
     renderDashboardDonut(resumo.distribuicao_tipo);
     renderTopMilitares(resumo.top_militares);
   } catch (error) {
     console.error('Erro ao carregar o resumo do Dashboard:', error);
-    ['dash-resumo-eventos', 'dash-resumo-diarias', 'dash-resumo-efetivo', 'dash-resumo-pessoal', 'dash-resumo-usuarios']
-      .forEach(id => { document.getElementById(id).textContent = '—'; });
-    const subEv = document.getElementById('dash-resumo-eventos-sub');
-    if (subEv) subEv.textContent = 'Falha ao carregar.';
+    ['dash-resumo-eventos-sub', 'dash-resumo-diarias', 'dash-resumo-efetivo', 'dash-resumo-pessoal', 'dash-resumo-usuarios']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = 'Falha ao carregar.'; });
   }
+}
+
+// Card "Cota Mensal de Diárias" da sidebar (protótipo do redesign): anel de progresso +
+// Consumido/Disponível/Total. O anel é o mesmo truque de stroke-dasharray dos donuts —
+// r=15.5 => circunferência ≈ 97, que é o valor de referência usado no dasharray.
+function atualizarCotaSidebar(consumido, planejado, cota, periodo) {
+  const card = document.getElementById('cota-sidebar-card');
+  if (!card) return;
+
+  const usado = consumido + planejado;
+  const pct = cota > 0 ? Math.min(100, Math.round((usado / cota) * 100)) : 0;
+  const CIRC = 97;
+
+  document.getElementById('cota-sidebar-periodo').textContent = periodo;
+  document.getElementById('cota-sidebar-pct').textContent = `${pct}%`;
+  document.getElementById('cota-sidebar-arco').setAttribute('stroke-dasharray', `${(pct / 100) * CIRC} ${CIRC}`);
+  document.getElementById('cota-sidebar-consumido').textContent = consumido;
+  document.getElementById('cota-sidebar-disponivel').textContent = Math.max(0, cota - usado);
+  document.getElementById('cota-sidebar-total').textContent = cota;
+}
+
+// Donut "Diárias — Visão Geral": consumido (escalas reais) x planejado (estimativa das
+// operações sem escala) x disponível. Mesma técnica dos outros gráficos do projeto —
+// SVG à mão, sem lib. Ver renderDashboardDonut logo acima.
+function renderDashboardDonutDiarias(consumido, planejado, cota) {
+  const container = document.getElementById('dashboard-donut-diarias');
+  if (!container) return;
+
+  const usado = consumido + planejado;
+  if (cota <= 0 && usado === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px;">Sem cota nem diárias lançadas neste período.</p>';
+    return;
+  }
+
+  // A escala do donut é a cota; se estourou, passa a ser o próprio total usado.
+  const base = Math.max(cota, usado) || 1;
+  const disponivel = Math.max(0, cota - usado);
+  const r = 40, cx = 50, cy = 50, traco = 16;
+  const circ = 2 * Math.PI * r;
+
+  const fatias = [
+    { valor: consumido, cor: 'var(--success)', rotulo: 'Consumido (escalas reais)' },
+    { valor: planejado, cor: 'var(--primary-solid)', rotulo: 'Planejado (estimado)' },
+    { valor: disponivel, cor: 'var(--border-color)', rotulo: 'Disponível' }
+  ].filter(f => f.valor > 0);
+
+  let acumulado = 0;
+  const arcos = fatias.map(f => {
+    const comprimento = (f.valor / base) * circ;
+    const offset = -acumulado;
+    acumulado += comprimento;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${f.cor}" stroke-width="${traco}" stroke-dasharray="${comprimento} ${circ - comprimento}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"><title>${esc(f.rotulo)}: ${f.valor}</title></circle>`;
+  }).join('');
+
+  const legenda = fatias.map(f => {
+    const pct = base > 0 ? Math.round((f.valor / base) * 100) : 0;
+    return `<span><i class="legenda-dot" style="background:${f.cor}"></i>${esc(f.rotulo)} — <strong>${f.valor} (${pct}%)</strong></span>`;
+  }).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 100 100" class="dashboard-donut-svg" role="img" aria-label="Diárias do período: ${consumido} consumidas, ${planejado} planejadas, cota ${cota}">
+      ${arcos}
+      <text x="50" y="49" text-anchor="middle" class="dashboard-donut-total">${consumido}</text>
+      <text x="50" y="59" text-anchor="middle" class="dashboard-donut-sub">Consumidas</text>
+    </svg>
+    <div class="dashboard-donut-legenda">${legenda}</div>
+  `;
 }
 
 // Top 10 — Ranking de Empenho (militares com mais diárias no período filtrado).
@@ -1348,75 +1595,152 @@ async function handleCreateEvento(e) {
 // -------------------------------------------------------------
 // TELA 3: MEU TURNO (HOJE & AMANHÃ)
 // -------------------------------------------------------------
-function renderTurnoTab() {
-  const containerHoje = document.getElementById('turno-cards-hoje');
-  const containerAmanha = document.getElementById('turno-cards-amanha');
+// Dia selecionado na aba Meu Turno ('hoje' | 'amanha') — trocado pelo seletor
+// segmentado do topo, no padrão do protótipo.
+let turnoDiaSelecionado = 'hoje';
 
-  containerHoje.innerHTML = '';
-  containerAmanha.innerHTML = '';
+window.handleTurnoTrocarDia = function(dia) {
+  turnoDiaSelecionado = (dia === 'amanha') ? 'amanha' : 'hoje';
+  document.querySelectorAll('.dia-opcao').forEach(btn => {
+    const ativo = btn.dataset.dia === turnoDiaSelecionado;
+    btn.classList.toggle('ativo', ativo);
+    btn.setAttribute('aria-checked', String(ativo));
+  });
+  renderTurnoTab();
+};
 
-  // Determinar datas (horário local, não UTC)
+async function renderTurnoTab() {
   const hoje = new Date();
-  const hojeStr = getLocalDateStr(hoje);
-  document.getElementById('turno-data-hoje').textContent = hojeStr.split('-').reverse().join('/');
+  const alvo = new Date(hoje);
+  if (turnoDiaSelecionado === 'amanha') alvo.setDate(hoje.getDate() + 1);
+  const dataStr = getLocalDateStr(alvo);
 
-  const amanha = new Date(hoje);
-  amanha.setDate(hoje.getDate() + 1);
-  const amanhaStr = getLocalDateStr(amanha);
-  document.getElementById('turno-data-amanha').textContent = amanhaStr.split('-').reverse().join('/');
+  const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  const dataBr = dataStr.split('-').reverse().join('/');
+  document.getElementById('turno-btn-hoje').textContent = `Hoje · ${getLocalDateStr(hoje).slice(8)}/${getLocalDateStr(hoje).slice(5, 7)}`;
+  const amanhaData = new Date(hoje); amanhaData.setDate(hoje.getDate() + 1);
+  const amanhaStr = getLocalDateStr(amanhaData);
+  document.getElementById('turno-btn-amanha').textContent = `Amanhã · ${amanhaStr.slice(8)}/${amanhaStr.slice(5, 7)}`;
 
-  // Filtra eventos
-  const eventosHoje = state.eventos.filter(e => e.data_inicio === hojeStr);
-  const eventosAmanha = state.eventos.filter(e => e.data_inicio === amanhaStr);
+  // --- Eventos do dia
+  const eventos = state.eventos
+    .filter(e => e.data_inicio === dataStr)
+    .sort((a, b) => (a.horario_inicio || '').localeCompare(b.horario_inicio || ''));
 
-  // Renderiza Hoje
-  if (eventosHoje.length === 0) {
-    containerHoje.innerHTML = `<p style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:32px;">Nenhum evento agendado para hoje.</p>`;
+  document.getElementById('turno-kpi-eventos').textContent = eventos.length;
+  document.getElementById('turno-eventos-contagem').textContent =
+    `${dataBr} · ${DIAS[alvo.getDay()]}`;
+
+  const listaEventos = document.getElementById('turno-eventos-lista');
+  if (eventos.length === 0) {
+    listaEventos.innerHTML = `<p class="turno-vazio">Nenhum evento agendado para ${turnoDiaSelecionado === 'hoje' ? 'hoje' : 'amanhã'}.</p>`;
   } else {
-    eventosHoje.forEach(evt => containerHoje.appendChild(createTurnoCard(evt)));
+    listaEventos.innerHTML = eventos.map(evt => {
+      const alocacoesEvt = state.alocacoes.filter(a => a.evento_id === evt.id);
+      const modalidades = alocacoesEvt.map(a => a.modalidade).filter(Boolean).join(', ');
+      return `
+        <div class="turno-linha" data-action="abrir-evento" data-id="${esc(evt.id)}" role="button" tabindex="0">
+          <div class="turno-linha-hora">${esc(evt.horario_inicio) || '--:--'}</div>
+          <div class="turno-linha-info">
+            <div class="turno-linha-nome">${esc(evt.nome_evento)}</div>
+            <div class="turno-linha-sub">
+              <i data-lucide="map-pin"></i>${esc(evt.bairro) || 'Sem bairro'}${modalidades ? ' · ' + esc(modalidades) : ''}
+            </div>
+          </div>
+          <div class="turno-linha-fim">
+            <div class="turno-linha-os">OS ${esc(evt.num_os_manual) || '—'}</div>
+            <span class="badge ${slugBadge(evt.tipo_evento)}">${esc(evt.tipo_evento)}</span>
+          </div>
+        </div>`;
+    }).join('');
   }
 
-  // Renderiza Amanhã
-  if (eventosAmanha.length === 0) {
-    containerAmanha.innerHTML = `<p style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:32px;">Nenhum evento agendado para amanhã.</p>`;
-  } else {
-    eventosAmanha.forEach(evt => containerAmanha.appendChild(createTurnoCard(evt)));
+  const totalEfetivo = eventos.reduce((soma, evt) =>
+    soma + state.alocacoes.filter(a => a.evento_id === evt.id).reduce((s, a) => s + (a.qtd_policiais || 0), 0), 0);
+  document.getElementById('turno-kpi-efetivo').textContent = totalEfetivo;
+
+  // --- Cartão Programa do dia (viaturas, equipe de serviço e avisos)
+  let cartao = null;
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/cartoes?data=${dataStr}`);
+    const lista = await res.json();
+    if (res.ok && Array.isArray(lista) && lista.length > 0) {
+      const resDetalhe = await apiFetch(`${API_BASE_URL}/api/cartoes/${lista[0].id}`);
+      if (resDetalhe.ok) cartao = await resDetalhe.json();
+    }
+  } catch (error) {
+    console.error('Erro ao carregar o cartão do turno:', error);
   }
+
+  const pill = document.getElementById('turno-status-cartao');
+  const pillTexto = document.getElementById('turno-status-texto');
+  pill.classList.toggle('status-pill-ok', !!cartao);
+  pill.classList.toggle('status-pill-pendente', !cartao);
+  pillTexto.textContent = cartao ? 'Cartão Programa lançado' : 'Cartão Programa não lançado';
+
+  const viaturas = cartao ? (cartao.viaturas || []) : [];
+  document.getElementById('turno-kpi-viaturas').textContent = viaturas.length;
+
+  const tbodyVtr = document.getElementById('turno-viaturas-lista');
+  tbodyVtr.innerHTML = viaturas.length === 0
+    ? `<tr><td colspan="5" class="text-center" style="color:var(--text-muted);padding:22px;">Nenhuma viatura lançada para este dia.</td></tr>`
+    : viaturas.map(v => `
+        <tr>
+          <td class="card-title-cell"><strong>${esc(v.prefixo)}</strong></td>
+          <td data-label="Setor">${esc(v.setor) || '-'}</td>
+          <td data-label="Categoria">${v.categoria ? `<span class="badge ${slugBadge('cat-' + v.categoria)}">${esc(v.categoria)}</span>` : '-'}</td>
+          <td data-label="Companhia">${esc(v.companhia) || '-'}</td>
+          <td data-label="Comandante">${esc(v.comandante) || 'Não informado'}</td>
+        </tr>`).join('');
+
+  // Equipe de serviço: os três papéis do cabeçalho do cartão
+  const equipe = [
+    { papel: 'Fiscal de Operações', nome: cartao && cartao.fiscal, icone: 'shield-check', cor: 'var(--primary)', bg: 'var(--primary-soft)' },
+    { papel: 'Adjunto', nome: cartao && cartao.adjunto, icone: 'user-check', cor: 'var(--success-fg)', bg: 'var(--success-bg)' },
+    { papel: 'Oficial de Sobreaviso', nome: cartao && cartao.oficial_sobreaviso, icone: 'phone-call', cor: 'var(--roxo)', bg: 'var(--roxo-bg)' }
+  ];
+  document.getElementById('turno-equipe').innerHTML = equipe.map(p => `
+    <div class="turno-equipe-item">
+      <span class="turno-equipe-icone" style="background:${p.bg};color:${p.cor};"><i data-lucide="${p.icone}"></i></span>
+      <div>
+        <div class="turno-equipe-papel">${esc(p.papel)}</div>
+        <div class="turno-equipe-nome${p.nome ? '' : ' turno-equipe-vazio'}">${esc(p.nome) || 'Não designado'}</div>
+      </div>
+    </div>`).join('');
+
+  // Avisos: conflitos do cartão do dia + eventos do dia sem OS/SEI
+  const avisos = cartao ? calcularAlertasCartao(cartao) : [];
+  eventos.forEach(evt => {
+    const faltando = [];
+    if (!evt.num_os_manual) faltando.push('Número da OS');
+    if (!evt.num_sei) faltando.push('Número SEI');
+    if (faltando.length) {
+      avisos.push({ tipo: 'evento-sem-numeracao', mensagem: `"${evt.nome_evento}" sem ${faltando.join(' e sem ')}.` });
+    }
+  });
+
+  document.getElementById('turno-kpi-avisos').textContent = avisos.length;
+  const iconeAvisos = document.getElementById('turno-kpi-avisos-icone');
+  iconeAvisos.style.background = avisos.length ? 'var(--warning-bg)' : 'var(--success-bg)';
+  iconeAvisos.style.color = avisos.length ? 'var(--warning-fg)' : 'var(--success-fg)';
+
+  document.getElementById('turno-avisos').innerHTML = avisos.length === 0
+    ? `<div class="dash-alertas-vazio"><i data-lucide="check-circle"></i><span>Nenhum aviso para este turno.</span></div>`
+    : avisos.map(a => {
+        const deCartao = a.tipo !== 'evento-sem-numeracao';
+        const cor = deCartao ? 'var(--warning-fg)' : 'var(--danger-fg)';
+        const bg = deCartao ? 'var(--warning-bg)' : 'var(--danger-bg)';
+        return `
+          <div class="dash-alerta-item">
+            <span class="dash-alerta-icone" style="background:${bg};color:${cor};"><i data-lucide="${deCartao ? 'alert-triangle' : 'alert-circle'}"></i></span>
+            <div class="dash-alerta-texto">
+              <div class="dash-alerta-titulo">${esc(deCartao ? 'Conflito no Cartão Programa' : 'Evento com pendência')}</div>
+              <div class="dash-alerta-sub">${esc(a.mensagem)}</div>
+            </div>
+          </div>`;
+      }).join('');
 
   lucide.createIcons();
-}
-
-function createTurnoCard(evt) {
-  const card = document.createElement('div');
-  card.className = 'turno-card';
-  card.addEventListener('click', () => openDrawer(evt.id));
-
-  const typeClass = slugBadge(evt.tipo_evento);
-
-  // Calcular métricas
-  const alocacoesEvt = state.alocacoes.filter(a => a.evento_id === evt.id);
-  const totalPoliciais = alocacoesEvt.reduce((sum, current) => sum + current.qtd_policiais, 0);
-  const totalViaturas = alocacoesEvt.reduce((sum, current) => sum + current.qtd_viaturas, 0);
-  
-  card.innerHTML = `
-    <div class="turno-card-header">
-      <h3 class="turno-card-title">${esc(evt.nome_evento)}</h3>
-      <span class="badge ${typeClass}">${esc(evt.tipo_evento)}</span>
-    </div>
-    <div class="turno-card-detail">
-      <span><i data-lucide="award"></i> <strong>Demandante:</strong> ${esc(evt.demandante)}</span>
-      <span><i data-lucide="clock"></i> <strong>Início:</strong> ${esc(evt.horario_inicio) || 'Horário Não Informado'}</span>
-      <span><i data-lucide="map-pin"></i> <strong>Local:</strong> ${esc(evt.local_itinerario)} (${esc(evt.bairro) || 'Sem Bairro'})</span>
-      <span><i data-lucide="file-text"></i> <strong>OS:</strong> ${esc(evt.num_os_manual) || 'Não informado'}</span>
-    </div>
-    <div class="turno-card-stats">
-      <span>Mod: <strong>${alocacoesEvt.length}</strong></span>
-      <span>Efetivo: <strong>${totalPoliciais} PMs</strong></span>
-      <span>Viaturas: <strong>${totalViaturas} VTRs</strong></span>
-    </div>
-  `;
-
-  return card;
 }
 
 // -------------------------------------------------------------
@@ -1444,13 +1768,46 @@ function getEventosFiltrados() {
   return lista;
 }
 
+// KPIs do topo de Listar Eventos: refletem o filtro ativo (exceto "próximos 7
+// dias", que é sempre a partir de hoje, como no Dashboard).
+function renderEventosKpis(eventosFiltrados) {
+  const hojeStr = getLocalDateStr();
+  const daqui7 = new Date();
+  daqui7.setDate(daqui7.getDate() + 7);
+  const daqui7Str = getLocalDateStr(daqui7);
+
+  const semOs = eventosFiltrados.filter(e => !e.num_os_manual).length;
+  const semSei = eventosFiltrados.filter(e => !e.num_sei).length;
+
+  document.getElementById('ev-kpi-total').textContent = eventosFiltrados.length;
+  document.getElementById('ev-kpi-proximos').textContent =
+    state.eventos.filter(e => e.data_inicio >= hojeStr && e.data_inicio <= daqui7Str).length;
+  document.getElementById('ev-kpi-sem-os').textContent = semOs;
+  document.getElementById('ev-kpi-sem-sei').textContent = semSei;
+
+  // sem pendência o card fica verde, em vez de âmbar permanente
+  const pintar = (idIcone, temPendencia) => {
+    const el = document.getElementById(idIcone);
+    el.style.background = temPendencia ? 'var(--warning-bg)' : 'var(--success-bg)';
+    el.style.color = temPendencia ? 'var(--warning-fg)' : 'var(--success-fg)';
+  };
+  pintar('ev-icone-os', semOs > 0);
+  pintar('ev-icone-sei', semSei > 0);
+}
+
 function renderEventosTab() {
   const tableBody = document.getElementById('table-eventos-body');
+  const rodape = document.getElementById('eventos-rodape-contagem');
 
   tableBody.innerHTML = '';
 
-  // Filtra coleções de acordo com os inputs (mesmo filtro usado pela Lista para SEI)
+  // Filtra coleções de acordo com os inputs (mesmo filtro usado pelo relatório PDF)
   let eventosFiltrados = getEventosFiltrados();
+  renderEventosKpis(eventosFiltrados);
+
+  rodape.textContent = eventosFiltrados.length === state.eventos.length
+    ? `${eventosFiltrados.length} evento(s) cadastrado(s).`
+    : `Mostrando ${eventosFiltrados.length} de ${state.eventos.length} evento(s).`;
 
   if (eventosFiltrados.length === 0) {
     tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhum evento localizado com os filtros aplicados.</td></tr>`;
@@ -1474,8 +1831,8 @@ function renderEventosTab() {
       <td data-label="Tipo"><span class="badge ${typeClass}">${esc(evt.tipo_evento)}</span></td>
       <td data-label="Demandante">${esc(evt.demandante)}</td>
       <td data-label="Bairro/Local">${esc(evt.bairro) || 'Centro'}</td>
-      <td data-label="Nº OS"><code style="color:#a5b4fc;">${esc(evt.num_os_manual) || '-'}</code></td>
-      <td data-label="Nº SEI"><code style="color:#a5b4fc;">${esc(evt.num_sei) || '-'}</code></td>
+      <td data-label="Nº OS"><code style="color:var(--primary);">${esc(evt.num_os_manual) || '-'}</code></td>
+      <td data-label="Nº SEI"><code style="color:var(--primary);">${esc(evt.num_sei) || '-'}</code></td>
     `;
 
     tableBody.appendChild(tr);
@@ -1529,7 +1886,7 @@ function salvarPrefsMapa(prefs) {
 const CORES_CATEGORIA_VIATURA = {
   'Força Tática': '#ef4444',
   'Suplementar': '#f59e0b',
-  'Ordinária': '#4f46e5'
+  'Ordinária': '#2563eb'
 };
 
 function criarIconeViatura(categoria) {
@@ -1559,6 +1916,70 @@ function itemAtivoAgora(vtr) {
   }) || null;
 }
 
+// Lista de ocorrências ao lado do mapa. Sem chamada nova: usa os eventos da
+// semana já filtrados e as coordenadas já buscadas por renderMapaTab.
+function renderMapaOcorrencias(eventosSemana, bairrosCoordenadas) {
+  const lista = document.getElementById('mapa-ocorrencias-lista');
+  const contagem = document.getElementById('mapa-ocorrencias-contagem');
+  if (!lista) return;
+
+  contagem.textContent = `${eventosSemana.length} ${eventosSemana.length === 1 ? 'ponto' : 'pontos'}`;
+
+  if (eventosSemana.length === 0) {
+    lista.innerHTML = `<p class="turno-vazio">Nenhum evento nesta semana.</p>`;
+    return;
+  }
+
+  const ordenados = [...eventosSemana].sort((a, b) =>
+    (a.data_inicio || '').localeCompare(b.data_inicio || '') ||
+    (a.horario_inicio || '').localeCompare(b.horario_inicio || ''));
+
+  lista.innerHTML = ordenados.map(evt => {
+    const alocacoes = state.alocacoes.filter(a => a.evento_id === evt.id);
+    const efetivo = alocacoes.reduce((s, a) => s + (a.qtd_policiais || 0), 0);
+    const viaturas = alocacoes.reduce((s, a) => s + (a.qtd_viaturas || 0), 0);
+    const bairroNorm = normalizarTexto(evt.bairro);
+    const coord = bairroNorm ? bairrosCoordenadas.find(b => normalizarTexto(b.nome_bairro) === bairroNorm) : null;
+    const [, mes, dia] = (evt.data_inicio || '--').split('-');
+
+    return `
+      <div class="mapa-ocorrencia${coord ? '' : ' mapa-ocorrencia-sem-coord'}"
+           data-action="focar-no-mapa" data-lat="${coord ? coord.latitude : ''}" data-lng="${coord ? coord.longitude : ''}"
+           data-id="${esc(evt.id)}" role="button" tabindex="0"
+           title="${coord ? 'Centralizar o mapa neste bairro' : 'Bairro sem coordenada cadastrada'}">
+        <span class="mapa-ocorrencia-icone badge ${slugBadge(evt.tipo_evento)}"><i data-lucide="map-pin"></i></span>
+        <div class="mapa-ocorrencia-info">
+          <div class="mapa-ocorrencia-topo">
+            <span class="mapa-ocorrencia-nome">${esc(evt.nome_evento)}</span>
+            <span class="badge ${slugBadge(evt.tipo_evento)}">${esc(evt.tipo_evento)}</span>
+          </div>
+          <div class="mapa-ocorrencia-sub">
+            <i data-lucide="map-pin"></i>${esc(evt.bairro) || 'Sem bairro'} · ${dia}/${mes}${evt.horario_inicio ? ' ' + esc(evt.horario_inicio) : ''}
+          </div>
+          <div class="mapa-ocorrencia-nums">
+            <span><i data-lucide="car"></i>${viaturas} vtr</span>
+            <span><i data-lucide="users"></i>${efetivo} pol</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  lucide.createIcons();
+}
+
+// Centraliza o mapa numa ocorrência da lista lateral
+window.handleFocarNoMapa = function(lat, lng, eventoId) {
+  if (!lat || !lng || !mapaLeafletInstancia) {
+    // sem coordenada não dá pra centralizar — abre a gaveta do evento
+    if (eventoId) openDrawer(eventoId);
+    return;
+  }
+  // animate:false de propósito — com animate:true o Leaflet descarta a transição
+  // quando o salto de posição/zoom é grande (verificado: o mapa simplesmente não
+  // se movia). Centralizar na hora também é melhor para "clicar e localizar".
+  mapaLeafletInstancia.setView([Number(lat), Number(lng)], 15, { animate: false });
+};
+
 async function renderMapaTab() {
   const container = document.getElementById('mapa-eventos-semana');
   const avisoEl = document.getElementById('mapa-aviso-sem-coordenada');
@@ -1573,6 +1994,12 @@ async function renderMapaTab() {
   if (!mapaLeafletInstancia) {
     mapaLeafletInstancia = L.map(container).setView([-5.85, -35.21], 12); // centro aproximado da Zona Sul de Natal
   }
+
+  // A aba fica escondida (display:none) quando não está ativa, e desde que o mapa
+  // divide espaço com o painel de ocorrências o container muda de tamanho. Sem
+  // invalidateSize o Leaflet mantém dimensões defasadas e passa a ignorar
+  // setView/cliques — sintoma observado ao clicar numa ocorrência da lista.
+  mapaLeafletInstancia.invalidateSize();
 
   // Troca o tile conforme o estilo salvo (dark vs. colorido) — só recria a camada se o estilo
   // realmente mudou desde a última renderização (evita descartar/recarregar tiles a cada
@@ -1632,6 +2059,10 @@ async function renderMapaTab() {
       }
       gruposPorCoordenada[coordenada.id].eventos.push(evt);
     });
+
+    // Painel lateral de ocorrências (protótipo): lista os eventos da semana, com
+    // ou sem coordenada. Clicar centraliza o mapa quando há coordenada.
+    renderMapaOcorrencias(eventosSemana, bairrosCoordenadas);
 
     // Aviso visível para bairros sem coordenada cadastrada — não quebra o mapa, só avisa
     if (semCoordenada.length > 0) {
@@ -2168,7 +2599,7 @@ function renderEscalasList(list) {
     el.innerHTML = `
       <div class="sub-list-item-info">
         <h5>${esc(item.militar_nome)} (${esc(item.militar_id)})</h5>
-        <p><strong>Aparições:</strong> ${item.qtd_aparicoes} | <strong>Total de Diárias:</strong> <span style="color:#f59e0b;font-weight:600;">${item.total_diarias} un.</span></p>
+        <p><strong>Aparições:</strong> ${item.qtd_aparicoes} | <strong>Total de Diárias:</strong> <span style="color:var(--warning-fg);font-weight:700;">${item.total_diarias} un.</span></p>
       </div>
       ${isAdmin ? `
       <button class="btn-icon btn-danger btn-sm" title="Remover militar da escala" aria-label="Remover militar da escala" data-action="excluir-escala" data-id="${item.id}">
@@ -2325,6 +2756,9 @@ async function renderRelatorioTable() {
              item.militar_id.toLowerCase().includes(searchInput);
     });
 
+    // KPIs do topo: refletem o filtro de busca aplicado
+    renderRelatorioKpis(filteredData);
+
     if (filteredData.length === 0) {
       tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Nenhum militar localizado para o período/filtro selecionado.</td></tr>`;
       return;
@@ -2337,15 +2771,32 @@ async function renderRelatorioTable() {
         <td class="card-title-cell">${esc(item.militar_nome)}</td>
         <td class="text-center" data-label="Qtd. Escalas">${item.escalas_count}</td>
         <td class="text-center" data-label="Total Aparições">${item.qtd_aparicoes}</td>
-        <td class="text-right" data-label="Total Diárias" style="color:#f59e0b;font-weight:600;">${item.total_diarias}</td>
+        <td class="text-right" data-label="Total Diárias" style="color:var(--warning-fg);font-weight:700;">${item.total_diarias}</td>
       `;
       tableBody.appendChild(tr);
     });
 
   } catch (error) {
     console.error("Erro ao gerar relatório:", error);
-    tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);">Falha ao carregar relatório financeiro.</td></tr>`;
+    renderRelatorioKpis([]);
+    tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger-fg);">Falha ao carregar o relatório de diárias.</td></tr>`;
   }
+}
+
+// Faixa de KPIs do Relatório de Diárias (protótipo). Tudo derivado da mesma
+// lista já carregada — nenhuma chamada extra à API.
+function renderRelatorioKpis(lista) {
+  const militares = lista.length;
+  const diarias = lista.reduce((s, m) => s + (m.total_diarias || 0), 0);
+  const escalas = lista.reduce((s, m) => s + (m.escalas_count || 0), 0);
+  const media = militares > 0 ? (diarias / militares) : 0;
+
+  document.getElementById('rel-kpi-militares').textContent = militares;
+  document.getElementById('rel-kpi-diarias').textContent = diarias;
+  document.getElementById('rel-kpi-escalas').textContent = escalas;
+  // uma casa decimal só quando não é inteiro, pra não poluir
+  document.getElementById('rel-kpi-media').textContent =
+    Number.isInteger(media) ? media : media.toFixed(1);
 }
 
 function exportRelatorioToCSV() {
@@ -2631,13 +3082,22 @@ async function renderPlanejadorTab() {
 
     state.config = { ...state.config, cota_mensal_diarias: data.cota_mensal };
 
-    // Cards de resumo
+    // KPIs: Cota / Consumido / Planejado / Disponível (+ % da cota)
     document.getElementById('plan-stat-cota').textContent = data.cota_mensal;
     document.getElementById('plan-stat-consumido').textContent = data.total_consumido;
+    document.getElementById('plan-stat-planejado').textContent = data.total_planejado || 0;
 
     const saldoEl = document.getElementById('plan-stat-saldo');
     saldoEl.textContent = data.saldo;
-    saldoEl.style.color = data.saldo < 0 ? 'var(--danger)' : '';
+    const estourou = data.saldo < 0;
+    saldoEl.style.color = estourou ? 'var(--danger-fg)' : '';
+    document.getElementById('plan-stat-saldo-pct').textContent = data.cota_mensal > 0
+      ? `${Math.round((data.saldo / data.cota_mensal) * 100)}% da cota` : '';
+    // o card vira vermelho quando a cota estourou
+    document.getElementById('plan-label-saldo').style.color = estourou ? 'var(--danger-fg)' : 'var(--warning-fg)';
+    const iconeSaldo = document.getElementById('plan-icone-saldo');
+    iconeSaldo.style.background = estourou ? 'var(--danger-bg)' : 'var(--warning-bg)';
+    iconeSaldo.style.color = estourou ? 'var(--danger-fg)' : 'var(--warning-fg)';
 
     // Input da cota (não sobrescreve enquanto o usuário edita — proteção contra o auto-sync)
     const cotaInput = document.getElementById('input-cota');
@@ -2668,10 +3128,11 @@ async function renderPlanejadorTab() {
     const fillPlanejado = document.getElementById('budget-bar-fill-planejado');
     fillPlanejado.style.width = `${Math.max(0, Math.min(pctPlanejado, 100 - Math.min(pctConsumido, 100)))}%`;
 
-    document.getElementById('budget-label-text').textContent = totalPlanejado > 0
-      ? `${data.total_consumido} consumidas + ${totalPlanejado} planejadas de ${data.cota_mensal} diárias`
-      : `${data.total_consumido} de ${data.cota_mensal} diárias planejadas no mês`;
-    document.getElementById('budget-label-pct').textContent = `${Math.round(pctTotal)}%`;
+    document.getElementById('budget-label-text').textContent =
+      `${data.total_consumido + totalPlanejado} de ${data.cota_mensal} diárias · ${Math.round(pctTotal)}%`;
+    document.getElementById('budget-legenda-consumido').textContent = data.total_consumido;
+    document.getElementById('budget-legenda-planejado').textContent = totalPlanejado;
+    document.getElementById('budget-legenda-disponivel').textContent = Math.max(0, data.saldo);
 
     // Alerta de estouro da cota (considera consumido + planejado)
     const alertEl = document.getElementById('budget-alert');
@@ -2686,9 +3147,11 @@ async function renderPlanejadorTab() {
     // Tabela de operações do mês
     tableBody.innerHTML = '';
     const operacoesMes = data.operacoes || [];
+    document.getElementById('plan-operacoes-contagem').textContent =
+      `${operacoesMes.length} ${operacoesMes.length === 1 ? 'operação' : 'operações'}`;
 
     if (operacoesMes.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhuma operação para este mês.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhuma operação para este mês.</td></tr>`;
     } else {
       operacoesMes.forEach(op => {
         const tr = document.createElement('tr');
@@ -2696,28 +3159,65 @@ async function renderPlanejadorTab() {
         tr.addEventListener('click', () => openDrawerOperacao(op.id));
 
         const dateBr = op.data_inicio.split('-').reverse().join('/');
-        const pctOp = data.cota_mensal > 0
-          ? `${((op.total_diarias / data.cota_mensal) * 100).toFixed(1)}%`
-          : '—';
+        // Coluna "Escala" do protótipo: com escala (verde) x sem escala (âmbar)
+        const badgeEscala = op.tem_escala
+          ? `<span class="badge-tint badge-tint-ok">Com escala</span>`
+          : `<span class="badge-tint badge-tint-alerta">Sem escala</span>`;
 
         tr.innerHTML = `
-          <td><strong>${dateBr}</strong></td>
-          <td>${esc(op.nome_operacao)}</td>
-          <td>${esc(op.tipo_operacao)}</td>
-          <td>${badgeSituacaoOperacao(op.situacao)}</td>
-          <td class="text-center">${op.militares_escalados}</td>
-          <td class="text-right" style="color:#f59e0b;font-weight:600;">${op.total_diarias}${op.tem_escala ? '' : ' <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">(est.)</span>'}</td>
-          <td class="text-right">${pctOp}</td>
+          <td data-label="Data"><strong>${dateBr}</strong></td>
+          <td class="card-title-cell">${esc(op.nome_operacao)}</td>
+          <td data-label="Tipo">${esc(op.tipo_operacao)}</td>
+          <td data-label="Situação">${badgeSituacaoOperacao(op.situacao)}</td>
+          <td class="text-center" data-label="Escala">${badgeEscala}</td>
+          <td class="text-right" data-label="Diárias" style="color:var(--warning-fg);font-weight:700;">${op.total_diarias}${op.tem_escala ? '' : ' <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">(est.)</span>'}</td>
         `;
         tableBody.appendChild(tr);
       });
     }
 
+    renderDiariasPorTipo(operacoesMes);
     lucide.createIcons();
   } catch (error) {
     console.error("Erro ao carregar planejador de diárias:", error);
-    tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--danger);">Falha ao carregar o planejador de diárias.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger-fg);">Falha ao carregar o planejador de diárias.</td></tr>`;
   }
+}
+
+// Barras "Diárias por Tipo de Operação" (trilho do Planejador). Agrega as
+// operações do mês por tipo_operacao; a barra é proporcional ao maior tipo.
+function renderDiariasPorTipo(operacoes) {
+  const container = document.getElementById('plan-por-tipo');
+  if (!container) return;
+
+  const porTipo = {};
+  (operacoes || []).forEach(op => {
+    const tipo = op.tipo_operacao || 'Outras';
+    porTipo[tipo] = (porTipo[tipo] || 0) + (op.total_diarias || 0);
+  });
+
+  const linhas = Object.entries(porTipo).filter(([, qtd]) => qtd > 0).sort((a, b) => b[1] - a[1]);
+  if (linhas.length === 0) {
+    container.innerHTML = `<p class="turno-vazio">Nenhuma diária lançada neste mês.</p>`;
+    return;
+  }
+
+  const maior = linhas[0][1];
+  // Reaproveita as cores de tipo de evento pra manter a paleta coerente entre telas
+  const CORES = ['var(--primary)', 'var(--warning-fg)', 'var(--info-fg)', 'var(--roxo)', 'var(--success)', 'var(--badge-neutro)'];
+
+  container.innerHTML = linhas.map(([tipo, qtd], i) => {
+    const pct = Math.round((qtd / maior) * 100);
+    const cor = CORES[i % CORES.length];
+    return `
+      <div class="categoria-linha">
+        <div class="categoria-topo">
+          <span style="font-weight:600;color:${cor};">${esc(tipo)}</span>
+          <span style="color:var(--text-muted);">${qtd}</span>
+        </div>
+        <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pct}%;background:${cor};"></div></div>
+      </div>`;
+  }).join('');
 }
 
 // -------------------------------------------------------------
@@ -2782,7 +3282,7 @@ function renderOperacoesTab() {
       <td data-label="Situação">${badgeSituacaoOperacao(op.situacao)}</td>
       <td data-label="Demandante">${esc(op.demandante) || '-'}</td>
       <td class="text-center" data-label="Militares">${op.militares_escalados}</td>
-      <td class="text-right" data-label="Diária" style="color:#f59e0b;font-weight:600;">${op.total_diarias}${op.tem_escala ? '' : ' <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">(est.)</span>'}</td>
+      <td class="text-right" data-label="Diária" style="color:var(--warning-fg);font-weight:700;">${op.total_diarias}${op.tem_escala ? '' : ' <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">(est.)</span>'}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -2985,9 +3485,14 @@ function handleDeleteOperacao() {
 // -------------------------------------------------------------
 // CALENDÁRIO DE DIÁRIAS + LANÇAMENTO RÁPIDO DE MISSÃO AVULSA
 // -------------------------------------------------------------
+// Token de execução: se duas chamadas se sobrepõem (clique + polling de 60s), só a
+// última escreve na grade. Antes o grid era limpo ANTES do await, então uma corrida
+// (ou uma falha do Supabase) deixava o calendário vazio e sem explicação.
+let calendarioDiariasToken = 0;
+
 async function renderCalendarioDiarias() {
   const grid = document.getElementById('calendar-diarias-grid');
-  grid.innerHTML = '';
+  const meuToken = ++calendarioDiariasToken;
 
   const meses = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -3002,53 +3507,63 @@ async function renderCalendarioDiarias() {
   try {
     const res = await apiFetch(`${API_BASE_URL}/api/diarias-calendario?mes=${mesStr}&ano=${anoStr}`);
     const lista = await res.json();
+    if (!res.ok || !Array.isArray(lista)) throw new Error('resposta inesperada da API');
     lista.forEach(d => { diasComDiaria[d.dia] = d; });
   } catch (error) {
-    console.error("Erro ao carregar o calendário de diárias:", error);
+    console.error('Erro ao carregar o calendário de diárias:', error);
+    if (meuToken === calendarioDiariasToken) {
+      grid.innerHTML = `<p class="turno-vazio" style="grid-column:1/-1;">Não foi possível carregar o calendário. Tente de novo em instantes.</p>`;
+    }
+    return;
   }
+
+  // chegou tarde: outra chamada mais recente já assumiu a grade
+  if (meuToken !== calendarioDiariasToken) return;
 
   const primeiroDiaSemana = new Date(state.calendarDiariasYear, state.calendarDiariasMonth, 1).getDay();
   const totalDiasMes = new Date(state.calendarDiariasYear, state.calendarDiariasMonth + 1, 0).getDate();
 
+  // Monta fora da árvore e só troca no fim: a grade nunca fica vazia no meio do caminho
+  const fragmento = document.createDocumentFragment();
+
+  // Células vazias antes do dia 1 (o mês pode não começar no domingo)
   for (let i = 0; i < primeiroDiaSemana; i++) {
-    const emptyCell = document.createElement('div');
-    emptyCell.className = 'calendar-day inactive';
-    grid.appendChild(emptyCell);
+    const vazia = document.createElement('div');
+    vazia.className = 'heat-cell heat-vazia';
+    fragmento.appendChild(vazia);
   }
 
   const hoje = new Date();
   for (let dia = 1; dia <= totalDiasMes; dia++) {
-    const dayCell = document.createElement('div');
-    dayCell.className = 'calendar-day';
+    const celula = document.createElement('div');
+    celula.className = 'heat-cell';
 
     if (hoje.getDate() === dia && hoje.getMonth() === state.calendarDiariasMonth && hoje.getFullYear() === state.calendarDiariasYear) {
-      dayCell.classList.add('today');
+      celula.classList.add('heat-hoje');
     }
-
-    const dayNum = document.createElement('span');
-    dayNum.className = 'calendar-day-number';
-    dayNum.textContent = dia;
-    dayCell.appendChild(dayNum);
 
     const diaFormatado = String(dia).padStart(2, '0');
     const dataStr = `${anoStr}-${mesStr}-${diaFormatado}`;
     const infoDia = diasComDiaria[dataStr];
+    const qtd = infoDia ? infoDia.total_diarias : 0;
 
-    if (infoDia) {
-      dayCell.classList.add('tem-diaria');
-      dayCell.title = infoDia.eventos.map(e => `${e.nome_evento} (${e.total_diarias} diária(s))`).join('\n');
-      const badge = document.createElement('span');
-      badge.className = 'calendar-day-diaria-badge';
-      badge.textContent = `${infoDia.total_diarias} diária(s)`;
-      dayCell.appendChild(badge);
-    }
+    // Faixas do protótipo: 0 = neutro, ≤12 leve, ≤24 médio, >24 alto
+    if (qtd > 24) celula.classList.add('heat-alto');
+    else if (qtd > 12) celula.classList.add('heat-medio');
+    else if (qtd > 0) celula.classList.add('heat-leve');
 
-    dayCell.title = (dayCell.title ? dayCell.title + '\n' : '') + 'Clique para lançar uma missão avulsa nesta data';
-    dayCell.addEventListener('click', () => abrirModalMissaoAvulsa(dataStr));
+    celula.innerHTML = `<span class="heat-dia">${dia}</span><span class="heat-qtd">${qtd || ''}</span>`;
 
-    grid.appendChild(dayCell);
+    const detalhe = infoDia
+      ? infoDia.eventos.map(e => `${e.nome_evento} (${e.total_diarias} diária(s))`).join('\n') + '\n'
+      : '';
+    celula.title = `${detalhe}Clique para lançar uma Missão Avulsa em ${diaFormatado}/${mesStr}`;
+    celula.addEventListener('click', () => abrirModalMissaoAvulsa(dataStr));
+
+    fragmento.appendChild(celula);
   }
 
+  grid.replaceChildren(fragmento);
   lucide.createIcons();
 }
 
@@ -3445,25 +3960,129 @@ function calcularAlertasCartao(cartao) {
   return alertas;
 }
 
-// Renderiza o painel de alertas de conflito do cartão atualmente aberto
+// Renderiza a faixa de conflito do topo + o painel detalhado do trilho.
 function renderAlertasCartao() {
-  const painel = document.getElementById('cartao-alertas-panel');
   const lista = document.getElementById('cartao-alertas-lista');
+  const contador = document.getElementById('cartao-alertas-contador');
+  const banner = document.getElementById('cartao-conflito-banner');
   const alertas = calcularAlertasCartao(state.cartaoAtual);
 
-  if (alertas.length === 0) {
-    painel.classList.add('hidden');
-    return;
-  }
+  contador.textContent = alertas.length;
+  contador.classList.toggle('contador-pill-zero', alertas.length === 0);
 
-  painel.classList.remove('hidden');
-  lista.innerHTML = alertas.map(a => `
-    <div class="cartao-alerta-item">
-      <i data-lucide="alert-triangle"></i>
-      <span>${esc(a.mensagem)}</span>
-    </div>
-  `).join('');
+  if (alertas.length === 0) {
+    banner.classList.add('hidden');
+    lista.innerHTML = `<div class="dash-alertas-vazio"><i data-lucide="check-circle"></i><span>Nenhum conflito neste cartão.</span></div>`;
+  } else {
+    banner.classList.remove('hidden');
+    document.getElementById('cartao-conflito-titulo').textContent =
+      `${alertas.length} ${alertas.length === 1 ? 'alerta de conflito' : 'alertas de conflito'} neste cartão.`;
+    // resumo dos tipos presentes, sem repetir
+    const tipos = [...new Set(alertas.map(a => ROTULO_CONFLITO[a.tipo] || 'Conflito'))];
+    document.getElementById('cartao-conflito-sub').textContent = tipos.join(' · ');
+
+    lista.innerHTML = alertas.map(a => `
+      <div class="dash-alerta-item">
+        <span class="dash-alerta-icone" style="background:var(--warning-bg);color:var(--warning-fg);"><i data-lucide="alert-triangle"></i></span>
+        <div class="dash-alerta-texto">
+          <div class="dash-alerta-titulo">${esc(ROTULO_CONFLITO[a.tipo] || 'Conflito')}</div>
+          <div class="dash-alerta-sub">${esc(a.mensagem)}</div>
+        </div>
+      </div>`).join('');
+  }
   lucide.createIcons();
+}
+
+// Rótulo curto por tipo de conflito — usado no título do item e no resumo da faixa
+const ROTULO_CONFLITO = {
+  'sobreposicao': 'Sobreposição de horário',
+  'cobertura': 'Setor sem cobertura',
+  'sobreaviso-pendente': 'Fiscal Praça sem Oficial de Sobreaviso'
+};
+
+// Mini-cards de resumo + barras de distribuição por categoria (trilho do cartão)
+function renderResumoLateralCartao() {
+  const viaturas = (state.cartaoAtual && state.cartaoAtual.viaturas) || [];
+  const setores = new Set(viaturas.map(v => v.setor).filter(Boolean));
+  const atividades = new Set();
+  viaturas.forEach(v => (v.itens || []).forEach(i => { if (i.atividade) atividades.add(i.atividade); }));
+  const conflitos = calcularAlertasCartao(state.cartaoAtual).length;
+
+  const cards = [
+    { valor: viaturas.length, rotulo: 'Viaturas', icone: 'car', cor: 'var(--primary)', bg: 'var(--primary-soft)' },
+    // sempre `-fg` para cor de TEXTO/ícone sobre superfície — é o token legível
+    // nos dois temas. `--info` sólido só serve de fundo com texto branco em cima.
+    { valor: setores.size, rotulo: 'Setores', icone: 'map', cor: 'var(--info-fg)', bg: 'var(--info-bg)' },
+    { valor: atividades.size, rotulo: 'Atividades', icone: 'activity', cor: 'var(--success-fg)', bg: 'var(--success-bg)' },
+    {
+      valor: conflitos, rotulo: 'Conflitos', icone: 'alert-triangle',
+      cor: conflitos ? 'var(--danger-fg)' : 'var(--success-fg)',
+      bg: conflitos ? 'var(--danger-bg)' : 'var(--success-bg)'
+    }
+  ];
+
+  document.getElementById('cartao-resumo-mini').innerHTML = cards.map(c => `
+    <div class="resumo-mini-card">
+      <span class="resumo-mini-icone" style="background:${c.bg};color:${c.cor};"><i data-lucide="${c.icone}"></i></span>
+      <div>
+        <div class="resumo-mini-valor" style="color:${c.cor};">${c.valor}</div>
+        <div class="resumo-mini-rotulo">${esc(c.rotulo)}</div>
+      </div>
+    </div>`).join('');
+
+  // Distribuição por categoria de viatura — mesmas cores dos badges .cat-*
+  const CORES_CAT = {
+    'Ordinária': 'var(--primary)',
+    'Força Tática': 'var(--danger-fg)',
+    'Suplementar': 'var(--warning-fg)'
+  };
+  const contagem = {};
+  viaturas.forEach(v => {
+    const cat = v.categoria || 'Ordinária';
+    contagem[cat] = (contagem[cat] || 0) + 1;
+  });
+  const total = viaturas.length;
+  const linhas = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+
+  document.getElementById('cartao-categorias').innerHTML = total === 0
+    ? `<p class="turno-vazio">Nenhuma viatura no cartão.</p>`
+    : linhas.map(([cat, qtd]) => {
+        const pct = Math.round((qtd / total) * 100);
+        const cor = CORES_CAT[cat] || 'var(--badge-neutro)';
+        return `
+          <div class="categoria-linha">
+            <div class="categoria-topo">
+              <span style="font-weight:600;color:${cor};">${esc(cat)}</span>
+              <span style="color:var(--text-muted);">${qtd} (${pct}%)</span>
+            </div>
+            <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pct}%;background:${cor};"></div></div>
+          </div>`;
+      }).join('');
+
+  lucide.createIcons();
+}
+
+// Move a data do cartão N dias e recarrega — setas do navegador de data.
+function deslocarDiaCartao(dias) {
+  const campo = document.getElementById('cartao-data');
+  const base = campo.value ? new Date(campo.value + 'T00:00:00') : new Date();
+  base.setDate(base.getDate() + dias);
+  campo.value = getLocalDateStr(base);
+  renderCartaoTab();
+}
+
+// Dia da semana + pílula de status ao lado do navegador de data
+function atualizarCabecalhoDataCartao(dataStr, temCartao) {
+  const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  const semana = document.getElementById('cartao-data-semana');
+  const pill = document.getElementById('cartao-status-pill');
+  const texto = document.getElementById('cartao-status-texto');
+
+  semana.textContent = dataStr ? DIAS[new Date(dataStr + 'T00:00:00').getDay()] : '';
+  pill.classList.toggle('status-pill-ok', temCartao === true);
+  pill.classList.toggle('status-pill-pendente', temCartao === false);
+  texto.textContent = temCartao === null ? 'Selecione uma data'
+    : (temCartao ? 'Cartão lançado' : 'Cartão não lançado');
 }
 
 async function renderCartaoTab() {
@@ -3476,6 +4095,7 @@ async function renderCartaoTab() {
   if (!dataSelecionada) {
     vazioEl.classList.remove('hidden');
     conteudoEl.classList.add('hidden');
+    atualizarCabecalhoDataCartao('', null);
     atualizarSugestaoTemplateUI();
     return;
   }
@@ -3493,12 +4113,14 @@ async function renderCartaoTab() {
     if (lista.length === 0) {
       vazioEl.classList.remove('hidden');
       conteudoEl.classList.add('hidden');
+      atualizarCabecalhoDataCartao(dataSelecionada, false);
       atualizarSugestaoTemplateUI();
       lucide.createIcons();
       renderHistoricoRecente();
       return;
     }
 
+    atualizarCabecalhoDataCartao(dataSelecionada, true);
     const resDetalhe = await apiFetch(`${API_BASE_URL}/api/cartoes/${lista[0].id}`);
     const cartao = await resDetalhe.json();
     exibirCartaoNoEditor(cartao);
@@ -3557,6 +4179,7 @@ function exibirCartaoNoEditor(cartao) {
   renderCartaoVtrGrid();
   renderQuadroResumo();
   renderAlertasCartao();
+  renderResumoLateralCartao();
   lucide.createIcons();
 }
 
@@ -3861,9 +4484,60 @@ function renderQuadroResumo() {
   }).join('');
 }
 
+// Troca entre as abas Viaturas | Roteiro do cartão (protótipo do redesign).
+window.handleCartaoTrocarAba = function(aba) {
+  const ehViaturas = aba !== 'roteiro';
+  document.getElementById('cartao-painel-viaturas').classList.toggle('hidden', !ehViaturas);
+  document.getElementById('cartao-painel-roteiro').classList.toggle('hidden', ehViaturas);
+  document.querySelectorAll('.sub-aba').forEach(btn => {
+    const ativo = (btn.dataset.aba === 'viaturas') === ehViaturas;
+    btn.classList.toggle('ativo', ativo);
+    btn.setAttribute('aria-selected', String(ativo));
+  });
+};
+
+// Tabela da aba "Viaturas": mesma lista dos cards de roteiro, em formato enxuto.
+// As ações reaproveitam os data-action já existentes (editar-vtr/excluir-cartao-vtr),
+// então nada da fiação de edição muda.
+function renderCartaoViaturasTabela() {
+  const tbody = document.getElementById('table-cartao-viaturas-body');
+  if (!tbody) return;
+
+  const viaturas = (state.cartaoAtual && state.cartaoAtual.viaturas) || [];
+  const isAdmin = state.user && (state.user.role === 'P3' || state.user.role === 'Adjunto');
+
+  if (viaturas.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhuma viatura adicionada. Use o formulário abaixo para montar o cartão.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = viaturas.map(vtr => `
+    <tr>
+      <td class="card-title-cell"><strong>${esc(vtr.prefixo)}</strong></td>
+      <td data-label="Setor">${esc(vtr.setor) || '-'}</td>
+      <td data-label="Companhia">${esc(vtr.companhia) || '-'}</td>
+      <td data-label="Categoria">${vtr.categoria ? `<span class="badge ${slugBadge('cat-' + vtr.categoria)}">${esc(vtr.categoria)}</span>` : '-'}</td>
+      <td data-label="Comandante">${esc(vtr.comandante) || 'Não informado'}</td>
+      <td data-label="Observação" style="color:var(--text-muted);">${esc(vtr.observacao) || '-'}</td>
+      <td class="text-right" data-label="Ações">
+        ${isAdmin ? `
+          <div class="acoes-linha">
+            <button class="btn-icon" data-action="editar-vtr" data-vtr-id="${esc(vtr.id)}" title="Editar viatura" aria-label="Editar viatura">
+              <i data-lucide="pencil"></i>
+            </button>
+            <button class="btn-icon btn-icon-danger" data-action="excluir-cartao-vtr" data-vtr-id="${esc(vtr.id)}" title="Excluir viatura" aria-label="Excluir viatura">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>` : '—'}
+      </td>
+    </tr>`).join('');
+}
+
 function renderCartaoVtrGrid() {
   const grid = document.getElementById('cartao-vtr-grid');
   grid.innerHTML = '';
+
+  renderCartaoViaturasTabela();
 
   const viaturas = state.cartaoAtual.viaturas || [];
 
@@ -4133,6 +4807,7 @@ async function handleSalvarCabecalhoCartao() {
       state.cartaoAtual = { ...state.cartaoAtual, ...(await res.json()) };
       showToast('Cabeçalho do cartão atualizado.', 'success');
       renderAlertasCartao();
+      renderResumoLateralCartao();
     }
   } catch (error) {
     console.error(error);

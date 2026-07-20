@@ -1413,7 +1413,9 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   res.json({
     periodo: { mes: mesPeriodo, ano: anoPeriodo },
     eventos: { total_periodo: eventosDoPeriodo.length, proximos_7_dias: eventosProximos7Dias },
-    diarias: { total_pago_periodo: consumidoPeriodo, saldo_cota_periodo: cota - consumidoPeriodo - planejadoPeriodo, cota_mensal: cota },
+    // `planejado_periodo` alimenta o donut "Diárias — Visão Geral" do Dashboard (consumido real
+    // x planejado estimado). Já era calculado aqui pro saldo da cota; só passou a ser exposto.
+    diarias: { total_pago_periodo: consumidoPeriodo, planejado_periodo: planejadoPeriodo, saldo_cota_periodo: cota - consumidoPeriodo - planejadoPeriodo, cota_mensal: cota },
     planejador: { operacoes_planejadas: operacoesPlanejadas.length },
     efetivo_total_periodo: efetivoTotalPeriodo,
     distribuicao_tipo: distribuicaoTipo,

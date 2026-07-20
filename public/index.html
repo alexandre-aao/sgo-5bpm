@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SGO 5º BPM - Sistema de Gestão Operacional</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
-  <!-- Google Fonts: Inter e Outfit -->
+  <!-- Google Fonts: Inter (única família do redesign; Outfit foi removida) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Lucide Icons (CDN) — versão fixada (era @latest) pra não quebrar ícones com update não controlado.
        integrity (SRI) + crossorigin: o navegador só executa o arquivo se o sha384 bater, protegendo
        contra CDN comprometido/adulterado. Hashes calculados sobre os arquivos exatos dessas versões
@@ -64,14 +64,27 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-icon">
-          <i data-lucide="shield"></i>
+          <img src="img/brasao-5bpm.png" alt="Brasão do 5º BPM">
         </div>
         <div class="brand-text">
           <h2>SGO 5º BPM</h2>
-          <span>Gestão Operacional</span>
+          <span>Sistema de Gestão Operacional</span>
         </div>
       </div>
-      
+
+      <!-- Card de perfil no topo da sidebar (protótipo do redesign). O rodapé
+           continua com Alterar Senha / Sair — ações, não identidade. -->
+      <div class="perfil-card">
+        <div class="perfil-avatar" id="perfil-card-avatar">--</div>
+        <div class="perfil-info">
+          <div class="perfil-nome" id="perfil-card-nome">Carregando...</div>
+          <div class="perfil-meta">
+            <span id="perfil-card-role">Perfil: —</span>
+            <span class="perfil-online"></span> Online
+          </div>
+        </div>
+      </div>
+
       <!-- Menu de Navegação Dinâmico -->
       <nav class="nav-menu" id="sidebar-nav">
         <!-- Standalone -->
@@ -137,12 +150,31 @@
         </button>
       </nav>
 
-      <!-- Sidebar Footer com dados de Usuário -->
-      <div class="sidebar-footer">
-        <div class="user-display">
-          <h4 id="user-display-name">Carregando...</h4>
-          <span id="user-display-role">Perfil</span>
+      <!-- Card de Cota Mensal de Diárias (protótipo do redesign) — só P3, que é
+           quem enxerga o Planejador. Alimentado por atualizarCotaSidebar(). -->
+      <div class="cota-card hidden-role" id="cota-sidebar-card">
+        <div class="cota-card-titulo">Cota Mensal de Diárias</div>
+        <div class="cota-card-periodo" id="cota-sidebar-periodo">—</div>
+        <div class="cota-card-corpo">
+          <div class="cota-anel">
+            <svg viewBox="0 0 36 36" aria-hidden="true">
+              <circle cx="18" cy="18" r="15.5" fill="none" class="cota-anel-trilho" stroke-width="4"></circle>
+              <circle cx="18" cy="18" r="15.5" fill="none" class="cota-anel-progresso" stroke-width="4"
+                      stroke-linecap="round" stroke-dasharray="0 97" id="cota-sidebar-arco"></circle>
+            </svg>
+            <div class="cota-anel-pct" id="cota-sidebar-pct">0%</div>
+          </div>
+          <div class="cota-card-numeros">
+            <div>Consumido: <strong id="cota-sidebar-consumido">0</strong></div>
+            <div>Disponível: <strong id="cota-sidebar-disponivel">0</strong></div>
+            <div>Total: <strong id="cota-sidebar-total">0</strong></div>
+          </div>
         </div>
+        <button class="cota-card-btn" data-action="dashboard-card" data-nav="nav-btn-planejador">Ver Planejador</button>
+      </div>
+
+      <!-- Sidebar Footer: só ações (a identidade do usuário subiu para o .perfil-card) -->
+      <div class="sidebar-footer">
         <button id="btn-alterar-senha" class="btn-alterar-senha">
           <i data-lucide="key-round"></i>
           <span>Alterar Senha</span>
@@ -169,67 +201,40 @@
           </div>
         </div>
         <div class="header-actions">
-          <div class="filter-group tema-select-group">
-            <label for="tema-select" class="sr-only">Tema</label>
-            <select id="tema-select" aria-label="Tema de cor">
-              <option value="padrao">Padrão</option>
-              <option value="escuro">Escuro</option>
-              <option value="claro">Claro</option>
-            </select>
+          <!-- Toggle segmentado Claro/Escuro do protótipo (era um <select>).
+               role=radiogroup mantém acessível por teclado/leitor de tela. -->
+          <div class="tema-toggle" role="radiogroup" aria-label="Tema de cor">
+            <button type="button" class="tema-opcao" data-tema="claro" role="radio" aria-checked="true">
+              <i data-lucide="sun"></i><span>Claro</span>
+            </button>
+            <button type="button" class="tema-opcao" data-tema="escuro" role="radio" aria-checked="false">
+              <i data-lucide="moon"></i><span>Escuro</span>
+            </button>
           </div>
+
+          <div class="topbar-data">
+            <i data-lucide="calendar-days"></i>
+            <div>
+              <div class="topbar-data-dia" id="topbar-data-dia">—</div>
+              <div class="topbar-data-semana" id="topbar-data-semana">—</div>
+            </div>
+          </div>
+
           <div class="profile">
             <div class="profile-avatar" id="avatar-display">P3</div>
+            <div class="profile-texto">
+              <div class="profile-nome" id="profile-nome">—</div>
+              <div class="profile-role" id="profile-role">—</div>
+            </div>
           </div>
         </div>
       </header>
 
       <!-- Aba 1: Dashboard (Apenas P3) -->
+      <!-- Layout do Dashboard segue o protótipo do redesign: coluna principal + trilho
+           lateral de 344px (o trilho vira uma seção empilhada abaixo de 1280px). -->
       <section id="tab-dashboard" class="tab-content">
-        <!-- Faixa de Alertas Consolidados (só aparece se houver algo urgente) -->
-        <div id="dashboard-alertas" class="panel cartao-alertas-panel hidden">
-          <div class="panel-header">
-            <div class="panel-title">
-              <i data-lucide="alert-triangle"></i>
-              <h2>Alertas Operacionais</h2>
-            </div>
-          </div>
-          <div id="dashboard-alertas-lista" class="cartao-alertas-lista"></div>
-        </div>
-
-        <!-- Top Stats Row -->
-        <div class="stats-row">
-          <div class="stat-card">
-            <div class="stat-icon">
-              <i data-lucide="calendar"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Eventos na Semana</h3>
-              <p id="stat-eventos-semana">0</p>
-              <span class="stat-tendencia" id="stat-eventos-semana-tendencia"></span>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon info">
-              <i data-lucide="wallet"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Diárias no Mês / Cota</h3>
-              <p id="stat-diarias-mes">0 / 0</p>
-              <span class="stat-tendencia" id="stat-diarias-mes-tendencia"></span>
-            </div>
-          </div>
-          <div class="stat-card" id="stat-card-cartao-hoje" style="cursor:pointer;" data-action="ir-cartao-hoje" title="Ir para o Cartão Programa de hoje">
-            <div class="stat-icon alert" id="stat-cartao-hoje-icon">
-              <i data-lucide="route"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Cartão Programa de Hoje</h3>
-              <p id="stat-cartao-hoje">Verificando...</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Filtro de período: reprocessa os cards abaixo e o donut de distribuição por tipo -->
+        <!-- Filtro de período: reprocessa os KPIs, os cards de módulo e os donuts -->
         <div class="report-filters dashboard-periodo-filtro">
           <div class="filter-group">
             <label for="dashboard-filtro-mes">Mês</label>
@@ -254,125 +259,287 @@
           </div>
         </div>
 
-        <!-- Grid de cards-resumo do período selecionado, cada um clicável levando à aba correspondente -->
-        <div class="dashboard-grid">
-          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-eventos" title="Ir para Listar Eventos">
-            <div class="stat-icon"><i data-lucide="calendar-range"></i></div>
-            <div class="stat-info">
-              <h3>Eventos</h3>
-              <p id="dash-resumo-eventos">—</p>
-              <span class="stat-sub" id="dash-resumo-eventos-sub"></span>
-            </div>
-          </div>
-          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-planejador" title="Ir para o Planejador de Diárias">
-            <div class="stat-icon info"><i data-lucide="wallet"></i></div>
-            <div class="stat-info">
-              <h3>Diárias no Período / Cota</h3>
-              <p id="dash-resumo-diarias">—</p>
-              <div class="stat-bar"><div class="mini-bar-track"><div class="mini-bar-fill" id="dash-resumo-diarias-bar" style="width:0%"></div></div></div>
-            </div>
-          </div>
-          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-cartao" title="Ir para o Cartão Programa">
-            <div class="stat-icon alert" id="dash-resumo-cartao-icon"><i data-lucide="route"></i></div>
-            <div class="stat-info">
-              <h3>Cartão Programa</h3>
-              <p id="dash-resumo-cartao">Carregando...</p>
-            </div>
-          </div>
-          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-eventos" title="Ir para Listar Eventos">
-            <div class="stat-icon info"><i data-lucide="users"></i></div>
-            <div class="stat-info">
-              <h3>Efetivo Total Empregado</h3>
-              <p id="dash-resumo-efetivo">—</p>
-              <span class="stat-sub">militares no período</span>
-            </div>
-          </div>
-          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-pessoal" title="Ir para o Cadastro de Pessoal">
-            <div class="stat-icon info"><i data-lucide="contact"></i></div>
-            <div class="stat-info">
-              <h3>Cadastro de Pessoal</h3>
-              <p id="dash-resumo-pessoal">—</p>
-              <div class="stat-badges" id="dash-resumo-pessoal-badges"></div>
-            </div>
-          </div>
-          <div class="stat-card" style="cursor:pointer;" data-action="dashboard-card" data-nav="nav-btn-usuarios" title="Ir para Usuários">
-            <div class="stat-icon"><i data-lucide="users-round"></i></div>
-            <div class="stat-info">
-              <h3>Usuários</h3>
-              <p id="dash-resumo-usuarios">—</p>
-              <span class="stat-sub">contas cadastradas</span>
-            </div>
-          </div>
-        </div>
+        <div class="dash-layout">
+          <!-- ---------- COLUNA PRINCIPAL ---------- -->
+          <div class="dash-main">
 
-        <!-- Distribuição por tipo de missão/evento no período — só em desktop (@media 768px oculta) -->
-        <div class="panel dashboard-donut-panel" id="dashboard-donut-panel">
-          <div class="panel-header">
-            <div class="panel-title">
-              <i data-lucide="pie-chart"></i>
-              <h2>Distribuição por Tipo de Missão</h2>
+            <!-- KPIs: rótulo + ícone em cima, número grande, rodapé livre (tendência/barra/link) -->
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-topo">
+                  <span class="kpi-label" style="color:var(--primary);">Eventos (7 dias)</span>
+                  <span class="kpi-icone" style="background:var(--primary-soft);color:var(--primary);"><i data-lucide="calendar"></i></span>
+                </div>
+                <div class="kpi-valor-linha">
+                  <span class="kpi-valor" id="stat-eventos-semana">0</span>
+                </div>
+                <div class="kpi-rodape"><span class="stat-tendencia" id="stat-eventos-semana-tendencia"></span></div>
+              </div>
+
+              <div class="kpi-card">
+                <div class="kpi-topo">
+                  <span class="kpi-label" style="color:var(--success-fg);">Operações (período)</span>
+                  <span class="kpi-icone" style="background:var(--success-bg);color:var(--success-fg);"><i data-lucide="shield-alert"></i></span>
+                </div>
+                <div class="kpi-valor-linha">
+                  <span class="kpi-valor" id="stat-operacoes-periodo">0</span>
+                </div>
+                <div class="kpi-rodape"><span class="stat-sub" id="stat-operacoes-periodo-sub"></span></div>
+              </div>
+
+              <div class="kpi-card">
+                <div class="kpi-topo">
+                  <span class="kpi-label" style="color:var(--warning-fg);">Diárias Consumidas</span>
+                  <span class="kpi-icone" style="background:var(--warning-bg);color:var(--warning-fg);"><i data-lucide="wallet"></i></span>
+                </div>
+                <div class="kpi-valor-linha">
+                  <span class="kpi-valor" id="stat-diarias-mes">0</span>
+                  <span class="kpi-sufixo" id="stat-diarias-mes-sufixo">de 0</span>
+                </div>
+                <div class="kpi-rodape kpi-rodape-barra">
+                  <div class="mini-bar-track"><div class="mini-bar-fill" id="stat-diarias-bar" style="width:0%"></div></div>
+                  <span class="kpi-pct" id="stat-diarias-pct">0%</span>
+                </div>
+              </div>
+
+              <div class="kpi-card kpi-card-clicavel" data-action="ir-cartao-hoje" title="Ir para o Cartão Programa de hoje">
+                <div class="kpi-topo">
+                  <span class="kpi-label" id="stat-conflitos-label" style="color:var(--danger-fg);">Conflitos Hoje</span>
+                  <span class="kpi-icone" id="stat-conflitos-icone" style="background:var(--danger-bg);color:var(--danger-fg);"><i data-lucide="alert-triangle"></i></span>
+                </div>
+                <div class="kpi-valor-linha">
+                  <span class="kpi-valor" id="stat-conflitos">0</span>
+                </div>
+                <div class="kpi-rodape"><span class="kpi-link" id="stat-cartao-hoje">Verificando...</span></div>
+              </div>
+            </div>
+
+            <!-- Alertas + Patrulhamento lado a lado -->
+            <div class="dash-duo">
+              <div class="panel">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <i data-lucide="alert-triangle"></i>
+                    <h2>Alertas Operacionais</h2>
+                  </div>
+                </div>
+                <div id="dashboard-alertas-lista" class="dash-alertas-lista"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <i data-lucide="route"></i>
+                    <h2>Patrulhamento de Hoje</h2>
+                  </div>
+                </div>
+
+                <div id="dash-patrulhamento-vazio" class="cartao-empty-state hidden" style="padding:28px 24px;">
+                  <i data-lucide="clipboard-x"></i>
+                  <h3>Nenhum Cartão Programa lançado para hoje</h3>
+                  <p>Lance o cartão de patrulhamento para orientar as viaturas do dia.</p>
+                  <button class="btn btn-primary btn-sm" style="margin-top:12px;" data-action="ir-cartao-hoje">
+                    <i data-lucide="plus"></i> Lançar Cartão de Hoje
+                  </button>
+                </div>
+
+                <div class="table-responsive">
+                  <table class="styled-table table-cards-mobile" id="table-dash-patrulhamento">
+                    <thead>
+                      <tr>
+                        <th>Viatura</th>
+                        <th>Setor</th>
+                        <th>Companhia</th>
+                        <th>Comandante</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dash-patrulhamento-lista"></tbody>
+                  </table>
+                </div>
+                <div class="panel-rodape-link"><button class="link-btn" data-action="ir-cartao-hoje">Ver cartão completo</button></div>
+              </div>
+            </div>
+
+            <!-- Módulos: navegação. A descrição de cada card carrega o número vivo do período
+                 (o protótipo usa texto fixo; aqui o dado real cabe no mesmo lugar). -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="layout-grid"></i>
+                  <h2>Módulos</h2>
+                </div>
+              </div>
+              <div class="mod-grid">
+                <button class="mod-card" data-action="dashboard-card" data-nav="nav-btn-eventos">
+                  <span class="mod-icone" style="background:var(--primary-soft);color:var(--primary);"><i data-lucide="calendar-range"></i></span>
+                  <span class="mod-nome">Eventos</span>
+                  <span class="mod-desc" id="dash-resumo-eventos-sub">—</span>
+                </button>
+                <button class="mod-card" data-action="dashboard-card" data-nav="nav-btn-cartao">
+                  <span class="mod-icone" style="background:var(--primary-soft);color:var(--primary);"><i data-lucide="car"></i></span>
+                  <span class="mod-nome">Cartão Programa</span>
+                  <span class="mod-desc" id="dash-resumo-cartao">Carregando...</span>
+                </button>
+                <button class="mod-card" data-action="dashboard-card" data-nav="nav-btn-planejador">
+                  <span class="mod-icone" style="background:var(--warning-bg);color:var(--warning-fg);"><i data-lucide="clipboard-list"></i></span>
+                  <span class="mod-nome">Planejador de Diárias</span>
+                  <span class="mod-desc" id="dash-resumo-diarias">—</span>
+                </button>
+                <button class="mod-card" data-action="dashboard-card" data-nav="nav-btn-relatorio">
+                  <span class="mod-icone" style="background:var(--success-bg);color:var(--success-fg);"><i data-lucide="file-text"></i></span>
+                  <span class="mod-nome">Relatório de Diárias</span>
+                  <span class="mod-desc">Consolidado por militar</span>
+                </button>
+                <!-- O protótipo traz "Estatísticas" aqui, mas este app não tem essa aba
+                     (o painel analítico vive dentro de Relatório Diárias). No lugar entra
+                     Cadastro de Viaturas, que é módulo real e não estava no grid. -->
+                <button class="mod-card" data-action="dashboard-card" data-nav="nav-btn-viaturas">
+                  <span class="mod-icone" style="background:var(--info-bg);color:var(--info-fg);"><i data-lucide="car"></i></span>
+                  <span class="mod-nome">Cadastro de Viaturas</span>
+                  <span class="mod-desc" id="dash-resumo-efetivo">—</span>
+                </button>
+                <button class="mod-card" data-action="dashboard-card" data-nav="nav-btn-pessoal">
+                  <span class="mod-icone" style="background:var(--roxo-bg);color:var(--roxo);"><i data-lucide="users"></i></span>
+                  <span class="mod-nome">Pessoal</span>
+                  <span class="mod-desc" id="dash-resumo-pessoal">—</span>
+                </button>
+                <button class="mod-card" data-action="dashboard-card" data-nav="nav-btn-usuarios">
+                  <span class="mod-icone" style="background:var(--primary-soft);color:var(--primary);"><i data-lucide="user"></i></span>
+                  <span class="mod-nome">Usuários</span>
+                  <span class="mod-desc" id="dash-resumo-usuarios">—</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Diárias: donut consumido (real) x planejado (estimado) -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="wallet"></i>
+                  <h2>Diárias — Visão Geral</h2>
+                </div>
+                <span class="panel-header-sub" id="dash-diarias-periodo"></span>
+              </div>
+              <div id="dashboard-donut-diarias" class="dashboard-donut-wrap"></div>
+            </div>
+
+            <!-- Distribuição por tipo de missão/evento no período -->
+            <div class="panel dashboard-donut-panel" id="dashboard-donut-panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="pie-chart"></i>
+                  <h2>Distribuição por Tipo de Missão</h2>
+                </div>
+              </div>
+              <div id="dashboard-donut-tipo" class="dashboard-donut-wrap"></div>
+            </div>
+
+            <!-- Operações Recentes -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="shield-alert"></i>
+                  <h2>Operações Recentes</h2>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="styled-table table-cards-mobile" id="table-dash-operacoes">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Operação</th>
+                      <th>Tipo</th>
+                      <th>Situação</th>
+                      <th class="text-center">Diárias</th>
+                      <th class="text-center">Escalados</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-operacoes-lista"></tbody>
+                </table>
+              </div>
+              <div class="panel-rodape-link"><button class="link-btn" data-action="dashboard-card" data-nav="nav-btn-operacoes">Ver todas as operações</button></div>
+            </div>
+
+            <!-- Top 10 — Ranking de Empenho -->
+            <div class="panel dashboard-ranking-panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="trophy"></i>
+                  <h2>Top 10 — Ranking de Empenho</h2>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="styled-table table-cards-mobile" id="table-top-militares">
+                  <thead>
+                    <tr>
+                      <th style="width:56px;">#</th>
+                      <th>Policial</th>
+                      <th class="text-center">Escalas</th>
+                      <th class="text-center">Diárias</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-top-militares-body"></tbody>
+                </table>
+              </div>
             </div>
           </div>
-          <div id="dashboard-donut-tipo" class="dashboard-donut-wrap"></div>
-        </div>
 
-        <!-- Top 10 — Ranking de Empenho (militares com mais diárias no período) -->
-        <div class="panel dashboard-ranking-panel">
-          <div class="panel-header">
-            <div class="panel-title">
-              <i data-lucide="trophy"></i>
-              <h2>Top 10 — Ranking de Empenho</h2>
+          <!-- ---------- TRILHO LATERAL ---------- -->
+          <aside class="dash-rail">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="calendar-days"></i>
+                  <h2>Eventos Próximos</h2>
+                </div>
+                <button class="link-btn" data-action="dashboard-card" data-nav="nav-btn-eventos">Ver todos</button>
+              </div>
+              <div class="table-responsive">
+                <!-- 3 colunas em vez das 4 do protótipo: com os nomes reais de evento
+                     e bairro, 4 colunas em 344px truncam tudo. O bairro virou a
+                     segunda linha da célula de evento. -->
+                <table class="styled-table styled-table-compacta" id="table-dash-eventos-proximos">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Evento</th>
+                      <th>Nº OS</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-eventos-proximos-lista"></tbody>
+                </table>
+              </div>
             </div>
-          </div>
-          <div class="table-responsive">
-            <table class="styled-table table-cards-mobile" id="table-top-militares">
-              <thead>
-                <tr>
-                  <th style="width:56px;">#</th>
-                  <th>Policial</th>
-                  <th class="text-center">Escalas</th>
-                  <th class="text-center">Diárias</th>
-                </tr>
-              </thead>
-              <tbody id="table-top-militares-body"></tbody>
-            </table>
-          </div>
-        </div>
 
-        <!-- Patrulhamento de Hoje (preview do Cartão Programa) -->
-        <div class="panel dash-patrulhamento-panel">
-          <div class="panel-header">
-            <div class="panel-title">
-              <i data-lucide="route"></i>
-              <h2>Patrulhamento de Hoje</h2>
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="zap"></i>
+                  <h2>Atalhos Rápidos</h2>
+                </div>
+              </div>
+              <div class="atalhos-lista">
+                <button class="atalho" data-action="dashboard-card" data-nav="nav-btn-cadastro">
+                  <i data-lucide="calendar-plus"></i> Novo Evento
+                </button>
+                <button class="atalho" data-action="dashboard-card" data-nav="nav-btn-operacoes">
+                  <i data-lucide="shield-plus"></i> Nova Operação
+                </button>
+                <button class="atalho" data-action="ir-cartao-hoje">
+                  <i data-lucide="clipboard-list"></i> Cartão Programa de Hoje
+                </button>
+                <button class="atalho" data-action="dashboard-card" data-nav="nav-btn-planejador">
+                  <i data-lucide="zap"></i> Lançamento — Missão Avulsa
+                </button>
+                <button class="atalho" data-action="dashboard-card" data-nav="nav-btn-relatorio">
+                  <i data-lucide="file-text"></i> Relatório de Diárias
+                </button>
+                <button class="atalho" data-action="dashboard-card" data-nav="nav-btn-mapa">
+                  <i data-lucide="map"></i> Mapa de Eventos
+                </button>
+              </div>
             </div>
-            <button class="btn btn-secondary btn-sm" data-action="ir-cartao-hoje">
-              <i data-lucide="arrow-right"></i> Ver Cartão Completo
-            </button>
-          </div>
-
-          <div id="dash-patrulhamento-vazio" class="cartao-empty-state hidden" style="padding:32px 24px;">
-            <i data-lucide="clipboard-x"></i>
-            <h3>Nenhum Cartão Programa lançado para hoje</h3>
-            <p>Lance o cartão de patrulhamento para orientar as viaturas do dia.</p>
-            <button class="btn btn-primary btn-sm" style="margin-top:12px;" data-action="ir-cartao-hoje">
-              <i data-lucide="plus"></i> Lançar Cartão de Hoje
-            </button>
-          </div>
-
-          <div class="table-responsive">
-            <table class="styled-table table-cards-mobile" id="table-dash-patrulhamento">
-              <thead>
-                <tr>
-                  <th>Viatura</th>
-                  <th>Setor</th>
-                  <th>Companhia</th>
-                  <th>Comandante</th>
-                </tr>
-              </thead>
-              <tbody id="dash-patrulhamento-lista"></tbody>
-            </table>
-          </div>
+          </aside>
         </div>
       </section>
 
@@ -388,7 +555,7 @@
             </div>
             <form id="form-evento" class="styled-form">
               <div class="form-section">
-                <h3 class="form-section-title">Documentação</h3>
+                <h3 class="form-section-title"><span class="form-section-icone"><i data-lucide="file-text"></i></span>Documentação</h3>
                 <div class="form-row">
                   <div class="form-group col-md-4">
                     <label for="num_oficio">Número do Ofício</label>
@@ -406,7 +573,7 @@
               </div>
 
               <div class="form-section">
-                <h3 class="form-section-title">Identificação</h3>
+                <h3 class="form-section-title"><span class="form-section-icone"><i data-lucide="info"></i></span>Identificação</h3>
                 <div class="form-row">
                   <div class="form-group col-md-4">
                     <label for="tipo_evento">Tipo de Evento *</label>
@@ -434,7 +601,7 @@
               </div>
 
               <div class="form-section">
-                <h3 class="form-section-title">Quando e Onde</h3>
+                <h3 class="form-section-title"><span class="form-section-icone"><i data-lucide="map-pin"></i></span>Quando e Onde</h3>
                 <div class="form-row">
                   <div class="form-group col-md-4">
                     <label for="data_inicio">Data de Início *</label>
@@ -477,49 +644,163 @@
         </div>
       </section>
 
-      <!-- Aba 3: Meu Turno (Para Oficial de Dia / Adjunto / P3) -->
+      <!-- Aba 3: Meu Turno (Para Oficial de Dia / Adjunto / P3)
+           Segue o protótipo "Meu Turno.dc.html": seletor Hoje/Amanhã, faixa de
+           KPIs, coluna principal (eventos + viaturas) e trilho lateral (equipe +
+           avisos). O painel "Contatos Rápidos" do protótipo ficou de fora: o
+           modelo de dados não tem telefone de ninguém e inventar número num
+           sistema operacional de PM seria pior que não ter o painel. -->
       <section id="tab-turno" class="tab-content">
-        <div class="turno-header-info">
-          <p>Visão simplificada focada na escala de serviço diário.</p>
+
+        <div class="turno-toolbar">
+          <div class="dia-switch" role="radiogroup" aria-label="Dia do turno">
+            <button type="button" class="dia-opcao ativo" data-action="turno-dia" data-dia="hoje" role="radio" aria-checked="true" id="turno-btn-hoje">Hoje</button>
+            <button type="button" class="dia-opcao" data-action="turno-dia" data-dia="amanha" role="radio" aria-checked="false" id="turno-btn-amanha">Amanhã</button>
+          </div>
+          <div class="turno-toolbar-acoes">
+            <span class="status-pill" id="turno-status-cartao">
+              <span class="status-dot"></span><span id="turno-status-texto">Verificando cartão...</span>
+            </span>
+            <button class="btn btn-secondary btn-sm" data-action="ir-cartao-hoje">
+              <i data-lucide="route"></i> Abrir Cartão Programa
+            </button>
+          </div>
         </div>
-        <div class="turno-grid">
-          <!-- Coluna Hoje -->
-          <div class="panel turno-column">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="calendar" class="color-success"></i>
-                <h2>Eventos de Hoje</h2>
-              </div>
-              <span class="badge badge-date" id="turno-data-hoje">05/07/2026</span>
+
+        <div class="kpi-row turno-kpis">
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--primary-soft);color:var(--primary);"><i data-lucide="calendar"></i></span>
+            <div>
+              <div class="kpi-valor" id="turno-kpi-eventos">0</div>
+              <div class="kpi-label-sob">Eventos do dia</div>
             </div>
-            <div class="turno-cards-container" id="turno-cards-hoje">
-              <!-- Injetado via JS -->
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--info-bg);color:var(--info-fg);"><i data-lucide="car"></i></span>
+            <div>
+              <div class="kpi-valor" id="turno-kpi-viaturas">0</div>
+              <div class="kpi-label-sob">Viaturas no turno</div>
+            </div>
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--success-bg);color:var(--success-fg);"><i data-lucide="users"></i></span>
+            <div>
+              <div class="kpi-valor" id="turno-kpi-efetivo">0</div>
+              <div class="kpi-label-sob">Efetivo empregado</div>
+            </div>
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" id="turno-kpi-avisos-icone" style="background:var(--warning-bg);color:var(--warning-fg);"><i data-lucide="alert-triangle"></i></span>
+            <div>
+              <div class="kpi-valor" id="turno-kpi-avisos">0</div>
+              <div class="kpi-label-sob">Avisos do turno</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-layout">
+          <div class="dash-main">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="calendar"></i>
+                  <h2>Eventos do Dia</h2>
+                </div>
+                <span class="panel-header-sub" id="turno-eventos-contagem"></span>
+              </div>
+              <div id="turno-eventos-lista" class="turno-lista"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="route"></i>
+                  <h2>Cartão Programa — Viaturas do Turno</h2>
+                </div>
+                <button class="link-btn" data-action="ir-cartao-hoje">Ver cartão completo</button>
+              </div>
+              <div class="table-responsive">
+                <table class="styled-table table-cards-mobile" id="table-turno-viaturas">
+                  <thead>
+                    <tr>
+                      <th>Prefixo</th>
+                      <th>Setor</th>
+                      <th>Categoria</th>
+                      <th>Companhia</th>
+                      <th>Comandante</th>
+                    </tr>
+                  </thead>
+                  <tbody id="turno-viaturas-lista"></tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <!-- Coluna Amanhã -->
-          <div class="panel turno-column">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="arrow-right-circle" class="color-primary"></i>
-                <h2>Eventos de Amanhã</h2>
+          <aside class="dash-rail">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="user-check"></i>
+                  <h2>Equipe de Serviço</h2>
+                </div>
               </div>
-              <span class="badge badge-date" id="turno-data-amanha">06/07/2026</span>
+              <div id="turno-equipe" class="turno-equipe"></div>
             </div>
-            <div class="turno-cards-container" id="turno-cards-amanha">
-              <!-- Injetado via JS -->
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="alert-triangle"></i>
+                  <h2>Avisos do Turno</h2>
+                </div>
+              </div>
+              <div id="turno-avisos" class="dash-alertas-lista"></div>
             </div>
-          </div>
+          </aside>
         </div>
       </section>
 
       <!-- Aba 4: Listar Eventos (Compartilhado com Filtro de Datas) -->
+      <!-- Segue "Eventos.dc.html": faixa de KPIs + card único com toolbar,
+           tabela e rodapé de contagem. Sem paginação: a listagem é filtrada por
+           período e o volume não justifica paginar (seria mudança funcional). -->
       <section id="tab-eventos" class="tab-content">
+        <div class="kpi-row eventos-kpis">
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--primary-soft);color:var(--primary);"><i data-lucide="calendar-range"></i></span>
+            <div>
+              <div class="kpi-valor" id="ev-kpi-total">0</div>
+              <div class="kpi-label-sob">No filtro atual</div>
+            </div>
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--success-bg);color:var(--success-fg);"><i data-lucide="calendar-clock"></i></span>
+            <div>
+              <div class="kpi-valor" id="ev-kpi-proximos">0</div>
+              <div class="kpi-label-sob">Próximos 7 dias</div>
+            </div>
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" id="ev-icone-os" style="background:var(--warning-bg);color:var(--warning-fg);"><i data-lucide="file-warning"></i></span>
+            <div>
+              <div class="kpi-valor" id="ev-kpi-sem-os">0</div>
+              <div class="kpi-label-sob">Sem Nº da OS</div>
+            </div>
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" id="ev-icone-sei" style="background:var(--warning-bg);color:var(--warning-fg);"><i data-lucide="file-question"></i></span>
+            <div>
+              <div class="kpi-valor" id="ev-kpi-sem-sei">0</div>
+              <div class="kpi-label-sob">Sem Nº SEI</div>
+            </div>
+          </div>
+        </div>
+
         <div class="panel events-panel">
           <div class="panel-header flex-column-mobile">
             <div class="panel-title">
               <i data-lucide="calendar-search"></i>
-              <h2>Consulta Geral de Pauta de Eventos</h2>
+              <h2>Listar Eventos</h2>
             </div>
             <div class="events-filters-bar">
               <div class="filter-group">
@@ -535,8 +816,11 @@
                 <input type="text" id="filter-eventos-search" placeholder="Buscar por Evento, Local ou Demandante...">
               </div>
               <button id="btn-clear-date-filter" class="btn btn-secondary btn-sm">Limpar Filtros</button>
-              <button id="btn-relatorio-pdf-eventos" class="btn btn-primary btn-sm">
-                <i data-lucide="file-down"></i> Relatório de Eventos (PDF)
+              <button id="btn-relatorio-pdf-eventos" class="btn btn-secondary btn-sm">
+                <i data-lucide="file-down"></i> Relatório (PDF)
+              </button>
+              <button class="btn btn-primary btn-sm admin-only" data-action="dashboard-card" data-nav="nav-btn-cadastro">
+                <i data-lucide="plus"></i> Novo Evento
               </button>
             </div>
           </div>
@@ -559,6 +843,7 @@
               </tbody>
             </table>
           </div>
+          <p class="panel-nota" id="eventos-rodape-contagem"></p>
         </div>
       </section>
 
@@ -595,7 +880,18 @@
             </div>
           </div>
           <div id="mapa-aviso-sem-coordenada" class="mapa-aviso hidden"></div>
-          <div id="mapa-eventos-semana" class="mapa-container"></div>
+          <!-- Mapa + painel de ocorrências ao lado (protótipo "Mapa.dc.html").
+               Clicar numa ocorrência centraliza o mapa no bairro dela. -->
+          <div class="mapa-layout">
+            <div id="mapa-eventos-semana" class="mapa-container"></div>
+            <aside class="mapa-ocorrencias">
+              <div class="mapa-ocorrencias-topo">
+                <span class="mapa-ocorrencias-titulo">Ocorrências no Mapa</span>
+                <span class="panel-header-sub" id="mapa-ocorrencias-contagem">0 pontos</span>
+              </div>
+              <div id="mapa-ocorrencias-lista"></div>
+            </aside>
+          </div>
         </div>
 
         <!-- Cadastro de Bairros (P3) -->
@@ -645,12 +941,44 @@
       </section>
 
       <!-- Aba 5: Relatório Diárias (Apenas P3) -->
+      <!-- Segue "Relatorio Diarias.dc.html": faixa de KPIs acima do consolidado. -->
       <section id="tab-relatorio" class="tab-content">
+        <div class="kpi-row relatorio-kpis">
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--primary-soft);color:var(--primary);"><i data-lucide="users"></i></span>
+            <div>
+              <div class="kpi-valor" id="rel-kpi-militares">0</div>
+              <div class="kpi-label-sob">Militares no mês</div>
+            </div>
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--warning-bg);color:var(--warning-fg);"><i data-lucide="wallet"></i></span>
+            <div>
+              <div class="kpi-valor" id="rel-kpi-diarias">0</div>
+              <div class="kpi-label-sob">Total de diárias</div>
+            </div>
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--success-bg);color:var(--success-fg);"><i data-lucide="list-checks"></i></span>
+            <div>
+              <div class="kpi-valor" id="rel-kpi-escalas">0</div>
+              <div class="kpi-label-sob">Escalas lançadas</div>
+            </div>
+          </div>
+          <div class="kpi-card kpi-card-horizontal">
+            <span class="kpi-icone" style="background:var(--info-bg);color:var(--info-fg);"><i data-lucide="trending-up"></i></span>
+            <div>
+              <div class="kpi-valor" id="rel-kpi-media">0</div>
+              <div class="kpi-label-sob">Média por militar</div>
+            </div>
+          </div>
+        </div>
+
         <div class="panel report-panel">
           <div class="panel-header">
             <div class="panel-title">
               <i data-lucide="file-spreadsheet"></i>
-              <h2>Relatório Consolidado de Diárias por Militar</h2>
+              <h2>Consolidado por Militar</h2>
             </div>
             <div class="report-filters">
               <div class="filter-group">
@@ -778,142 +1106,178 @@
         </div>
       </section>
 
+      <!-- Segue "Planejador Diarias.dc.html": toolbar, faixa de 4 KPIs, coluna
+           principal (ocupação da cota + operações) e trilho (calendário heatmap
+           + diárias por tipo). -->
       <section id="tab-planejador" class="tab-content">
-        <div class="stats-row">
-          <div class="stat-card">
-            <div class="stat-icon">
-              <i data-lucide="wallet"></i>
+
+        <div class="plan-toolbar">
+          <div class="plan-toolbar-filtros">
+            <div class="filter-group">
+              <label for="plan-filter-mes">Mês</label>
+              <select id="plan-filter-mes">
+                <option value="01">Janeiro</option>
+                <option value="02">Fevereiro</option>
+                <option value="03">Março</option>
+                <option value="04">Abril</option>
+                <option value="05">Maio</option>
+                <option value="06">Junho</option>
+                <option value="07">Julho</option>
+                <option value="08">Agosto</option>
+                <option value="09">Setembro</option>
+                <option value="10">Outubro</option>
+                <option value="11">Novembro</option>
+                <option value="12">Dezembro</option>
+              </select>
             </div>
-            <div class="stat-info">
-              <h3>Cota Mensal de Diárias</h3>
-              <p id="plan-stat-cota">0</p>
+            <div class="filter-group">
+              <label for="plan-filter-ano">Ano</label>
+              <select id="plan-filter-ano"></select>
             </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon alert">
-              <i data-lucide="trending-up"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Diárias Planejadas</h3>
-              <p id="plan-stat-consumido">0</p>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon success">
-              <i data-lucide="piggy-bank"></i>
-            </div>
-            <div class="stat-info">
-              <h3>Saldo Disponível</h3>
-              <p id="plan-stat-saldo">0</p>
+            <div class="cota-inline admin-only">
+              <label for="input-cota">Cota mensal</label>
+              <input type="number" id="input-cota" min="0" placeholder="Ex: 240">
+              <button id="btn-save-cota" class="btn btn-primary btn-sm">
+                <i data-lucide="save"></i> Salvar
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- Calendário de Diárias -->
-        <div class="panel calendario-diarias-panel">
-          <div class="panel-header">
-            <div class="panel-title">
-              <i data-lucide="calendar-days"></i>
-              <h2>Calendário de Diárias</h2>
+        <div class="kpi-row plan-kpis">
+          <div class="kpi-card">
+            <div class="kpi-topo">
+              <span class="kpi-label" style="color:var(--primary);">Cota Mensal</span>
+              <span class="kpi-icone" style="background:var(--primary-soft);color:var(--primary);"><i data-lucide="wallet"></i></span>
             </div>
-            <div class="calendar-nav">
-              <button id="btn-prev-month-diarias" class="btn-icon" aria-label="Mês anterior" title="Mês anterior"><i data-lucide="chevron-left"></i></button>
-              <span id="calendar-diarias-month-year">Julho 2026</span>
-              <button id="btn-next-month-diarias" class="btn-icon" aria-label="Próximo mês" title="Próximo mês"><i data-lucide="chevron-right"></i></button>
-            </div>
+            <div class="kpi-valor-linha"><span class="kpi-valor" id="plan-stat-cota">0</span></div>
+            <div class="kpi-rodape"><span class="stat-sub">diárias no mês</span></div>
           </div>
-          <div class="calendar-container">
-            <div class="calendar-weekdays">
-              <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+          <div class="kpi-card">
+            <div class="kpi-topo">
+              <span class="kpi-label" style="color:var(--success-fg);">Consumido</span>
+              <span class="kpi-icone" style="background:var(--success-bg);color:var(--success-fg);"><i data-lucide="check-circle"></i></span>
             </div>
-            <div id="calendar-diarias-grid" class="calendar-grid">
-              <!-- Injetado dinamicamente -->
-            </div>
+            <div class="kpi-valor-linha"><span class="kpi-valor" id="plan-stat-consumido">0</span></div>
+            <div class="kpi-rodape"><span class="stat-sub">escalas reais</span></div>
           </div>
-          <p class="calendario-diarias-dica">
-            <i data-lucide="info"></i>
-            Clique em um dia para lançar uma diária avulsa (Missa, Bar, etc.) sem precisar do cadastro completo de evento.
-          </p>
+          <div class="kpi-card">
+            <div class="kpi-topo">
+              <span class="kpi-label" style="color:var(--info-fg);">Planejado</span>
+              <span class="kpi-icone" style="background:var(--info-bg);color:var(--info-fg);"><i data-lucide="clock"></i></span>
+            </div>
+            <div class="kpi-valor-linha"><span class="kpi-valor" id="plan-stat-planejado">0</span></div>
+            <div class="kpi-rodape"><span class="stat-sub">estimado, sem escala</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-topo">
+              <span class="kpi-label" id="plan-label-saldo" style="color:var(--warning-fg);">Disponível</span>
+              <span class="kpi-icone" id="plan-icone-saldo" style="background:var(--warning-bg);color:var(--warning-fg);"><i data-lucide="piggy-bank"></i></span>
+            </div>
+            <div class="kpi-valor-linha">
+              <span class="kpi-valor" id="plan-stat-saldo">0</span>
+              <span class="kpi-sufixo" id="plan-stat-saldo-pct"></span>
+            </div>
+            <div class="kpi-rodape"><span class="stat-sub">da cota do mês</span></div>
+          </div>
         </div>
 
-        <div class="panel">
-          <div class="panel-header flex-column-mobile">
-            <div class="panel-title">
-              <i data-lucide="calendar-clock"></i>
-              <h2>Planejamento Mensal Dentro da Cota</h2>
+        <div class="dash-layout dash-layout-360">
+          <div class="dash-main">
+
+            <!-- Ocupação da Cota: barra segmentada consumido | planejado | disponível -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="gauge"></i>
+                  <h2>Ocupação da Cota</h2>
+                </div>
+                <span class="panel-header-sub" id="budget-label-text">0 de 0 diárias</span>
+              </div>
+              <div class="budget-bar-section">
+                <div class="budget-bar">
+                  <div class="budget-bar-fill" id="budget-bar-fill"></div>
+                  <div class="budget-bar-fill-planejado" id="budget-bar-fill-planejado"></div>
+                </div>
+                <div class="budget-bar-legenda">
+                  <span><i class="legenda-dot legenda-consumido"></i> Consumido (escalas reais) <strong id="budget-legenda-consumido">0</strong></span>
+                  <span><i class="legenda-dot legenda-planejado-cota"></i> Planejado (estimado) <strong id="budget-legenda-planejado">0</strong></span>
+                  <span><i class="legenda-dot legenda-disponivel"></i> Disponível <strong id="budget-legenda-disponivel">0</strong></span>
+                </div>
+                <p class="budget-alert hidden" id="budget-alert">
+                  <i data-lucide="alert-triangle"></i>
+                  <span id="budget-alert-text">Cota mensal excedida.</span>
+                </p>
+              </div>
             </div>
-            <div class="report-filters">
-              <div class="filter-group">
-                <label for="plan-filter-mes">Mês</label>
-                <select id="plan-filter-mes">
-                  <option value="01">Janeiro</option>
-                  <option value="02">Fevereiro</option>
-                  <option value="03">Março</option>
-                  <option value="04">Abril</option>
-                  <option value="05">Maio</option>
-                  <option value="06">Junho</option>
-                  <option value="07">Julho</option>
-                  <option value="08">Agosto</option>
-                  <option value="09">Setembro</option>
-                  <option value="10">Outubro</option>
-                  <option value="11">Novembro</option>
-                  <option value="12">Dezembro</option>
-                </select>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="shield-alert"></i>
+                  <h2>Operações do Mês</h2>
+                </div>
+                <span class="panel-header-sub" id="plan-operacoes-contagem"></span>
               </div>
-              <div class="filter-group">
-                <label for="plan-filter-ano">Ano</label>
-                <select id="plan-filter-ano"></select>
+              <div class="table-responsive">
+                <table class="styled-table table-cards-mobile" id="table-planejador">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Operação</th>
+                      <th>Tipo</th>
+                      <th>Situação</th>
+                      <th class="text-center">Escala</th>
+                      <th class="text-right">Diárias</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-planejador-body"></tbody>
+                </table>
               </div>
-              <div class="filter-group admin-only">
-                <label for="input-cota">Definir Cota Mensal</label>
-                <div class="cota-input-wrap">
-                  <input type="number" id="input-cota" min="0" placeholder="Ex: 60">
-                  <button id="btn-save-cota" class="btn btn-primary btn-sm">
-                    <i data-lucide="save"></i> Salvar
-                  </button>
+              <p class="panel-nota">Diária = nº de aparições × 2. Consumido conta escalas reais; Planejado conta a estimativa das operações sem escala.</p>
+            </div>
+          </div>
+
+          <aside class="dash-rail dash-rail-360">
+            <div class="panel calendario-diarias-panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="calendar-days"></i>
+                  <h2>Calendário de Diárias</h2>
+                </div>
+                <div class="calendar-nav">
+                  <button id="btn-prev-month-diarias" class="btn-icon" aria-label="Mês anterior" title="Mês anterior"><i data-lucide="chevron-left"></i></button>
+                  <span id="calendar-diarias-month-year">Julho 2026</span>
+                  <button id="btn-next-month-diarias" class="btn-icon" aria-label="Próximo mês" title="Próximo mês"><i data-lucide="chevron-right"></i></button>
                 </div>
               </div>
+              <div class="calendar-container heatmap-container">
+                <div class="calendar-weekdays heatmap-weekdays">
+                  <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+                </div>
+                <div id="calendar-diarias-grid" class="heatmap-grid"></div>
+                <div class="heatmap-legenda">
+                  <span><i class="heat-amostra heat-leve"></i> Leve (≤12)</span>
+                  <span><i class="heat-amostra heat-medio"></i> Médio (≤24)</span>
+                  <span><i class="heat-amostra heat-alto"></i> Alto (&gt;24)</span>
+                </div>
+              </div>
+              <p class="calendario-diarias-dica">
+                <i data-lucide="info"></i>
+                Clique em um dia para lançar uma Missão Avulsa.
+              </p>
             </div>
-          </div>
 
-          <!-- Barra de consumo da cota -->
-          <div class="budget-bar-section">
-            <div class="budget-bar-labels">
-              <span id="budget-label-text">0 de 0 diárias planejadas</span>
-              <span id="budget-label-pct">0%</span>
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="bar-chart-3"></i>
+                  <h2>Diárias por Tipo de Operação</h2>
+                </div>
+              </div>
+              <div class="cartao-categorias" id="plan-por-tipo"></div>
             </div>
-            <div class="budget-bar">
-              <div class="budget-bar-fill" id="budget-bar-fill"></div>
-              <div class="budget-bar-fill-planejado" id="budget-bar-fill-planejado"></div>
-            </div>
-            <div class="budget-bar-legenda">
-              <span><i class="legenda-dot legenda-consumido"></i> Consumido (efetivo já escalado)</span>
-              <span><i class="legenda-dot legenda-planejado-cota"></i> Planejado (operações ainda não escaladas)</span>
-            </div>
-            <p class="budget-alert hidden" id="budget-alert">
-              <i data-lucide="alert-triangle"></i>
-              <span id="budget-alert-text">Cota mensal excedida.</span>
-            </p>
-          </div>
-
-          <div class="table-responsive">
-            <table class="styled-table" id="table-planejador">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Operação</th>
-                  <th>Tipo</th>
-                  <th>Situação</th>
-                  <th class="text-center">Militares Escalados</th>
-                  <th class="text-right">Diárias</th>
-                  <th class="text-right">% da Cota</th>
-                </tr>
-              </thead>
-              <tbody id="table-planejador-body">
-                <!-- Injetado dinamicamente -->
-              </tbody>
-            </table>
-          </div>
+          </aside>
         </div>
       </section>
 
@@ -927,10 +1291,22 @@
               <h2>Cartão Programa de Patrulhamento</h2>
             </div>
             <div class="report-filters cartao-toolbar">
-              <div class="filter-group">
-                <label for="cartao-data">Data do Cartão</label>
-                <input type="date" id="cartao-data">
+              <!-- Navegador de data do protótipo: setas < > em volta do campo,
+                   com dia da semana e status do cartão ao lado. -->
+              <div class="cartao-data-nav">
+                <button type="button" class="btn-icon" id="btn-cartao-dia-anterior" aria-label="Dia anterior" title="Dia anterior">
+                  <i data-lucide="chevron-left"></i>
+                </button>
+                <i data-lucide="calendar" class="cartao-data-nav-icone"></i>
+                <input type="date" id="cartao-data" aria-label="Data do cartão">
+                <span class="cartao-data-semana" id="cartao-data-semana"></span>
+                <button type="button" class="btn-icon" id="btn-cartao-dia-seguinte" aria-label="Próximo dia" title="Próximo dia">
+                  <i data-lucide="chevron-right"></i>
+                </button>
               </div>
+              <span class="status-pill" id="cartao-status-pill">
+                <span class="status-dot"></span><span id="cartao-status-texto">—</span>
+              </span>
               <button id="btn-novo-cartao" class="btn btn-primary btn-sm">
                 <i data-lucide="plus"></i> Criar Cartão
               </button>
@@ -1045,16 +1421,21 @@
 
         <!-- Conteúdo do Cartão -->
         <div id="cartao-conteudo" class="hidden">
-          <!-- Alertas de Conflito -->
-          <div id="cartao-alertas-panel" class="panel cartao-alertas-panel hidden">
-            <div class="panel-header">
-              <div class="panel-title">
-                <i data-lucide="alert-triangle"></i>
-                <h2>Alertas de Conflito</h2>
-              </div>
+          <!-- Faixa de conflito do protótipo: resumo em uma linha no topo.
+               O detalhamento fica no painel "Alertas de Conflito" do trilho. -->
+          <div id="cartao-conflito-banner" class="cartao-conflito-banner hidden">
+            <i data-lucide="alert-triangle"></i>
+            <div class="cartao-conflito-texto">
+              <strong id="cartao-conflito-titulo"></strong>
+              <span id="cartao-conflito-sub"></span>
             </div>
-            <div id="cartao-alertas-lista" class="cartao-alertas-lista"></div>
           </div>
+
+          <!-- Layout de duas colunas do protótipo: cartão à esquerda, trilho de
+               resumo/categorias/alertas à direita. `.dash-layout` é o mesmo grid
+               usado no Dashboard e em Meu Turno. -->
+          <div class="dash-layout">
+          <div class="dash-main">
 
           <!-- Cabeçalho oficial do cartão -->
           <div class="panel cartao-header-panel" id="cartao-print-header">
@@ -1121,9 +1502,39 @@
             </div>
           </div>
 
-          <!-- Grid de Viaturas -->
-          <div id="cartao-vtr-grid" class="cartao-vtr-grid">
-            <!-- Injetado via JS -->
+          <!-- Abas Viaturas | Roteiro do protótipo. "Viaturas" é a tabela
+               enxuta (com editar/excluir); "Roteiro" são os cards por viatura,
+               onde vive toda a edição de itens do roteiro. -->
+          <div class="panel cartao-abas-panel">
+            <div class="sub-abas" role="tablist" aria-label="Conteúdo do cartão">
+              <button type="button" class="sub-aba ativo" data-action="cartao-aba" data-aba="viaturas"
+                      role="tab" aria-selected="true" id="cartao-aba-viaturas">Viaturas</button>
+              <button type="button" class="sub-aba" data-action="cartao-aba" data-aba="roteiro"
+                      role="tab" aria-selected="false" id="cartao-aba-roteiro">Roteiro</button>
+            </div>
+
+            <div id="cartao-painel-viaturas" class="table-responsive">
+              <table class="styled-table table-cards-mobile" id="table-cartao-viaturas">
+                <thead>
+                  <tr>
+                    <th>Prefixo</th>
+                    <th>Setor</th>
+                    <th>Companhia</th>
+                    <th>Categoria</th>
+                    <th>Comandante</th>
+                    <th>Observação</th>
+                    <th class="text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="table-cartao-viaturas-body"></tbody>
+              </table>
+            </div>
+
+            <div id="cartao-painel-roteiro" class="hidden">
+              <div id="cartao-vtr-grid" class="cartao-vtr-grid">
+                <!-- Injetado via JS -->
+              </div>
+            </div>
           </div>
 
           <!-- Adicionar Viatura -->
@@ -1176,6 +1587,45 @@
               </div>
             </form>
           </div>
+
+          </div><!-- /.dash-main -->
+
+          <aside class="dash-rail">
+            <!-- Resumo do turno em 4 mini-cards (protótipo). Não confundir com o
+                 "Quadro Resumo" da coluna principal, que é a tabela oficial de
+                 impressão (Companhia/VTR/Setor/QTLs) e continua existindo. -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="layout-grid"></i>
+                  <h2>Resumo do Turno</h2>
+                </div>
+              </div>
+              <div class="cartao-resumo-mini" id="cartao-resumo-mini"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="bar-chart-3"></i>
+                  <h2>Distribuição por Categoria</h2>
+                </div>
+              </div>
+              <div class="cartao-categorias" id="cartao-categorias"></div>
+            </div>
+
+            <div class="panel" id="cartao-alertas-panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="alert-triangle"></i>
+                  <h2>Alertas de Conflito</h2>
+                </div>
+                <span class="contador-pill" id="cartao-alertas-contador">0</span>
+              </div>
+              <div id="cartao-alertas-lista" class="dash-alertas-lista"></div>
+            </div>
+          </aside>
+          </div><!-- /.dash-layout -->
         </div>
       </section>
 
@@ -1294,6 +1744,12 @@
 
 
     </main>
+
+    <!-- Barra de abas inferior (só no celular, ≤768px) — shell mobile do redesign.
+         Os 5 destinos são montados por perfil em montarBottomTabs() (app.js):
+         P3 e Adjunto/Oficial veem conjuntos diferentes. O último item ("Mais")
+         abre o mesmo drawer de navegação da sidebar. -->
+    <nav class="bottom-tabs" id="bottom-tabs" aria-label="Navegação principal"></nav>
   </div>
 
   <!-- Modal: Criar / Editar Usuário -->
@@ -2007,7 +2463,7 @@
       </div>
       <form id="form-editar-evento" class="styled-form">
         <div class="form-section">
-          <h3 class="form-section-title">Documentação</h3>
+          <h3 class="form-section-title"><span class="form-section-icone"><i data-lucide="file-text"></i></span>Documentação</h3>
           <div class="form-row">
             <div class="form-group col-md-4">
               <label for="edit-num_oficio">Número do Ofício</label>
@@ -2025,7 +2481,7 @@
         </div>
 
         <div class="form-section">
-          <h3 class="form-section-title">Identificação</h3>
+          <h3 class="form-section-title"><span class="form-section-icone"><i data-lucide="info"></i></span>Identificação</h3>
           <div class="form-row">
             <div class="form-group col-md-4">
               <label for="edit-tipo_evento">Tipo de Evento *</label>
@@ -2052,7 +2508,7 @@
         </div>
 
         <div class="form-section">
-          <h3 class="form-section-title">Quando e Onde</h3>
+          <h3 class="form-section-title"><span class="form-section-icone"><i data-lucide="map-pin"></i></span>Quando e Onde</h3>
           <div class="form-row">
             <div class="form-group col-md-4">
               <label for="edit-data_inicio">Data de Início *</label>
