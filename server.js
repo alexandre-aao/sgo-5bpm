@@ -35,7 +35,8 @@ const supabase = createClient(
 // Allowlist de origens: produção fixa + qualquer preview do projeto na Vercel + localhost de desenvolvimento
 const ORIGENS_PERMITIDAS = [
   'https://sgo-5bpm.vercel.app',
-  'http://localhost:3005'
+  'http://localhost:3005',
+  'http://localhost:5173' // Vite dev server do /client (migração React, Fase 2) — só dev local
 ];
 function origemPermitida(origin) {
   if (!origin) return true; // requisições sem Origin (ex: curl, apps nativos) — não é o caso de browsers
