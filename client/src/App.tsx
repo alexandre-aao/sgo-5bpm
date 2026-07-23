@@ -1,23 +1,11 @@
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth';
 import { Login } from './pages/Login';
+import { AppLayout } from './layout/AppLayout';
 
 function Shell() {
-  const { usuario, logout } = useAuth();
-
-  if (!usuario) return <Login />;
-
-  // Placeholder até o Lote 3 (AppLayout: Sidebar/Topbar/Navegação mobile).
-  return (
-    <div style={{ padding: 24 }}>
-      <p>
-        Logado como <strong>{usuario.nome}</strong> ({usuario.role})
-      </p>
-      <button className="btn" onClick={() => logout()}>
-        Sair
-      </button>
-    </div>
-  );
+  const { usuario } = useAuth();
+  return usuario ? <AppLayout /> : <Login />;
 }
 
 function App() {
