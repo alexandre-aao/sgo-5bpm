@@ -1,7 +1,8 @@
 import { Menu, Sun, Moon, CalendarDays } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { useTheme } from '../hooks/useTheme';
-import { SECTION_TITLES, type SectionId } from './navConfig';
+import { SECTION_TITLES } from './navConfig';
+import { useActiveSection } from '../routes/useActiveSection';
 
 const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
@@ -14,15 +15,15 @@ function dataHojeFormatada() {
 }
 
 interface TopbarProps {
-  activeSection: SectionId;
   onAbrirDrawer: () => void;
 }
 
-export function Topbar({ activeSection, onAbrirDrawer }: TopbarProps) {
+export function Topbar({ onAbrirDrawer }: TopbarProps) {
   const { usuario } = useAuth();
   const { tema, definirTema } = useTheme();
   const { dia, semana } = dataHojeFormatada();
-  const { title, subtitle } = SECTION_TITLES[activeSection];
+  const activeSection = useActiveSection();
+  const { title, subtitle } = activeSection ? SECTION_TITLES[activeSection] : { title: '', subtitle: '' };
 
   if (!usuario) return null;
   const sigla = usuario.role === 'P3' ? 'P3' : usuario.role.substring(0, 2).toUpperCase();

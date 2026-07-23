@@ -1,14 +1,14 @@
 import { KeyRound, LogOut } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
-import { NAV_SECTIONS, type SectionId } from './navConfig';
+import { NAV_SECTIONS } from './navConfig';
 
 interface SidebarProps {
-  activeSection: SectionId;
-  onNavigate: (id: SectionId) => void;
   drawerAberto: boolean;
+  onNavigate: () => void;
 }
 
-export function Sidebar({ activeSection, onNavigate, drawerAberto }: SidebarProps) {
+export function Sidebar({ drawerAberto, onNavigate }: SidebarProps) {
   const { usuario, logout } = useAuth();
   if (!usuario) return null;
 
@@ -50,15 +50,15 @@ export function Sidebar({ activeSection, onNavigate, drawerAberto }: SidebarProp
               {itensVisiveis.map((item) => {
                 const Icone = item.icon;
                 return (
-                  <button
+                  <NavLink
                     key={item.id}
-                    type="button"
-                    className={`nav-btn${activeSection === item.id ? ' active' : ''}`}
-                    onClick={() => onNavigate(item.id)}
+                    to={`/${item.id}`}
+                    onClick={onNavigate}
+                    className={({ isActive }) => `nav-btn${isActive ? ' active' : ''}`}
                   >
                     <Icone />
                     <span>{item.label}</span>
-                  </button>
+                  </NavLink>
                 );
               })}
             </div>

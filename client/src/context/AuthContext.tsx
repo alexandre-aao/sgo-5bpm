@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { apiFetch, setAuthToken, setOnUnauthorized } from '../lib/api';
 import type { Usuario } from '../types/auth';
 import { AuthContext } from './auth-context';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
 const STORAGE_KEY = 'user';
 
@@ -54,6 +55,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUsuario(null);
     });
   }, []);
+
+  // Checagem proativa de expiração (12h) a cada 60s + ao voltar o foco da aba —
+  // mesma cadência do fetchData() periódico do app antigo, aplicada aqui à sessão
+  // em si (o app antigo só verificava a expiração no boot; toda outra sessão
+  // vencida ali era pega de rebote pelo primeiro 401 de alguma chamada de API).
+  useAutoRefresh(
+    useCallback(() => {
+      if (usuario && usuario.expira <= Date.now()) {
+        localStorage.removeItem(STORAGE_KEY);
+        setAuthToken(null);
+        setUsuario(null);
+      }
+    }, [usuario]),
+    !!usuario,
+  );
 
   const login = useCallback(async (usuarioLogin: string, senha: string) => {
     const res = await apiFetch('/api/login', {

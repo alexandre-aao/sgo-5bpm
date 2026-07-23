@@ -1,24 +1,24 @@
 import { useState } from 'react';
-import { useAuth } from '../context/useAuth';
+import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { BottomTabs } from './BottomTabs';
-import { secaoInicialDoPerfil, type SectionId } from './navConfig';
+import { AppRoutes } from '../routes/AppRoutes';
 
-// Sem React Router ainda (vem no próximo lote) — a "seção ativa" é estado local,
-// no mesmo papel do data-target/classList('active') do app antigo. Trocar por
-// rotas de verdade é refatoração pequena: a estrutura de Sidebar/Topbar/BottomTabs
-// já recebe activeSection/onNavigate de fora, só a fonte muda (useParams em vez de useState).
 export function AppLayout() {
-  const { usuario } = useAuth();
-  const [activeSection, setActiveSection] = useState<SectionId>(() =>
-    secaoInicialDoPerfil(usuario!.role),
-  );
   const [drawerAberto, setDrawerAberto] = useState(false);
+  const { pathname } = useLocation();
 
-  function navegarPara(id: SectionId) {
-    setActiveSection(id);
-    setDrawerAberto(false); // fecha o drawer mobile ao trocar de aba — sem efeito em desktop
+  // Fecha o drawer mobile sempre que a rota muda — mesmo papel do fecharNavDrawer()
+  // chamado a cada clique de nav-btn no app antigo, mas genérico (cobre navegação
+  // por Sidebar, BottomTabs ou botão "voltar" do navegador). Ajuste de estado
+  // durante o render (padrão documentado do React p/ "sincronizar com uma prop que
+  // mudou" sem useEffect) em vez de useEffect+setState — ver useAutoRefresh.ts pro
+  // mesmo motivo em outro lugar.
+  const [pathnameAnterior, setPathnameAnterior] = useState(pathname);
+  if (pathname !== pathnameAnterior) {
+    setPathnameAnterior(pathname);
+    setDrawerAberto(false);
   }
 
   return (
@@ -27,19 +27,20 @@ export function AppLayout() {
         className={`nav-drawer-overlay${drawerAberto ? ' open' : ''}`}
         onClick={() => setDrawerAberto(false)}
       />
-      <Sidebar activeSection={activeSection} onNavigate={navegarPara} drawerAberto={drawerAberto} />
+      <Sidebar drawerAberto={drawerAberto} onNavigate={() => setDrawerAberto(false)} />
 
       <main className="main-content">
-        <Topbar activeSection={activeSection} onAbrirDrawer={() => setDrawerAberto(true)} />
-
-        <section className="tab-content active">
-          <p style={{ padding: 24, color: 'var(--text-muted)' }}>
-            Em construção — conteúdo desta aba chega na Fase 3/4 da migração.
-          </p>
-        </section>
+        <Topbar onAbrirDrawer={() => setDrawerAberto(true)} />
+        {/* .tab-content.active: só uma seção "ativa" por vez (a que o Router
+            renderizou), então sempre entra com as duas classes juntas — o
+            toggle active/inativo que existia no app antigo (múltiplas seções
+            no DOM ao mesmo tempo) não se aplica mais aqui. */}
+        <div className="tab-content active">
+          <AppRoutes />
+        </div>
       </main>
 
-      <BottomTabs activeSection={activeSection} onNavigate={navegarPara} onAbrirDrawer={() => setDrawerAberto(true)} />
+      <BottomTabs onAbrirDrawer={() => setDrawerAberto(true)} />
     </div>
   );
 }
