@@ -17,7 +17,7 @@ export function NavegadorData({ dataSelecionada, onMudarData, onDeslocarDia, tem
   const classePill = temCartao === true ? ' status-pill-ok' : temCartao === false ? ' status-pill-pendente' : '';
 
   return (
-    <div className="report-filters cartao-toolbar">
+    <>
       <div className="cartao-data-nav">
         <button type="button" className="btn-icon" aria-label="Dia anterior" title="Dia anterior" onClick={() => onDeslocarDia(-1)}>
           <ChevronLeft />
@@ -37,6 +37,6 @@ export function NavegadorData({ dataSelecionada, onMudarData, onDeslocarDia, tem
       <span className={`status-pill${classePill}`}>
         <span className="status-dot" /><span>{textoStatus}</span>
       </span>
-    </div>
+    </>
   );
 }

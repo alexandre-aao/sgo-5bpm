@@ -17,6 +17,15 @@ export function dataInicialCartao(): string {
   return getLocalDateStr(amanha);
 }
 
+export type ResultadoAcao = { ok: true } | { ok: false; mensagem: string };
+
+interface CabecalhoPatch {
+  fiscal?: string;
+  adjunto?: string;
+  oficial_sobreaviso?: string;
+  tipo_periodo?: string;
+}
+
 interface UseCartaoPrograma {
   dataSelecionada: string;
   setDataSelecionada: (data: string) => void;
@@ -26,6 +35,8 @@ interface UseCartaoPrograma {
   temCartao: boolean | null;
   carregando: boolean;
   recarregar: () => Promise<void>;
+  criarCartao: (tipoPeriodo?: string) => Promise<ResultadoAcao>;
+  atualizarCabecalho: (patch: CabecalhoPatch) => Promise<ResultadoAcao>;
 }
 
 /** Busca o Cartão Programa da data selecionada — espelha renderCartaoTab() em
@@ -99,5 +110,69 @@ export function useCartaoPrograma(): UseCartaoPrograma {
     await buscar(dataSelecionada, cancelRef);
   }, [dataSelecionada, buscar]);
 
-  return { dataSelecionada, setDataSelecionada, deslocarDia, cartao, temCartao, carregando, recarregar };
+  // Cria um cartão em branco na data selecionada — espelha handleCriarCartao(false)
+  // em public/app.js (o "copiar do dia anterior" fica pro lote de templates/cópia).
+  const criarCartao = useCallback(
+    async (tipoPeriodo = ''): Promise<ResultadoAcao> => {
+      if (!dataSelecionada) return { ok: false, mensagem: 'Selecione a data do Cartão Programa.' };
+      try {
+        const res = await apiFetch('/api/cartoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: dataSelecionada, tipo_periodo: tipoPeriodo }),
+        });
+        if (res.status === 409) {
+          await recarregar();
+          return { ok: false, mensagem: 'Já existe um Cartão Programa para esta data.' };
+        }
+        if (!res.ok) {
+          const corpo = (await res.json().catch(() => ({}))) as { error?: string };
+          return { ok: false, mensagem: corpo.error || 'Falha ao criar o Cartão Programa.' };
+        }
+        await recarregar();
+        return { ok: true };
+      } catch (erro) {
+        console.error('Erro ao criar Cartão Programa:', erro);
+        return { ok: false, mensagem: 'Falha ao criar o Cartão Programa.' };
+      }
+    },
+    [dataSelecionada, recarregar],
+  );
+
+  // Atualiza fiscal/adjunto/sobreaviso/tipo_periodo — espelha handleSalvarCabecalhoCartao().
+  const atualizarCabecalho = useCallback(
+    async (patch: CabecalhoPatch): Promise<ResultadoAcao> => {
+      if (!cartao) return { ok: false, mensagem: 'Nenhum cartão carregado.' };
+      try {
+        const res = await apiFetch(`/api/cartoes/${cartao.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        if (!res.ok) {
+          const corpo = (await res.json().catch(() => ({}))) as { error?: string };
+          return { ok: false, mensagem: corpo.error || 'Falha ao atualizar o cabeçalho do cartão.' };
+        }
+        const atualizado = (await res.json()) as CartaoDetalhado;
+        setCartao((atual) => (atual ? { ...atual, ...atualizado } : atual));
+        return { ok: true };
+      } catch (erro) {
+        console.error('Erro ao atualizar cabeçalho do Cartão Programa:', erro);
+        return { ok: false, mensagem: 'Falha ao atualizar o cabeçalho do cartão.' };
+      }
+    },
+    [cartao],
+  );
+
+  return {
+    dataSelecionada,
+    setDataSelecionada,
+    deslocarDia,
+    cartao,
+    temCartao,
+    carregando,
+    recarregar,
+    criarCartao,
+    atualizarCabecalho,
+  };
 }

@@ -2,6 +2,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth';
 import { AppDataProvider } from './context/AppDataContext';
+import { ToastProvider } from './context/ToastContext';
 import { Login } from './pages/Login';
 import { AppLayout } from './layout/AppLayout';
 
@@ -20,9 +21,11 @@ function Shell() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Shell />
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <Shell />
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 
