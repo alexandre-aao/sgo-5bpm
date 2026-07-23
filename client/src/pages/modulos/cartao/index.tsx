@@ -1,13 +1,21 @@
+import { useState } from 'react';
 import { Route, ClipboardX, Plus } from 'lucide-react';
+import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
+import type { CartaoViatura } from '../../../lib/cartaoConflitos';
 import { useCartaoPrograma } from './useCartaoPrograma';
+import { useViaturasCartao } from './useViaturasCartao';
 import { NavegadorData } from './NavegadorData';
 import { QuadroResumo } from './QuadroResumo';
 import { CartoesRecentes } from './CartoesRecentes';
 import { CartaoHeader } from './CartaoHeader';
+import { ViaturasTabela } from './ViaturasTabela';
+import { FormAdicionarViatura } from './FormAdicionarViatura';
+import { ModalEditarViatura } from './ModalEditarViatura';
 
 export default function CartaoProgramaPage() {
+  const { usuario } = useAuth();
   const { dados } = useAppData();
   const { toast } = useToast();
   const {
@@ -18,7 +26,16 @@ export default function CartaoProgramaPage() {
     temCartao,
     criarCartao,
     atualizarCabecalho,
+    recarregar,
   } = useCartaoPrograma();
+  const { adicionarViatura, editarViatura, removerViatura } = useViaturasCartao(cartao?.id, recarregar);
+
+  const [aba, setAba] = useState<'viaturas' | 'roteiro'>('viaturas');
+  const [vtrEmEdicao, setVtrEmEdicao] = useState<CartaoViatura | null>(null);
+
+  // Cartão Programa é a única tela que Adjunto/Oficial podem editar — só a
+  // exclusão de cartão (fora do escopo deste lote) segue P3-only.
+  const podeEditar = usuario?.role === 'P3' || usuario?.role === 'Adjunto';
 
   async function handleCriarCartao() {
     const resultado = await criarCartao();
@@ -26,6 +43,16 @@ export default function CartaoProgramaPage() {
       toast('Cartão Programa criado. Adicione as viaturas e roteiros.', 'success');
     } else {
       toast(resultado.mensagem, 'warning');
+    }
+  }
+
+  async function handleExcluirViatura(vtr: CartaoViatura) {
+    if (!window.confirm('Remover esta viatura e todo o seu roteiro do cartão?')) return;
+    const resultado = await removerViatura(vtr.id);
+    if (resultado.ok) {
+      toast('Viatura removida do cartão.', 'info');
+    } else {
+      toast(resultado.mensagem, 'danger');
     }
   }
 
@@ -66,11 +93,60 @@ export default function CartaoProgramaPage() {
           <div className="dash-main">
             <CartaoHeader cartao={cartao} pessoal={dados.pessoal} onAtualizar={atualizarCabecalho} />
             <QuadroResumo viaturas={cartao.viaturas} />
+
+            <div className="panel cartao-abas-panel">
+              <div className="sub-abas" role="tablist" aria-label="Conteúdo do cartão">
+                <button
+                  type="button"
+                  className={`sub-aba${aba === 'viaturas' ? ' ativo' : ''}`}
+                  role="tab"
+                  aria-selected={aba === 'viaturas'}
+                  onClick={() => setAba('viaturas')}
+                >
+                  Viaturas
+                </button>
+                <button
+                  type="button"
+                  className={`sub-aba${aba === 'roteiro' ? ' ativo' : ''}`}
+                  role="tab"
+                  aria-selected={aba === 'roteiro'}
+                  onClick={() => setAba('roteiro')}
+                >
+                  Roteiro
+                </button>
+              </div>
+
+              {aba === 'viaturas' ? (
+                <ViaturasTabela
+                  viaturas={cartao.viaturas}
+                  podeEditar={podeEditar}
+                  onEditar={setVtrEmEdicao}
+                  onExcluir={handleExcluirViatura}
+                />
+              ) : (
+                <p style={{ padding: 24, color: 'var(--text-muted)' }}>
+                  Roteiro por viatura chega no próximo lote da migração.
+                </p>
+              )}
+            </div>
+
+            {podeEditar && (
+              <FormAdicionarViatura viaturasCadastradas={dados.viaturas} onAdicionar={adicionarViatura} />
+            )}
+
             <p style={{ padding: 24, color: 'var(--text-muted)' }}>
-              Viaturas, Roteiro e trilho de conflitos chegam nos próximos lotes da migração.
+              Trilho de conflitos chega nos próximos lotes da migração.
             </p>
           </div>
         </div>
+      )}
+
+      {vtrEmEdicao && (
+        <ModalEditarViatura
+          viatura={vtrEmEdicao}
+          onFechar={() => setVtrEmEdicao(null)}
+          onSalvar={editarViatura}
+        />
       )}
     </>
   );
