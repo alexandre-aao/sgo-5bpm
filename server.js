@@ -1328,7 +1328,19 @@ app.get('/api/planejador-diarias', exigirP3, asyncRoute(async (req, res) => {
 // grid de cards-resumo, em vez de várias chamadas paralelas do frontend.
 // -------------------------------------------------------------
 app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
+  // Só as 7 tabelas realmente usadas por este agregador (de 10 no total) — corta 4 SELECTs
+  // inúteis (sessoes, bairros_coordenadas, cartoes, viaturas) que o readDB() antigo fazia.
+  // Continua em JS puro (Promise.all de readTabela), não em SQL — ver nota de arquitetura
+  // no topo do arquivo sobre por que a lógica de negócio fica no shim, não no banco.
+  const [eventos, operacoes, escalas, alocacoes, pessoal, usuarios, config] = await Promise.all([
+    readTabela('eventos'),
+    readTabela('operacoes'),
+    readTabela('escalas'),
+    readTabela('alocacoes'),
+    readTabela('pessoal'),
+    readTabela('usuarios'),
+    buscarConfig(),
+  ]);
   const hojeStr = getLocalDateStrServer();
   const [anoHoje, mesHoje] = hojeStr.split('-');
 
@@ -1338,32 +1350,32 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   const mesPeriodo = req.query.mes || mesHoje;
   const prefixoPeriodo = `${anoPeriodo}-${mesPeriodo}`;
 
-  const eventosDoPeriodo = db.eventos.filter(e => e.data_inicio.startsWith(prefixoPeriodo));
+  const eventosDoPeriodo = eventos.filter(e => e.data_inicio.startsWith(prefixoPeriodo));
   const idsEventosDoPeriodo = new Set(eventosDoPeriodo.map(e => e.id));
 
   // Eventos: total no período + próximos 7 dias (sempre a partir de hoje, não do período filtrado)
   const daqui7Dias = new Date();
   daqui7Dias.setDate(daqui7Dias.getDate() + 7);
   const daqui7DiasStr = getLocalDateStrServer(daqui7Dias);
-  const eventosProximos7Dias = db.eventos.filter(e => e.data_inicio >= hojeStr && e.data_inicio <= daqui7DiasStr).length;
+  const eventosProximos7Dias = eventos.filter(e => e.data_inicio >= hojeStr && e.data_inicio <= daqui7DiasStr).length;
 
   // Diárias: total pago no período + saldo da cota do período (mesma lógica de /api/planejador-diarias).
   // Fonte da diária agora são as OPERAÇÕES do período (não mais eventos): consumido = operações
   // com escala; planejado = estimativa das operações sem escala. Nunca a mesma nos dois.
-  const operacoesDoPeriodo = db.operacoes.filter(o => o.data_inicio.startsWith(prefixoPeriodo));
+  const operacoesDoPeriodo = operacoes.filter(o => o.data_inicio.startsWith(prefixoPeriodo));
   const idsOperacoesDoPeriodo = new Set(operacoesDoPeriodo.map(o => o.id));
-  const escalasDoPeriodo = db.escalas.filter(s => idsOperacoesDoPeriodo.has(s.operacao_id));
+  const escalasDoPeriodo = escalas.filter(s => idsOperacoesDoPeriodo.has(s.operacao_id));
   const opsComEscala = new Set(escalasDoPeriodo.map(s => s.operacao_id));
   const consumidoPeriodo = escalasDoPeriodo.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
   const operacoesPlanejadas = operacoesDoPeriodo.filter(o => !opsComEscala.has(o.id));
   const planejadoPeriodo = operacoesPlanejadas.reduce((sum, o) => sum + (o.qtd_diarias_estimada || 0), 0);
-  const cota = (db.config && db.config.cota_mensal_diarias) || 0;
+  const cota = (config && config.cota_mensal_diarias) || 0;
 
-  // Índice alocações por evento — construído uma vez para não varrer db.alocacoes dentro do forEach abaixo.
-  const alocacoesPorEvento = indexarPor(db.alocacoes, 'evento_id');
+  // Índice alocações por evento — construído uma vez para não varrer alocacoes dentro do forEach abaixo.
+  const alocacoesPorEvento = indexarPor(alocacoes, 'evento_id');
 
   // Efetivo total empregado no período
-  const alocacoesDoPeriodo = db.alocacoes.filter(a => idsEventosDoPeriodo.has(a.evento_id));
+  const alocacoesDoPeriodo = alocacoes.filter(a => idsEventosDoPeriodo.has(a.evento_id));
   const efetivoTotalPeriodo = alocacoesDoPeriodo.reduce((sum, a) => sum + a.qtd_policiais, 0);
 
   // Distribuição por tipo de missão/evento no período — mesma agregação de GET /api/estatisticas,
@@ -1386,7 +1398,7 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   // sobre as escalas do período. Enriquece com posto/graduação via matrícula (best-effort; escalas
   // antigas podem ter militar_id de texto livre que não casa com nenhum cadastro).
   const postoPorMatricula = new Map();
-  db.pessoal.forEach(p => { if (p.matricula) postoPorMatricula.set(String(p.matricula), p.posto_graduacao || ''); });
+  pessoal.forEach(p => { if (p.matricula) postoPorMatricula.set(String(p.matricula), p.posto_graduacao || ''); });
   const consolidadoMilitares = {};
   escalasDoPeriodo.forEach(s => {
     const chave = s.militar_id || s.militar_nome;
@@ -1406,9 +1418,9 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
     .slice(0, 10);
 
   // Cadastro de Pessoal: total + quebra Praça/Oficial (não depende de período)
-  const totalPessoal = db.pessoal.length;
-  const pracas = db.pessoal.filter(p => p.tipo === 'Praça').length;
-  const oficiais = db.pessoal.filter(p => p.tipo === 'Oficial').length;
+  const totalPessoal = pessoal.length;
+  const pracas = pessoal.filter(p => p.tipo === 'Praça').length;
+  const oficiais = pessoal.filter(p => p.tipo === 'Oficial').length;
 
   res.json({
     periodo: { mes: mesPeriodo, ano: anoPeriodo },
@@ -1421,7 +1433,7 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
     distribuicao_tipo: distribuicaoTipo,
     top_militares: topMilitares,
     pessoal: { total: totalPessoal, pracas, oficiais },
-    usuarios: { total: db.usuarios.length }
+    usuarios: { total: usuarios.length }
   });
 }));
 
@@ -1859,8 +1871,7 @@ app.get('/api/cartoes', asyncRoute(async (req, res) => {
 // Lista de templates de Cartão Programa, com filtro opcional por período/quantidade de viaturas
 // IMPORTANTE: precisa vir antes de /api/cartoes/:id para o Express não tratar "templates" como :id
 app.get('/api/cartoes/templates', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  let templates = (db.cartoes || []).filter(c => c.is_template);
+  let templates = await readTabela('cartoes', { is_template: true });
 
   if (req.query.tipo_periodo) {
     templates = templates.filter(c => c.tipo_periodo === req.query.tipo_periodo);
