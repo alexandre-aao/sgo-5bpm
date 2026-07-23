@@ -53,8 +53,13 @@ export function normalizarTexto(texto: string | undefined | null): string {
 }
 
 /** Dois itens de roteiro (mesma viatura) se sobrepõem no tempo? Sem horário de fim
- * em algum dos dois, não dá pra afirmar sobreposição com segurança. */
-export function itensSobrepostos(itemA: CartaoItem, itemB: CartaoItem): boolean {
+ * em algum dos dois, não dá pra afirmar sobreposição com segurança. Aceita só
+ * {inicio,fim} (não o CartaoItem inteiro) pra dar pra checar um item ainda não
+ * salvo (form de novo item) contra um já existente. */
+export function itensSobrepostos(
+  itemA: Pick<CartaoItem, 'inicio' | 'fim'>,
+  itemB: Pick<CartaoItem, 'inicio' | 'fim'>,
+): boolean {
   if (!itemA.fim || !itemB.fim) return false;
 
   const aIni = horaParaMinutos(itemA.inicio);

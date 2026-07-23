@@ -6,11 +6,13 @@ import { useToast } from '../../../context/useToast';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
 import { useCartaoPrograma } from './useCartaoPrograma';
 import { useViaturasCartao } from './useViaturasCartao';
+import { useItensRoteiro } from './useItensRoteiro';
 import { NavegadorData } from './NavegadorData';
 import { QuadroResumo } from './QuadroResumo';
 import { CartoesRecentes } from './CartoesRecentes';
 import { CartaoHeader } from './CartaoHeader';
 import { ViaturasTabela } from './ViaturasTabela';
+import { RoteiroGrid } from './RoteiroGrid';
 import { FormAdicionarViatura } from './FormAdicionarViatura';
 import { ModalEditarViatura } from './ModalEditarViatura';
 
@@ -29,6 +31,7 @@ export default function CartaoProgramaPage() {
     recarregar,
   } = useCartaoPrograma();
   const { adicionarViatura, editarViatura, removerViatura } = useViaturasCartao(cartao?.id, recarregar);
+  const { adicionarItem, removerItem, atualizarAtividade } = useItensRoteiro(cartao?.id, recarregar);
 
   const [aba, setAba] = useState<'viaturas' | 'roteiro'>('viaturas');
   const [vtrEmEdicao, setVtrEmEdicao] = useState<CartaoViatura | null>(null);
@@ -124,9 +127,17 @@ export default function CartaoProgramaPage() {
                   onExcluir={handleExcluirViatura}
                 />
               ) : (
-                <p style={{ padding: 24, color: 'var(--text-muted)' }}>
-                  Roteiro por viatura chega no próximo lote da migração.
-                </p>
+                <RoteiroGrid
+                  viaturas={cartao.viaturas}
+                  dataCartao={cartao.data || dataSelecionada}
+                  eventos={dados.eventos}
+                  podeEditar={podeEditar}
+                  onAdicionarItem={adicionarItem}
+                  onExcluirItem={removerItem}
+                  onSalvarAtividade={atualizarAtividade}
+                  onEditarViatura={setVtrEmEdicao}
+                  onExcluirViatura={handleExcluirViatura}
+                />
               )}
             </div>
 

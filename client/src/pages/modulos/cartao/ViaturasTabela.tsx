@@ -1,14 +1,6 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
-
-function slugBadge(valor: string): string {
-  return valor
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '');
-}
+import { categoriaBadgeClass } from './constantes';
 
 interface ViaturasTabelaProps {
   viaturas: CartaoViatura[];
@@ -47,7 +39,7 @@ export function ViaturasTabela({ viaturas, podeEditar, onEditar, onExcluir }: Vi
                 <td data-label="Setor">{vtr.setor || '-'}</td>
                 <td data-label="Companhia">{vtr.companhia || '-'}</td>
                 <td data-label="Categoria">
-                  {vtr.categoria ? <span className={`badge ${slugBadge('cat-' + vtr.categoria)}`}>{vtr.categoria}</span> : '-'}
+                  {vtr.categoria ? <span className={`badge ${categoriaBadgeClass(vtr.categoria)}`}>{vtr.categoria}</span> : '-'}
                 </td>
                 <td data-label="Comandante">{vtr.comandante || 'Não informado'}</td>
                 <td data-label="Observação" style={{ color: 'var(--text-muted)' }}>{vtr.observacao || '-'}</td>
