@@ -1,6 +1,7 @@
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth';
+import { AppDataProvider } from './context/AppDataContext';
 import { Login } from './pages/Login';
 import { AppLayout } from './layout/AppLayout';
 
@@ -9,9 +10,11 @@ function Shell() {
   if (!usuario) return <Login />;
 
   return (
-    <BrowserRouter>
-      <AppLayout />
-    </BrowserRouter>
+    <AppDataProvider>
+      <BrowserRouter>
+        <AppLayout />
+      </BrowserRouter>
+    </AppDataProvider>
   );
 }
 
