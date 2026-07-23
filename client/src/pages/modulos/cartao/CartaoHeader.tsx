@@ -66,6 +66,21 @@ export function CartaoHeader({ cartao, pessoal, onAtualizar }: CartaoHeaderProps
 
   const dataBr = cartao.data ? cartao.data.split('-').reverse().join('/') : '';
 
+  // Template não tem data/fiscal/adjunto/sobreaviso próprios — só o cabeçalho de
+  // identificação aparece, igual a exibirCartaoNoEditor() quando is_template.
+  if (cartao.is_template) {
+    return (
+      <div className="panel cartao-header-panel">
+        <div className="cartao-print-title">
+          <h2>CARTÃO PADRÃO: {cartao.nome_template}</h2>
+          <span>
+            {cartao.tipo_periodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'} · {cartao.qtd_viaturas_base} viatura(s) base
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="panel cartao-header-panel">
       <div className="cartao-print-title">
