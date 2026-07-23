@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
+import { calcularAlertasCartao } from '../../../lib/cartaoConflitos';
 import { useCartaoPrograma } from './useCartaoPrograma';
 import { useViaturasCartao } from './useViaturasCartao';
 import { useItensRoteiro } from './useItensRoteiro';
@@ -15,6 +16,8 @@ import { ViaturasTabela } from './ViaturasTabela';
 import { RoteiroGrid } from './RoteiroGrid';
 import { FormAdicionarViatura } from './FormAdicionarViatura';
 import { ModalEditarViatura } from './ModalEditarViatura';
+import { ConflitoBanner } from './ConflitoBanner';
+import { TrilhoCartao } from './TrilhoCartao';
 
 export default function CartaoProgramaPage() {
   const { usuario } = useAuth();
@@ -92,7 +95,9 @@ export default function CartaoProgramaPage() {
       )}
 
       {cartao && (
-        <div className="dash-layout">
+        <>
+          <ConflitoBanner alertas={calcularAlertasCartao(cartao, dados.pessoal)} />
+          <div className="dash-layout">
           <div className="dash-main">
             <CartaoHeader cartao={cartao} pessoal={dados.pessoal} onAtualizar={atualizarCabecalho} />
             <QuadroResumo viaturas={cartao.viaturas} />
@@ -144,12 +149,11 @@ export default function CartaoProgramaPage() {
             {podeEditar && (
               <FormAdicionarViatura viaturasCadastradas={dados.viaturas} onAdicionar={adicionarViatura} />
             )}
-
-            <p style={{ padding: 24, color: 'var(--text-muted)' }}>
-              Trilho de conflitos chega nos próximos lotes da migração.
-            </p>
           </div>
-        </div>
+
+          <TrilhoCartao viaturas={cartao.viaturas} alertas={calcularAlertasCartao(cartao, dados.pessoal)} />
+          </div>
+        </>
       )}
 
       {vtrEmEdicao && (
