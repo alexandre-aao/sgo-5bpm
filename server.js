@@ -881,7 +881,7 @@ function diariaDaOperacao(op, escalasDaOp) {
   return op.qtd_diarias_estimada || 0;
 }
 
-app.get('/api/operacoes', asyncRoute(async (req, res) => {
+app.get('/api/operacoes', exigirP3, asyncRoute(async (req, res) => {
   res.json(await readTabela('operacoes'));
 }));
 
@@ -1038,7 +1038,7 @@ app.delete('/api/alocacoes/:id', exigirP3, asyncRoute(async (req, res) => {
 // -------------------------------------------------------------
 
 // Listar escalas (permite filtro por operacao_id)
-app.get('/api/escalas', asyncRoute(async (req, res) => {
+app.get('/api/escalas', exigirP3, asyncRoute(async (req, res) => {
   res.json(await readTabela('escalas', { operacao_id: req.query.operacao_id }));
 }));
 
@@ -1276,7 +1276,7 @@ app.put('/api/config', exigirP3, asyncRoute(async (req, res) => {
 // -------------------------------------------------------------
 // ROTA DO PLANEJADOR MENSAL DE DIÁRIAS (COTA x CONSUMO)
 // -------------------------------------------------------------
-app.get('/api/planejador-diarias', asyncRoute(async (req, res) => {
+app.get('/api/planejador-diarias', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
   const mesFiltro = req.query.mes; // Formato "MM" (ex: "07")
   const anoFiltro = req.query.ano || String(new Date().getFullYear());
@@ -1558,7 +1558,7 @@ app.get('/api/relatorio-diario', exigirP3, asyncRoute(async (req, res) => {
 // -------------------------------------------------------------
 // ROTA DO CALENDÁRIO DE DIÁRIAS (TOTAL POR DIA NO MÊS)
 // -------------------------------------------------------------
-app.get('/api/diarias-calendario', asyncRoute(async (req, res) => {
+app.get('/api/diarias-calendario', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
   const mesFiltro = req.query.mes;
   const anoFiltro = req.query.ano || String(new Date().getFullYear());

@@ -19,7 +19,7 @@
 | Relatório Diárias | ✅ | ❌ |
 | Usuários | ✅ | ❌ |
 | Cadastro de Pessoal | ✅ | ❌ |
-| Cadastro de Viaturas | ✅ | **✅ (não deveria — ver "Achados" abaixo)** |
+| Cadastro de Viaturas | ✅ | ✅ (exceção deliberada — ver módulo Viaturas abaixo) |
 
 Tela inicial por perfil (regra 7 do `MIGRACAO.md`): P3 → Dashboard; Adjunto/Oficial → Meu Turno.
 
@@ -85,15 +85,15 @@ Coerente com a regra "Adjunto/Oficial só leitura em Listar Eventos" — a tela 
 
 Coerente: o painel de gerenciamento já é ocultado por `hidden-role` no Mapa para Adjunto/Oficial, e a API de escrita também é P3-only.
 
-### Viaturas (Cadastro de Viaturas — tela deveria ser P3-only)
+### Viaturas (Cadastro de Viaturas — exceção deliberada: aberto a Adjunto/Oficial)
 | Rota | Método | Middleware |
 |---|---|---|
 | `/api/viaturas` | GET | autenticado |
-| `/api/viaturas` | POST | autenticado (**sem P3** — ⚠️) |
-| `/api/viaturas/:id` | PUT | autenticado (**sem P3** — ⚠️) |
+| `/api/viaturas` | POST | autenticado (sem P3 — **proposital**) |
+| `/api/viaturas/:id` | PUT | autenticado (sem P3 — **proposital**) |
 | `/api/viaturas/:id` | DELETE | **P3** |
 
-**Achado principal desta auditoria (já registrado em 0.2):** a tela não está em `hidden-role` para Adjunto/Oficial (deveria estar, segundo o `CLAUDE.md`) **e** as rotas de criação/edição não são protegidas por `exigirP3`. É o único módulo onde o gap é de leitura **e** escrita, nos dois lados. Prioridade mais alta dos achados desta fase.
+Único módulo de "Administração" aberto (leitura e escrita) a Adjunto/Oficial — comentado em `applyRolePermissions` (`app.js`): eles podem cadastrar/editar viaturas, só a exclusão é P3-only. Coerente nos dois lados; não é gap. (Concluí o contrário numa primeira passada por esta auditoria — corrigido aqui e no `CLAUDE.md`, que não citava a exceção.)
 
 ### Config (cota mensal — usada no Planejador)
 | Rota | Método | Middleware |
@@ -156,8 +156,6 @@ Este é o único módulo com modelo de permissão genuinamente diferenciado por 
 
 ## Achados consolidados desta fase (0.1–0.3) para decisão do usuário
 
-1. **Cadastro de Viaturas — gap de leitura E escrita** (tela + `POST`/`PUT` sem `exigirP3`) — prioridade alta.
-2. **Operações, Escalas, Planejador de Diárias — gap de leitura** (`GET` sem `exigirP3`, apesar da tela oculta) — prioridade média, é dado sensível de efetivo/diárias.
-3. **`GET /api/estatisticas` e `/api/estatisticas-cartao`** — código morto, não usado pelo client atual.
-
-Nenhum desses três foi corrigido nesta etapa (fora de escopo de 0.1–0.3, que é levantamento/documentação). Ficam registrados aqui e nos arquivos de `referencia-visual/` para tratamento explícito — via correção pontual antes da migração, ou via a Fase 1 (que já vai desenhar rotas novas do zero, oportunidade natural de fechar o gap 1 e 2 corretamente desde o início).
+1. ~~Cadastro de Viaturas~~ — **não é gap**, é exceção deliberada (ver módulo Viaturas acima e `CLAUDE.md` atualizado). Descartado após checar `applyRolePermissions` em `app.js`.
+2. **Operações, Escalas, Planejador de Diárias, Calendário de Diárias — gap de leitura real**: `GET /api/operacoes`, `GET /api/escalas`, `GET /api/planejador-diarias`, `GET /api/diarias-calendario` não têm `exigirP3`, apesar das telas correspondentes serem ocultas para Adjunto/Oficial. Sem comentário no código indicando que seja proposital (ao contrário do caso de Viaturas). Confirmado por análise estática que nenhuma tela visível a Adjunto/Oficial (Meu Turno, Cartão Programa, Listar Eventos, Mapa) usa `state.operacoes`/`state.escalas`, e que `/api/planejador-diarias`/`/api/diarias-calendario` só são chamadas de dentro da própria aba Planejador (P3-only, nunca alcançada por Adjunto/Oficial). **Corrigido nesta etapa** — ver commit desta correção: `exigirP3` adicionado às 4 rotas + `fetchData()` em `app.js` deixa de buscar `operacoes`/`escalas` no núcleo para quem não é P3 (evita o toast "parte dos dados não carregou" a cada refresh de 60s, que apareceria se só o backend fosse alterado).
+3. **`GET /api/estatisticas` e `/api/estatisticas-cartao`** — código morto, não usado pelo client atual (a aba "Estatísticas" do `CLAUDE.md` foi incorporada ao Relatório Diárias, comentário em `index.html:393-395`). **Não removido nesta etapa** — mantido só documentado; remoção de ~240 linhas fica para quando o usuário confirmar que não há uso futuro planejado.

@@ -23,17 +23,13 @@ Confirmado **idêntico** para Adjunto e Oficial:
 | Relatório Diárias | ❌ oculto |
 | Usuários | ❌ oculto |
 | Cadastro de Pessoal | ❌ oculto |
-| **Cadastro de Viaturas** | **✅ visível** |
+| Cadastro de Viaturas | ✅ visível (intencional — ver nota abaixo) |
 
 Cota Mensal de Diárias (sidebar): oculta para os dois perfis (`hidden-role`, P3-only), como esperado.
 
-## ⚠️ Achado fora do escopo desta etapa — gap de permissão em Cadastro de Viaturas
+## ✅ Correção: Cadastro de Viaturas visível a Adjunto/Oficial é intencional, não bug
 
-O `CLAUDE.md` (seção "Perfis de acesso") documenta que Adjunto/Oficial "só veem Meu Turno, Cartão Programa, Listar Eventos e Mapa (leitura)". Na prática, **"Cadastro de Viaturas" está visível e navegável para os dois perfis** (sem `hidden-role` no botão da sidebar) — item não documentado como exceção.
-
-Conferido também no backend (`server.js`): `POST /api/viaturas` e `PUT /api/viaturas/:id` **não têm o middleware `exigirP3`** (só o `DELETE /api/viaturas/:id` tem, linha ~1247). Ou seja, Adjunto/Oficial conseguem **criar e editar** viaturas do cadastro, não só visualizar — violando o princípio "client-side E server-side" que o próprio `CLAUDE.md` estabelece como regra de segurança.
-
-**Não corrigido nesta etapa** (fora do escopo de 0.1/0.2 — captura de referência). Registrar como item de backlog para decisão do usuário: (a) é um comportamento desejado que ficou de fora da doc, ou (b) é um bug de controle de acesso a corrigir (adicionar `hidden-role` no botão + `exigirP3` no POST/PUT) antes ou depois da migração.
+Concluí inicialmente (nesta mesma sessão) que "Cadastro de Viaturas" visível para Adjunto/Oficial era um gap de permissão. **Estava errado** — é decisão deliberada e comentada em `applyRolePermissions` (`public/app.js`, por volta da linha 263): "Cadastro de Viaturas é aberto a Adjunto/Oficial (cadastrar e editar; excluir segue P3-only...)". O `POST`/`PUT` de `/api/viaturas` não terem `exigirP3` é proposital (só o `DELETE` é P3-only), coerente com o client. A lacuna real era na documentação (`CLAUDE.md` não citava essa exceção) — já corrigida na seção "Perfis de acesso" do `CLAUDE.md`.
 
 ## Telas visíveis — conteúdo
 

@@ -971,11 +971,16 @@ async function fetchData() {
     // não são usados na tela de entrada de nenhum perfil (só no Cartão, no autocomplete de
     // escala e no fallback de setor do Mapa), então não devem competir por banda no celular
     // durante o 1º paint — vão na 2ª onda logo abaixo, sem travar a pintura.
+    // operacoes/escalas são P3-only no servidor (GET exige exigirP3, ver server.js) porque
+    // nenhuma tela de Adjunto/Oficial usa state.operacoes/state.escalas — pedir mesmo assim
+    // daria 403 a cada refresh (inicial + polling de 60s) e disparia o toast de "falha
+    // parcial" incorretamente, já que a falha aqui é permanente (permissão), não transitória.
+    const ehP3 = state.user && state.user.role === 'P3';
     const [eventos, operacoes, alocacoes, escalas, config] = await Promise.all([
       apiFetch(`${API_BASE_URL}/api/eventos`).then(r => r.json()),
-      apiFetch(`${API_BASE_URL}/api/operacoes`).then(r => r.json()),
+      ehP3 ? apiFetch(`${API_BASE_URL}/api/operacoes`).then(r => r.json()) : Promise.resolve([]),
       apiFetch(`${API_BASE_URL}/api/alocacoes`).then(r => r.json()),
-      apiFetch(`${API_BASE_URL}/api/escalas`).then(r => r.json()),
+      ehP3 ? apiFetch(`${API_BASE_URL}/api/escalas`).then(r => r.json()) : Promise.resolve([]),
       apiFetch(`${API_BASE_URL}/api/config`).then(r => r.json()),
     ]);
     state.eventos = usarLista(eventos, state.eventos);
