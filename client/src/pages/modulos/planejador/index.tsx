@@ -4,10 +4,14 @@ import { useToast } from '../../../context/useToast';
 import { periodoInicial } from '../../../lib/periodo';
 import { FiltroMesAno } from '../../../components/FiltroMesAno';
 import { usePlanejadorDiarias } from './usePlanejadorDiarias';
+import { OcupacaoCota } from './OcupacaoCota';
+import { OperacoesDoMes } from './OperacoesDoMes';
+import { DiariasPorTipo } from './DiariasPorTipo';
 
 // Painel Planejador de Diárias — espelha renderPlanejadorTab() em public/app.js.
-// Fase 3.3 Lote 1: toolbar (mês/ano + cota) + KPIs. Ocupação da Cota, Operações do
-// Mês, calendário e Missão Avulsa chegam nos próximos lotes.
+// Fase 3.3 Lote 2: + Ocupação da Cota, Operações do Mês e Diárias por Tipo.
+// Calendário e Missão Avulsa chegam no Lote 3; a gaveta de Operação (clique na
+// linha da tabela) chega no Lote 4.
 export default function PlanejadorPage() {
   const { toast } = useToast();
   const [{ mes, ano }, setPeriodo] = useState(periodoInicial);
@@ -131,6 +135,16 @@ export default function PlanejadorPage() {
           </div>
           <div className="kpi-rodape"><span className="stat-sub">da cota do mês</span></div>
         </div>
+      </div>
+
+      <div className="dash-layout dash-layout-360">
+        <div className="dash-main">
+          <OcupacaoCota resumo={resumo} />
+          <OperacoesDoMes operacoes={resumo.operacoes} />
+        </div>
+        <aside className="dash-rail dash-rail-360">
+          <DiariasPorTipo operacoes={resumo.operacoes} />
+        </aside>
       </div>
     </>
   );
