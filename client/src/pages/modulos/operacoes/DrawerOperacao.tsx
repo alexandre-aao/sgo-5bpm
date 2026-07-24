@@ -1,18 +1,14 @@
 import { useState } from 'react';
-import { Info, X, UserPlus, Trash2, CheckCircle } from 'lucide-react';
+import { Info, X, UserPlus, Trash2, CheckCircle, Pencil } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { useToast } from '../../../context/useToast';
+import { ROTULOS_RECORRENCIA } from '../../../lib/tiposOperacao';
 import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarExclusaoForte';
 import { useOperacaoDrawer, type ResultadoAcao } from './useOperacaoDrawer';
-import { BadgeSituacao } from './OperacoesDoMes';
+import { BadgeSituacao } from './BadgeSituacao';
 import { FormEscalarMilitar } from './FormEscalarMilitar';
 import { EscalasList } from './EscalasList';
-
-const ROTULOS_RECORRENCIA: Record<string, string> = {
-  diaria: 'Diária',
-  fim_de_semana: 'Fim de Semana',
-  dia_unico: 'Dia Único',
-};
+import { ModalOperacao } from './ModalOperacao';
 
 interface DrawerOperacaoProps {
   operacaoId: string;
@@ -39,9 +35,10 @@ export function DrawerOperacao({
   onAlterado,
 }: DrawerOperacaoProps) {
   const { toast } = useToast();
-  const { operacao, escalas, marcarExecutada, excluirOperacao, adicionarEscala, removerEscala } = useOperacaoDrawer(operacaoId);
+  const { operacao, escalas, atualizarOperacao, marcarExecutada, excluirOperacao, adicionarEscala, removerEscala } = useOperacaoDrawer(operacaoId);
 
   const [formEscalaAberto, setFormEscalaAberto] = useState(false);
+  const [modalEditarAberto, setModalEditarAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [marcandoExecutada, setMarcandoExecutada] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
@@ -156,6 +153,9 @@ export function DrawerOperacao({
             <button className="btn btn-danger" onClick={() => setModalExcluirAberto(true)}>
               <Trash2 /> Excluir Operação
             </button>
+            <button className="btn btn-secondary" onClick={() => setModalEditarAberto(true)}>
+              <Pencil /> Editar Operação
+            </button>
             {operacao.situacao !== 'Executada' && (
               <button
                 className={`btn btn-success${marcandoExecutada ? ' btn-carregando' : ''}`} disabled={marcandoExecutada}
@@ -181,6 +181,18 @@ export function DrawerOperacao({
           valorEsperado={nomeOp}
           onFechar={() => setModalExcluirAberto(false)}
           onConfirmar={() => { if (!excluindo) void handleConfirmarExclusao(); }}
+        />
+      )}
+
+      {modalEditarAberto && (
+        <ModalOperacao
+          operacao={operacao}
+          onFechar={() => setModalEditarAberto(false)}
+          onSalvar={async (payload) => {
+            const resultado = await atualizarOperacao(payload);
+            if (resultado.ok) onAlterado();
+            return resultado;
+          }}
         />
       )}
     </>

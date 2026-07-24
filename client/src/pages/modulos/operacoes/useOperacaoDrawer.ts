@@ -10,6 +10,22 @@ export interface EscalaPayload {
   qtd_aparicoes: number;
 }
 
+export interface OperacaoPayload {
+  nome_operacao: string;
+  tipo_operacao: string;
+  data_inicio: string;
+  data_termino: string;
+  qtd_diarias_estimada: number | string;
+  horario_inicio: string;
+  tipo_recorrencia: string;
+  bairro: string;
+  local_itinerario: string;
+  num_oficio: string;
+  num_os_manual: string;
+  num_sei: string;
+  demandante: string;
+}
+
 async function extrairErro(res: Response, padrao: string): Promise<string> {
   const corpo = (await res.json().catch(() => ({}))) as { error?: string };
   return corpo.error || padrao;
@@ -46,6 +62,23 @@ export function useOperacaoDrawer(operacaoId: string | null) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void recarregar();
   }, [recarregar]);
+
+  const atualizarOperacao = useCallback(async (payload: OperacaoPayload): Promise<ResultadoAcao> => {
+    if (!operacaoId) return { ok: false, mensagem: 'Nenhuma operação selecionada.' };
+    try {
+      const res = await apiFetch(`/api/operacoes/${operacaoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao salvar a operação.') };
+      await recarregar();
+      return { ok: true };
+    } catch (erro) {
+      console.error('Erro ao salvar edição de operação:', erro);
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [operacaoId, recarregar]);
 
   const marcarExecutada = useCallback(async (): Promise<ResultadoAcao> => {
     if (!operacaoId) return { ok: false, mensagem: 'Nenhuma operação selecionada.' };
@@ -105,5 +138,5 @@ export function useOperacaoDrawer(operacaoId: string | null) {
     }
   }, [recarregar]);
 
-  return { operacao, escalas, carregando, recarregar, marcarExecutada, excluirOperacao, adicionarEscala, removerEscala };
+  return { operacao, escalas, carregando, recarregar, atualizarOperacao, marcarExecutada, excluirOperacao, adicionarEscala, removerEscala };
 }

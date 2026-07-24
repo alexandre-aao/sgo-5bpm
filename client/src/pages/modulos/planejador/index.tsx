@@ -10,7 +10,7 @@ import { OperacoesDoMes } from './OperacoesDoMes';
 import { DiariasPorTipo } from './DiariasPorTipo';
 import { CalendarioDiarias } from './CalendarioDiarias';
 import { ModalMissaoAvulsa } from './ModalMissaoAvulsa';
-import { DrawerOperacao } from './DrawerOperacao';
+import { DrawerOperacao } from '../operacoes/DrawerOperacao';
 
 function dataHojeStr(): string {
   const hoje = new Date();

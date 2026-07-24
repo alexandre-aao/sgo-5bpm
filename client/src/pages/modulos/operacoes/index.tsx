@@ -1,4 +1,4 @@
-import { ModuloEmConstrucao } from './ModuloEmConstrucao';
+import { ModuloEmConstrucao } from '../ModuloEmConstrucao';
 
 export default function Pagina() {
   return <ModuloEmConstrucao />;
