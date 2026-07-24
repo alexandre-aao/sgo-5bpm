@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react';
-import { Map as MapIcon, AlertTriangle } from 'lucide-react';
+import { Map as MapIcon, AlertTriangle, MapPinPlus } from 'lucide-react';
 import { useAppData } from '../../../context/useAppData';
+import { useAuth } from '../../../context/useAuth';
 import { useBairros } from '../../../hooks/useBairros';
 import { useCartaoDeHoje } from '../../../hooks/useCartaoDeHoje';
 import { normalizarTexto } from '../../../lib/cartaoConflitos';
 import { DrawerEvento } from '../eventos/DrawerEvento';
 import { MapaLeaflet, type MapaLeafletHandle } from './MapaLeaflet';
 import { OcorrenciasPanel } from './OcorrenciasPanel';
+import { GerenciarBairrosPanel } from './GerenciarBairrosPanel';
 import { useMapaPrefs } from './useMapaPrefs';
 import type { Tables } from '../../../types/supabase';
 
@@ -28,12 +30,15 @@ function calcularEventosDaSemana(eventos: Tables<'eventos'>[]): Tables<'eventos'
 // Cartão Programa de hoje + painel lateral de ocorrências. Espelha
 // #tab-mapa + renderMapaTab()/renderMapaOcorrencias() em public/app.js.
 export default function MapaPage() {
+  const { usuario } = useAuth();
   const { dados, recarregar } = useAppData();
-  const { bairros } = useBairros();
+  const { bairros, criarBairro, atualizarBairro, excluirBairro } = useBairros();
   const { cartaoHoje } = useCartaoDeHoje();
   const { prefs, setPrefs } = useMapaPrefs();
   const mapaRef = useRef<MapaLeafletHandle>(null);
   const [eventoAbertoId, setEventoAbertoId] = useState<string | null>(null);
+  const [gerenciarBairrosAberto, setGerenciarBairrosAberto] = useState(false);
+  const podeGerenciarBairros = usuario?.role === 'P3';
 
   const eventosSemana = calcularEventosDaSemana(dados.eventos);
 
@@ -59,9 +64,16 @@ export default function MapaPage() {
             <MapIcon />
             <h2>Mapa de Eventos da Semana</h2>
           </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Eventos da pauta com data dentro da semana corrente (segunda a domingo), agrupados por bairro.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Eventos da pauta com data dentro da semana corrente (segunda a domingo), agrupados por bairro.
+            </p>
+            {podeGerenciarBairros && (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setGerenciarBairrosAberto((v) => !v)}>
+                <MapPinPlus /> Gerenciar Bairros
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mapa-controles">
@@ -120,6 +132,15 @@ export default function MapaPage() {
           />
         </div>
       </div>
+
+      {podeGerenciarBairros && gerenciarBairrosAberto && (
+        <GerenciarBairrosPanel
+          bairros={bairros}
+          criarBairro={criarBairro}
+          atualizarBairro={atualizarBairro}
+          excluirBairro={excluirBairro}
+        />
+      )}
 
       {eventoAbertoId && (
         <DrawerEvento
