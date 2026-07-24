@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, X, Plus, Trash2 } from 'lucide-react';
+import { Info, X, Plus, Trash2, Pencil } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { useAuth } from '../../../context/useAuth';
 import { useToast } from '../../../context/useToast';
@@ -8,6 +8,7 @@ import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarE
 import { useEventoDrawer, type ResultadoAcao } from './useEventoDrawer';
 import { AlocacoesList } from './AlocacoesList';
 import { FormAlocarModalidade } from './FormAlocarModalidade';
+import { ModalEditarEvento } from './ModalEditarEvento';
 
 interface DrawerEventoProps {
   eventoId: string;
@@ -18,16 +19,16 @@ interface DrawerEventoProps {
 }
 
 // Gaveta de detalhes do Evento (Detalhes + Modalidades Alocadas) — espelha
-// #drawer + fetchEventDetails()/handleCreateAlocacao()/handleDeleteEvento() em
-// public/app.js. "Editar Evento" (modal com todos os campos) fica pra Fase
-// 4.1, junto com a tela cheia de Eventos — mesma decisão da gaveta de Operação.
+// #drawer + fetchEventDetails()/handleCreateAlocacao()/handleDeleteEvento()/
+// handleSalvarEdicaoEvento() em public/app.js.
 export function DrawerEvento({ eventoId, onFechar, onAlterado }: DrawerEventoProps) {
   const { usuario } = useAuth();
   const { toast } = useToast();
-  const { evento, alocacoes, excluirEvento, adicionarAlocacao, removerAlocacao } = useEventoDrawer(eventoId);
+  const { evento, alocacoes, atualizarEvento, excluirEvento, adicionarAlocacao, removerAlocacao } = useEventoDrawer(eventoId);
   const podeEditar = usuario?.role === 'P3';
 
   const [formAlocacaoAberto, setFormAlocacaoAberto] = useState(false);
+  const [modalEditarAberto, setModalEditarAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
@@ -126,6 +127,11 @@ export function DrawerEvento({ eventoId, onFechar, onAlterado }: DrawerEventoPro
                 <Trash2 /> Excluir Evento
               </button>
             )}
+            {podeEditar && (
+              <button className="btn btn-secondary" onClick={() => setModalEditarAberto(true)}>
+                <Pencil /> Editar Evento
+              </button>
+            )}
             <button className="btn btn-primary" onClick={onFechar}>Fechar</button>
           </div>
         </div>
@@ -139,6 +145,18 @@ export function DrawerEvento({ eventoId, onFechar, onAlterado }: DrawerEventoPro
           valorEsperado={nomeEvento}
           onFechar={() => setModalExcluirAberto(false)}
           onConfirmar={() => { if (!excluindo) void handleConfirmarExclusao(); }}
+        />
+      )}
+
+      {modalEditarAberto && (
+        <ModalEditarEvento
+          evento={evento}
+          onFechar={() => setModalEditarAberto(false)}
+          onSalvar={async (payload) => {
+            const resultado = await atualizarEvento(payload);
+            if (resultado.ok) onAlterado();
+            return resultado;
+          }}
         />
       )}
     </>

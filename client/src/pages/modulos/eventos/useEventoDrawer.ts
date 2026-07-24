@@ -12,6 +12,20 @@ export interface AlocacaoPayload {
   comando_servico: string;
 }
 
+export interface EventoPayload {
+  num_oficio: string;
+  num_os_manual: string;
+  num_sei: string;
+  tipo_evento: string;
+  nome_evento: string;
+  demandante: string;
+  data_inicio: string;
+  data_termino: string;
+  horario_inicio: string;
+  local_itinerario: string;
+  bairro: string;
+}
+
 async function extrairErro(res: Response, padrao: string): Promise<string> {
   const corpo = (await res.json().catch(() => ({}))) as { error?: string };
   return corpo.error || padrao;
@@ -48,6 +62,23 @@ export function useEventoDrawer(eventoId: string | null) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void recarregar();
   }, [recarregar]);
+
+  const atualizarEvento = useCallback(async (payload: EventoPayload): Promise<ResultadoAcao> => {
+    if (!eventoId) return { ok: false, mensagem: 'Nenhum evento selecionado.' };
+    try {
+      const res = await apiFetch(`/api/eventos/${eventoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao salvar o evento.') };
+      await recarregar();
+      return { ok: true };
+    } catch (erro) {
+      console.error('Erro ao salvar edição de evento:', erro);
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [eventoId, recarregar]);
 
   const excluirEvento = useCallback(async (): Promise<ResultadoAcao> => {
     if (!eventoId) return { ok: false, mensagem: 'Nenhum evento selecionado.' };
@@ -90,5 +121,5 @@ export function useEventoDrawer(eventoId: string | null) {
     }
   }, [recarregar]);
 
-  return { evento, alocacoes, carregando, recarregar, excluirEvento, adicionarAlocacao, removerAlocacao };
+  return { evento, alocacoes, carregando, recarregar, atualizarEvento, excluirEvento, adicionarAlocacao, removerAlocacao };
 }
