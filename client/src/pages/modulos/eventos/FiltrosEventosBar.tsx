@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Plus, FileDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { FiltrosEventos } from './filtros';
 
@@ -6,13 +6,14 @@ interface FiltrosEventosBarProps {
   filtros: FiltrosEventos;
   onMudar: (filtros: FiltrosEventos) => void;
   onLimpar: () => void;
+  onRelatorio: () => void;
   podeCriar: boolean;
 }
 
 // Barra de filtros de Listar Eventos — espelha a events-filters-bar de
-// public/index.html (data inicial/final + busca de texto + Limpar Filtros).
-// O botão "Relatório (PDF)" chega no Lote 4.
-export function FiltrosEventosBar({ filtros, onMudar, onLimpar, podeCriar }: FiltrosEventosBarProps) {
+// public/index.html (data inicial/final + busca de texto + Limpar Filtros +
+// Relatório (PDF)).
+export function FiltrosEventosBar({ filtros, onMudar, onLimpar, onRelatorio, podeCriar }: FiltrosEventosBarProps) {
   return (
     <div className="events-filters-bar">
       <div className="filter-group">
@@ -37,6 +38,9 @@ export function FiltrosEventosBar({ filtros, onMudar, onLimpar, podeCriar }: Fil
         />
       </div>
       <button type="button" className="btn btn-secondary btn-sm" onClick={onLimpar}>Limpar Filtros</button>
+      <button type="button" className="btn btn-secondary btn-sm" onClick={onRelatorio}>
+        <FileDown /> Relatório (PDF)
+      </button>
       {podeCriar && (
         <Link to="/cadastro" className="btn btn-primary btn-sm">
           <Plus /> Novo Evento
