@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertTriangle, X, Trash2 } from 'lucide-react';
-import { normalizarTexto } from '../../../lib/cartaoConflitos';
+import { normalizarTexto } from '../lib/cartaoConflitos';
 
 interface ModalConfirmarExclusaoForteProps {
   titulo: string;
@@ -12,9 +12,9 @@ interface ModalConfirmarExclusaoForteProps {
 }
 
 // Confirmação reforçada de exclusão (digitar um valor pra habilitar o botão) —
-// espelha abrirConfirmacaoExclusaoForte() em public/app.js. Genérico o
-// suficiente pra ser reaproveitado por outros módulos (Eventos, Operações)
-// quando chegar a vez deles na migração.
+// espelha abrirConfirmacaoExclusaoForte() em public/app.js. Reaproveitado pelo
+// Cartão Programa (excluir cartão/template) e pela gaveta de Operação (excluir
+// operação).
 export function ModalConfirmarExclusaoForte({
   titulo,
   aviso,

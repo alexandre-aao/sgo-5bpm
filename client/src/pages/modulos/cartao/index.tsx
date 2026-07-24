@@ -23,7 +23,7 @@ import { TemplatesPanel } from './TemplatesPanel';
 import { ModalNovoTemplate } from './ModalNovoTemplate';
 import { SugestaoTemplate } from './SugestaoTemplate';
 import { ModalCopiarCartao } from './ModalCopiarCartao';
-import { ModalConfirmarExclusaoForte } from './ModalConfirmarExclusaoForte';
+import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarExclusaoForte';
 
 export default function CartaoProgramaPage() {
   const { usuario } = useAuth();

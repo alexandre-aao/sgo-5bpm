@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
 
 export interface OperacaoDoMes {
@@ -37,17 +37,25 @@ export function usePlanejadorDiarias(mes: string, ano: string) {
   const [resumo, setResumo] = useState<PlanejadorResumo>(RESUMO_VAZIO);
   const [carregando, setCarregando] = useState(true);
 
+  // Token de execução: mudar mês e ano em sequência rápida (dois selects, dois
+  // effects) dispara duas buscas em paralelo — sem isso, a resposta do período
+  // antigo pode chegar depois e sobrescrever a do período novo. Mesmo padrão de
+  // calendarioDiariasToken em public/app.js (renderCalendarioDiarias).
+  const tokenRef = useRef(0);
+
   const recarregar = useCallback(async () => {
+    const meuToken = ++tokenRef.current;
     setCarregando(true);
     try {
       const res = await apiFetch(`/api/planejador-diarias?mes=${mes}&ano=${ano}`);
       const dados = (await res.json()) as PlanejadorResumo;
+      if (tokenRef.current !== meuToken) return;
       setResumo(dados && Array.isArray(dados.operacoes) ? dados : RESUMO_VAZIO);
     } catch (erro) {
       console.error('Erro ao carregar planejador de diárias:', erro);
-      setResumo(RESUMO_VAZIO);
+      if (tokenRef.current === meuToken) setResumo(RESUMO_VAZIO);
     } finally {
-      setCarregando(false);
+      if (tokenRef.current === meuToken) setCarregando(false);
     }
   }, [mes, ano]);
 

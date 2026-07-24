@@ -3,19 +3,19 @@ import type { OperacaoDoMes } from './usePlanejadorDiarias';
 
 interface OperacoesDoMesProps {
   operacoes: OperacaoDoMes[];
+  onAbrir: (id: string) => void;
 }
 
 // Badge de situação da operação — Planejada (alerta) x Executada (sucesso). Espelha
 // badgeSituacaoOperacao() em public/app.js.
-function BadgeSituacao({ situacao }: { situacao: string }) {
+export function BadgeSituacao({ situacao }: { situacao: string }) {
   const classe = situacao === 'Executada' ? 'situacao-executada' : 'situacao-planejada';
   return <span className={`badge ${classe}`}>{situacao || 'Planejada'}</span>;
 }
 
 // Tabela "Operações do Mês" do Planejador — espelha o trecho de renderPlanejadorTab()
-// que monta table-planejador-body. Clicar na linha (abre a gaveta de Operação) chega
-// no Lote 4, junto com a própria gaveta.
-export function OperacoesDoMes({ operacoes }: OperacoesDoMesProps) {
+// que monta table-planejador-body. Clicar na linha abre a gaveta de Operação.
+export function OperacoesDoMes({ operacoes, onAbrir }: OperacoesDoMesProps) {
   return (
     <div className="panel">
       <div className="panel-header">
@@ -48,7 +48,7 @@ export function OperacoesDoMes({ operacoes }: OperacoesDoMesProps) {
               </tr>
             ) : (
               operacoes.map((op) => (
-                <tr key={op.id}>
+                <tr key={op.id} style={{ cursor: 'pointer' }} onClick={() => onAbrir(op.id)}>
                   <td data-label="Data"><strong>{op.data_inicio.split('-').reverse().join('/')}</strong></td>
                   <td className="card-title-cell">{op.nome_operacao}</td>
                   <td data-label="Tipo">{op.tipo_operacao}</td>

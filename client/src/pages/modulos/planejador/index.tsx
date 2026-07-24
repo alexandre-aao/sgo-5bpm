@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Wallet, CheckCircle, Clock, PiggyBank, Save } from 'lucide-react';
+import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
 import { periodoInicial } from '../../../lib/periodo';
 import { FiltroMesAno } from '../../../components/FiltroMesAno';
@@ -9,6 +10,7 @@ import { OperacoesDoMes } from './OperacoesDoMes';
 import { DiariasPorTipo } from './DiariasPorTipo';
 import { CalendarioDiarias } from './CalendarioDiarias';
 import { ModalMissaoAvulsa } from './ModalMissaoAvulsa';
+import { DrawerOperacao } from './DrawerOperacao';
 
 function dataHojeStr(): string {
   const hoje = new Date();
@@ -18,10 +20,10 @@ function dataHojeStr(): string {
 }
 
 // Painel Planejador de Diárias — espelha renderPlanejadorTab() em public/app.js.
-// Fase 3.3 Lote 3: + Calendário heatmap e Lançamento de Missão Avulsa. A gaveta
-// de Operação (clique na linha da tabela / abrir após criar a missão) chega no
-// Lote 4.
+// Fase 3.3 Lote 4 (final): + gaveta de Operação (Detalhes, Marcar como
+// Executada, Excluir, Efetivo Escalado com autocomplete de militar).
 export default function PlanejadorPage() {
+  const { dados, recarregar: recarregarAppData } = useAppData();
   const { toast } = useToast();
   const [{ mes, ano }, setPeriodo] = useState(periodoInicial);
   const { resumo, salvarCota, recarregar } = usePlanejadorDiarias(mes, ano);
@@ -29,18 +31,27 @@ export default function PlanejadorPage() {
   const [modalMissaoAberto, setModalMissaoAberto] = useState(false);
   const [dataMissaoPrefill, setDataMissaoPrefill] = useState(dataHojeStr);
   const [recarregarCalendarioSinal, setRecarregarCalendarioSinal] = useState(0);
+  const [operacaoAbertaId, setOperacaoAbertaId] = useState<string | null>(null);
 
   function handleClickDiaCalendario(dataStr: string) {
     setDataMissaoPrefill(dataStr);
     setModalMissaoAberto(true);
   }
 
-  function handleMissaoCriada() {
+  function handleMissaoCriada(operacaoId: string) {
     setModalMissaoAberto(false);
     setRecarregarCalendarioSinal((s) => s + 1);
     void recarregar();
-    // Abrir a gaveta de Operação já criada (pra escalar o efetivo) chega no
-    // Lote 4, junto com a própria gaveta.
+    setOperacaoAbertaId(operacaoId);
+  }
+
+  // Chamado pela gaveta após marcar executada / escalar / remover escala —
+  // atualiza KPIs, tabela do mês, calendário e o cache global (Dashboard etc.),
+  // igual ao await fetchData() do app antigo depois dessas ações.
+  function handleOperacaoAlterada() {
+    void recarregar();
+    void recarregarAppData();
+    setRecarregarCalendarioSinal((s) => s + 1);
   }
 
   const [cotaServidorAnterior, setCotaServidorAnterior] = useState(resumo.cota_mensal);
@@ -166,7 +177,7 @@ export default function PlanejadorPage() {
       <div className="dash-layout dash-layout-360">
         <div className="dash-main">
           <OcupacaoCota resumo={resumo} />
-          <OperacoesDoMes operacoes={resumo.operacoes} />
+          <OperacoesDoMes operacoes={resumo.operacoes} onAbrir={setOperacaoAbertaId} />
         </div>
         <aside className="dash-rail dash-rail-360">
           <CalendarioDiarias recarregarSinal={recarregarCalendarioSinal} onClickDia={handleClickDiaCalendario} />
@@ -179,6 +190,18 @@ export default function PlanejadorPage() {
           dataPreenchida={dataMissaoPrefill}
           onFechar={() => setModalMissaoAberto(false)}
           onCriada={handleMissaoCriada}
+        />
+      )}
+
+      {operacaoAbertaId && (
+        <DrawerOperacao
+          operacaoId={operacaoAbertaId}
+          pessoal={dados.pessoal}
+          operacoesTodas={dados.operacoes}
+          escalasTodas={dados.escalas}
+          cotaMensal={resumo.cota_mensal}
+          onFechar={() => setOperacaoAbertaId(null)}
+          onAlterado={handleOperacaoAlterada}
         />
       )}
     </>
