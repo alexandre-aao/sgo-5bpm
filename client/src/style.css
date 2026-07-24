@@ -2982,6 +2982,35 @@ body.sgo-sincronizando .topbar::before {
   color: var(--text-muted);
 }
 
+/* Paginação client-side (Listar Eventos — 1ª tela do projeto com paginação
+   de verdade, a API nunca paginou). */
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--divider);
+}
+
+.pagination-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination-pagina {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* Trilho um pouco mais largo (360px) — o calendário precisa de espaço */
 .dash-layout-360 { grid-template-columns: minmax(0, 1fr) 360px; }
 .dash-rail-360 { width: 100%; }

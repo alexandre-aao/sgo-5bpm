@@ -8,7 +8,7 @@ import { ViaturasDoTurno } from './ViaturasDoTurno';
 import { EquipeDeServico } from './EquipeDeServico';
 import { AvisosDoTurno } from './AvisosDoTurno';
 import { calcularAvisosDoTurno } from './avisos';
-import { DrawerEvento } from './DrawerEvento';
+import { DrawerEvento } from '../eventos/DrawerEvento';
 
 const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
