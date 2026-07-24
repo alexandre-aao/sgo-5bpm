@@ -4,6 +4,10 @@ import { Link } from 'react-router-dom';
 import { useAppData } from '../../../context/useAppData';
 import { useCartaoPorData } from '../../../hooks/useCartaoPorData';
 import { EventosDoDia } from './EventosDoDia';
+import { ViaturasDoTurno } from './ViaturasDoTurno';
+import { EquipeDeServico } from './EquipeDeServico';
+import { AvisosDoTurno } from './AvisosDoTurno';
+import { calcularAvisosDoTurno } from './avisos';
 
 const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
@@ -22,9 +26,8 @@ function rotuloDiaBotao(prefixo: string, date: Date): string {
 
 // Meu Turno — visão do dia (Hoje/Amanhã) para Adjunto/Oficial, landing page
 // desses perfis. Espelha renderTurnoTab() em public/app.js.
-// Fase 3.4 Lote 1: toolbar (seletor de dia + status do cartão) + KPIs +
-// Eventos do Dia. Viaturas/Equipe/Avisos chegam no Lote 2; a gaveta de
-// detalhes do evento chega no Lote 3.
+// Fase 3.4 Lote 2: + Viaturas do Turno, Equipe de Serviço e Avisos do Turno.
+// A gaveta de detalhes do evento chega no Lote 3.
 export default function TurnoPage() {
   const { dados } = useAppData();
   const [diaSelecionado, setDiaSelecionado] = useState<'hoje' | 'amanha'>('hoje');
@@ -48,6 +51,7 @@ export default function TurnoPage() {
   );
 
   const viaturas = cartao?.viaturas || [];
+  const avisos = calcularAvisosDoTurno(cartao, eventosDoDia, dados.pessoal);
 
   const textoStatusCartao = carregandoCartao ? 'Verificando cartão...' : cartao ? 'Cartão Programa lançado' : 'Cartão Programa não lançado';
   const classePill = carregandoCartao ? '' : cartao ? ' status-pill-ok' : ' status-pill-pendente';
@@ -102,9 +106,17 @@ export default function TurnoPage() {
           </div>
         </div>
         <div className="kpi-card kpi-card-horizontal">
-          <span className="kpi-icone" style={{ background: 'var(--warning-bg)', color: 'var(--warning-fg)' }}><AlertTriangle /></span>
+          <span
+            className="kpi-icone"
+            style={{
+              background: avisos.length ? 'var(--warning-bg)' : 'var(--success-bg)',
+              color: avisos.length ? 'var(--warning-fg)' : 'var(--success-fg)',
+            }}
+          >
+            <AlertTriangle />
+          </span>
           <div>
-            <div className="kpi-valor">0</div>
+            <div className="kpi-valor">{avisos.length}</div>
             <div className="kpi-label-sob">Avisos do turno</div>
           </div>
         </div>
@@ -113,7 +125,12 @@ export default function TurnoPage() {
       <div className="dash-layout">
         <div className="dash-main">
           <EventosDoDia eventos={eventosDoDia} alocacoes={dados.alocacoes} dataBr={dataBr} diaLabel={DIAS[alvo.getDay()]} />
+          <ViaturasDoTurno viaturas={viaturas} />
         </div>
+        <aside className="dash-rail">
+          <EquipeDeServico cartao={cartao} />
+          <AvisosDoTurno avisos={avisos} />
+        </aside>
       </div>
     </>
   );
