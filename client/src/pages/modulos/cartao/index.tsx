@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Route, ClipboardX, Plus, Copy, MoreHorizontal, LayoutTemplate, FilePlus2 } from 'lucide-react';
+import { Route, ClipboardX, Plus, Copy, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2 } from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
@@ -23,6 +23,7 @@ import { TemplatesPanel } from './TemplatesPanel';
 import { ModalNovoTemplate } from './ModalNovoTemplate';
 import { SugestaoTemplate } from './SugestaoTemplate';
 import { ModalCopiarCartao } from './ModalCopiarCartao';
+import { ModalConfirmarExclusaoForte } from './ModalConfirmarExclusaoForte';
 
 export default function CartaoProgramaPage() {
   const { usuario } = useAuth();
@@ -75,6 +76,7 @@ export default function CartaoProgramaPage() {
   const [mostrarTemplatesPanel, setMostrarTemplatesPanel] = useState(false);
   const [modalNovoTemplateAberto, setModalNovoTemplateAberto] = useState(false);
   const [modalCopiarAberto, setModalCopiarAberto] = useState(false);
+  const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function CartaoProgramaPage() {
   }, [menuAberto]);
 
   // Cartão Programa é a única tela que Adjunto/Oficial podem editar — só a
-  // exclusão de cartão (fora do escopo deste lote) segue P3-only.
+  // exclusão de cartão e a gestão de templates seguem P3-only.
   const podeEditar = usuario?.role === 'P3' || usuario?.role === 'Adjunto';
   const ehP3 = usuario?.role === 'P3';
 
@@ -124,6 +126,46 @@ export default function CartaoProgramaPage() {
     if (templateAberto?.id === id) setTemplateAberto(null);
   }
 
+  function handleImprimir() {
+    if (!cartaoEditando) {
+      toast('Não há Cartão Programa nesta data para imprimir.', 'warning');
+      return;
+    }
+    window.print();
+  }
+
+  function handleAbrirExcluir() {
+    if (!cartaoEditando) {
+      toast('Não há Cartão Programa nesta data para excluir.', 'warning');
+      return;
+    }
+    setModalExcluirAberto(true);
+  }
+
+  async function handleConfirmarExclusao() {
+    if (!cartaoEditando) return;
+    try {
+      const res = await apiFetch(`/api/cartoes/${cartaoEditando.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const corpo = (await res.json().catch(() => ({}))) as { error?: string };
+        toast(corpo.error || 'Falha ao excluir o Cartão Programa.', 'danger');
+        return;
+      }
+      setModalExcluirAberto(false);
+      const eraTemplate = !!templateAberto;
+      toast(eraTemplate ? 'Cartão padrão excluído.' : 'Cartão Programa excluído.', 'info');
+      if (eraTemplate) {
+        setTemplateAberto(null);
+        setMostrarTemplatesPanel(false);
+      } else {
+        await recarregar();
+      }
+    } catch (erro) {
+      console.error('Erro ao excluir Cartão Programa:', erro);
+      toast('Falha na comunicação com o servidor.', 'danger');
+    }
+  }
+
   async function handleExcluirViatura(vtr: CartaoViatura) {
     if (!window.confirm('Remover esta viatura e todo o seu roteiro do cartão?')) return;
     const resultado = await removerViatura(vtr.id);
@@ -155,6 +197,9 @@ export default function CartaoProgramaPage() {
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleAbrirCopiar}>
               <Copy /> Copiar
             </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleImprimir}>
+              <Printer /> Imprimir
+            </button>
             {ehP3 && (
               <div className="dropdown" ref={menuRef}>
                 <button
@@ -178,6 +223,11 @@ export default function CartaoProgramaPage() {
                   </button>
                 </div>
               </div>
+            )}
+            {ehP3 && (
+              <button type="button" className="btn btn-danger btn-sm" onClick={handleAbrirExcluir}>
+                <Trash2 /> Excluir
+              </button>
             )}
           </div>
         </div>
@@ -280,6 +330,21 @@ export default function CartaoProgramaPage() {
           dataAlvo={dataSelecionada}
           onFechar={() => setModalCopiarAberto(false)}
           onCopiado={() => { setModalCopiarAberto(false); setTemplateAberto(null); void recarregar(); }}
+        />
+      )}
+
+      {modalExcluirAberto && cartaoEditando && (
+        <ModalConfirmarExclusaoForte
+          titulo={templateAberto ? 'Excluir Cartão Padrão' : 'Excluir Cartão Programa'}
+          aviso={
+            templateAberto
+              ? 'Isso excluirá permanentemente este cartão padrão, com todas as viaturas e roteiros associados.'
+              : 'Isso excluirá permanentemente o Cartão Programa desta data, com todas as viaturas e roteiros associados.'
+          }
+          label={`Digite "${templateAberto ? cartaoEditando.nome_template : cartaoEditando.data?.split('-').reverse().join('/')}" para confirmar`}
+          valorEsperado={(templateAberto ? cartaoEditando.nome_template : cartaoEditando.data?.split('-').reverse().join('/')) || ''}
+          onFechar={() => setModalExcluirAberto(false)}
+          onConfirmar={() => void handleConfirmarExclusao()}
         />
       )}
     </>

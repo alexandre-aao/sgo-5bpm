@@ -66,6 +66,14 @@ export function CartaoHeader({ cartao, pessoal, onAtualizar }: CartaoHeaderProps
 
   const dataBr = cartao.data ? cartao.data.split('-').reverse().join('/') : '';
 
+  // Na impressão, o campo Sobreaviso vira um rótulo dinâmico: se o Fiscal já é
+  // Oficial, o sobreaviso é redundante e mostra "Oficial de Serviço" com o
+  // próprio Fiscal — espelha atualizarCampoSobreavisoPrint().
+  const fiscalPessoa = pessoal.find((p) => p.nome === cartao.fiscal);
+  const fiscalEhOficial = fiscalPessoa?.tipo === 'Oficial';
+  const sobreavisoPrintLabel = fiscalEhOficial ? 'Oficial de Serviço' : 'Sobreaviso';
+  const sobreavisoPrintValor = (fiscalEhOficial ? cartao.fiscal : cartao.oficial_sobreaviso) || '-';
+
   // Template não tem data/fiscal/adjunto/sobreaviso próprios — só o cabeçalho de
   // identificação aparece, igual a exibirCartaoNoEditor() quando is_template.
   if (cartao.is_template) {
@@ -116,14 +124,20 @@ export function CartaoHeader({ cartao, pessoal, onAtualizar }: CartaoHeaderProps
           pessoal={pessoal}
           onChange={(valor) => salvar({ adjunto: valor })}
         />
-        <SelectPessoal
-          id="cartao-sobreaviso"
-          label="Oficial de Sobreaviso"
-          categoria="Oficial de Sobreaviso"
-          valorAtual={cartao.oficial_sobreaviso || ''}
-          pessoal={pessoal}
-          onChange={(valor) => salvar({ oficial_sobreaviso: valor })}
-        />
+        <div id="cartao-sobreaviso-grupo">
+          <SelectPessoal
+            id="cartao-sobreaviso"
+            label="Oficial de Sobreaviso"
+            categoria="Oficial de Sobreaviso"
+            valorAtual={cartao.oficial_sobreaviso || ''}
+            pessoal={pessoal}
+            onChange={(valor) => salvar({ oficial_sobreaviso: valor })}
+          />
+        </div>
+        <div className="form-group cartao-sobreaviso-print-only">
+          <label>{sobreavisoPrintLabel}</label>
+          <span>{sobreavisoPrintValor}</span>
+        </div>
       </div>
     </div>
   );

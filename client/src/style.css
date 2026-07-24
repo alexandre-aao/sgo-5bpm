@@ -4044,7 +4044,7 @@ body.sgo-sincronizando .topbar::before {
   .app-container { display: block; height: auto; width: auto; }
   .main-content { overflow: visible; display: block; }
   .tab-content { display: none; padding: 0; overflow: visible; }
-  .tab-content.active#tab-cartao { display: block; }
+  .tab-content.active { display: block; }
 
   .cartao-header-panel,
   .cartao-vtr-card,
