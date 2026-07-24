@@ -7,15 +7,41 @@ import { usePlanejadorDiarias } from './usePlanejadorDiarias';
 import { OcupacaoCota } from './OcupacaoCota';
 import { OperacoesDoMes } from './OperacoesDoMes';
 import { DiariasPorTipo } from './DiariasPorTipo';
+import { CalendarioDiarias } from './CalendarioDiarias';
+import { ModalMissaoAvulsa } from './ModalMissaoAvulsa';
+
+function dataHojeStr(): string {
+  const hoje = new Date();
+  const m = String(hoje.getMonth() + 1).padStart(2, '0');
+  const d = String(hoje.getDate()).padStart(2, '0');
+  return `${hoje.getFullYear()}-${m}-${d}`;
+}
 
 // Painel Planejador de Diárias — espelha renderPlanejadorTab() em public/app.js.
-// Fase 3.3 Lote 2: + Ocupação da Cota, Operações do Mês e Diárias por Tipo.
-// Calendário e Missão Avulsa chegam no Lote 3; a gaveta de Operação (clique na
-// linha da tabela) chega no Lote 4.
+// Fase 3.3 Lote 3: + Calendário heatmap e Lançamento de Missão Avulsa. A gaveta
+// de Operação (clique na linha da tabela / abrir após criar a missão) chega no
+// Lote 4.
 export default function PlanejadorPage() {
   const { toast } = useToast();
   const [{ mes, ano }, setPeriodo] = useState(periodoInicial);
-  const { resumo, salvarCota } = usePlanejadorDiarias(mes, ano);
+  const { resumo, salvarCota, recarregar } = usePlanejadorDiarias(mes, ano);
+
+  const [modalMissaoAberto, setModalMissaoAberto] = useState(false);
+  const [dataMissaoPrefill, setDataMissaoPrefill] = useState(dataHojeStr);
+  const [recarregarCalendarioSinal, setRecarregarCalendarioSinal] = useState(0);
+
+  function handleClickDiaCalendario(dataStr: string) {
+    setDataMissaoPrefill(dataStr);
+    setModalMissaoAberto(true);
+  }
+
+  function handleMissaoCriada() {
+    setModalMissaoAberto(false);
+    setRecarregarCalendarioSinal((s) => s + 1);
+    void recarregar();
+    // Abrir a gaveta de Operação já criada (pra escalar o efetivo) chega no
+    // Lote 4, junto com a própria gaveta.
+  }
 
   const [cotaServidorAnterior, setCotaServidorAnterior] = useState(resumo.cota_mensal);
   const [cotaValor, setCotaValor] = useState(String(resumo.cota_mensal));
@@ -143,9 +169,18 @@ export default function PlanejadorPage() {
           <OperacoesDoMes operacoes={resumo.operacoes} />
         </div>
         <aside className="dash-rail dash-rail-360">
+          <CalendarioDiarias recarregarSinal={recarregarCalendarioSinal} onClickDia={handleClickDiaCalendario} />
           <DiariasPorTipo operacoes={resumo.operacoes} />
         </aside>
       </div>
+
+      {modalMissaoAberto && (
+        <ModalMissaoAvulsa
+          dataPreenchida={dataMissaoPrefill}
+          onFechar={() => setModalMissaoAberto(false)}
+          onCriada={handleMissaoCriada}
+        />
+      )}
     </>
   );
 }
