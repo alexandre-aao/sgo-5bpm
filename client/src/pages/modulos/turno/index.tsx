@@ -8,6 +8,7 @@ import { ViaturasDoTurno } from './ViaturasDoTurno';
 import { EquipeDeServico } from './EquipeDeServico';
 import { AvisosDoTurno } from './AvisosDoTurno';
 import { calcularAvisosDoTurno } from './avisos';
+import { DrawerEvento } from './DrawerEvento';
 
 const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
@@ -26,11 +27,12 @@ function rotuloDiaBotao(prefixo: string, date: Date): string {
 
 // Meu Turno — visão do dia (Hoje/Amanhã) para Adjunto/Oficial, landing page
 // desses perfis. Espelha renderTurnoTab() em public/app.js.
-// Fase 3.4 Lote 2: + Viaturas do Turno, Equipe de Serviço e Avisos do Turno.
-// A gaveta de detalhes do evento chega no Lote 3.
+// Fase 3.4 Lote 3 (final): + gaveta de detalhes do Evento (Detalhes +
+// Modalidades Alocadas), abrindo ao clicar numa linha de Eventos do Dia.
 export default function TurnoPage() {
-  const { dados } = useAppData();
+  const { dados, recarregar: recarregarAppData } = useAppData();
   const [diaSelecionado, setDiaSelecionado] = useState<'hoje' | 'amanha'>('hoje');
+  const [eventoAbertoId, setEventoAbertoId] = useState<string | null>(null);
 
   const hoje = new Date();
   const amanha = new Date(hoje);
@@ -124,7 +126,10 @@ export default function TurnoPage() {
 
       <div className="dash-layout">
         <div className="dash-main">
-          <EventosDoDia eventos={eventosDoDia} alocacoes={dados.alocacoes} dataBr={dataBr} diaLabel={DIAS[alvo.getDay()]} />
+          <EventosDoDia
+            eventos={eventosDoDia} alocacoes={dados.alocacoes} dataBr={dataBr} diaLabel={DIAS[alvo.getDay()]}
+            onAbrir={setEventoAbertoId}
+          />
           <ViaturasDoTurno viaturas={viaturas} />
         </div>
         <aside className="dash-rail">
@@ -132,6 +137,14 @@ export default function TurnoPage() {
           <AvisosDoTurno avisos={avisos} />
         </aside>
       </div>
+
+      {eventoAbertoId && (
+        <DrawerEvento
+          eventoId={eventoAbertoId}
+          onFechar={() => setEventoAbertoId(null)}
+          onAlterado={() => void recarregarAppData()}
+        />
+      )}
     </>
   );
 }
