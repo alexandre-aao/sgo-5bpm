@@ -27,21 +27,14 @@ Aplicativo full-stack para a Seção de Planejamento (P3) do 5º Batalhão de Po
 
 ## Rodando o projeto
 
-Pós-migração (Fase 6): `node server.js` sozinho só serve `/api/*` — não serve mais frontend nenhum (o antigo `public/` foi removido; em produção o frontend é o build estático de `/client`, servido pela Vercel via `@vercel/static-build`, não por Express). Pra rodar o app completo localmente, precisa dos **dois** processos:
-
 ```bash
-npm install               # backend, na raiz
-npm start                 # ou: node server.js — API em :3005
-
-cd client && npm install
-npm run dev                # frontend Vite em :5173, aponta pra :3005 via VITE_API_BASE_URL
+npm install
+npm start        # ou: node server.js
 ```
 
-Ver `.claude/launch.json` (`autoPort: true` deixa o harness de preview escolher outra porta livre se 3005/5173 já estiverem em uso). Precisa de `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` no ambiente do backend — já configuradas em `.claude/launch.json`.
+Sobe em `http://localhost:3005` por padrão (ver `.claude/launch.json`; `autoPort: true` deixa o harness de preview escolher outra porta livre se a 3005 já estiver em uso por outra sessão). Precisa de `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` no ambiente — já configuradas em `.claude/launch.json` para o preview server.
 
-**Sempre reiniciar `node server.js`** depois de editar `server.js` — não há hot reload (o frontend em `client/` tem HMR via Vite, esse não precisa reiniciar). Se o usuário reportar "erro no servidor" em algo que você acabou de mudar, o primeiro suspeito é sempre um servidor real (`npm start` do próprio usuário, fora do preview do Claude Code) rodando código antigo sem reiniciar.
-
-Pra conferir o build de produção do frontend localmente: `cd client && npm run build && npm run preview` (serve `client/dist` isolado, sem API — só serve pra checar se o build compila e renderiza; pra testar fluxos completos use o par `node server.js` + `npm run dev` acima).
+**Sempre reiniciar o servidor** depois de editar `server.js` — não há hot reload. Se o usuário reportar "erro no servidor" em algo que você acabou de mudar, o primeiro suspeito é sempre um servidor real (`npm start` do próprio usuário, fora do preview do Claude Code) rodando código antigo sem reiniciar.
 
 ## Modelo de dados (Supabase / Postgres)
 
