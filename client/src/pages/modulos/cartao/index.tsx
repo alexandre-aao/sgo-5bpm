@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Route, ClipboardX, Plus, Copy, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2 } from 'lucide-react';
+import {
+  Route, ClipboardX, Plus, Copy, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2,
+  ClipboardList, Lock,
+} from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
 import { apiFetch } from '../../../lib/api';
 import type { CartaoViatura, CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { calcularAlertasCartao } from '../../../lib/cartaoConflitos';
+import { tipoDoCartao } from '../../../lib/cartaoConflitos';
+import { dentroDoPrazoCartao, motivoBloqueioCartao, podeEditarCartao } from '../../../lib/prazoCartao';
+import { useOrientacoesCartao, orientacoesDoTipo } from '../../../hooks/useOrientacoesCartao';
 import { useCartaoPrograma } from './useCartaoPrograma';
 import { useViaturasCartao } from './useViaturasCartao';
 import { useItensRoteiro } from './useItensRoteiro';
@@ -23,7 +29,12 @@ import { TemplatesPanel } from './TemplatesPanel';
 import { ModalNovoTemplate } from './ModalNovoTemplate';
 import { SugestaoTemplate } from './SugestaoTemplate';
 import { ModalCopiarCartao } from './ModalCopiarCartao';
-import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarExclusaoForte';
+import { TipoCartaoSwitch } from './TipoCartaoSwitch';
+import { FaixaReforcos } from './FaixaReforcos';
+import { ModalNovoReforco } from './ModalNovoReforco';
+import { OrientacoesPanel } from './OrientacoesPanel';
+import { ModalExcluirCartao } from './ModalExcluirCartao';
+import { CartaoProgramaPdf } from './CartaoProgramaPdf';
 
 export default function CartaoProgramaPage() {
   const { usuario } = useAuth();
@@ -33,6 +44,12 @@ export default function CartaoProgramaPage() {
     dataSelecionada,
     setDataSelecionada,
     deslocarDia,
+    tipoAtivo,
+    setTipoAtivo,
+    cartaoOrdinario,
+    reforcos,
+    reforcoSelecionadoId,
+    selecionarReforco,
     cartao,
     temCartao,
     criarCartao,
@@ -40,9 +57,9 @@ export default function CartaoProgramaPage() {
     recarregar,
   } = useCartaoPrograma();
 
-  // Cartão padrão aberto para edição no mesmo editor de viaturas/roteiro —
-  // espelha exibirCartaoNoEditor() recebendo tanto um cartão do dia quanto um
-  // template em public/app.js. Trocar a data sempre sai do modo template.
+  // Modelo aberto para edição no MESMO editor de viaturas/roteiro — espelha
+  // exibirCartaoNoEditor() recebendo tanto um cartão do dia quanto um modelo em
+  // public/app.js. Trocar a data ou o tipo sempre sai do modo modelo.
   const [templateAberto, setTemplateAberto] = useState<CartaoDetalhado | null>(null);
   const [dataAnterior, setDataAnterior] = useState(dataSelecionada);
   if (dataSelecionada !== dataAnterior) {
@@ -52,6 +69,12 @@ export default function CartaoProgramaPage() {
 
   const cartaoEditando = templateAberto ?? cartao;
 
+  // Orientações permanentes da P3 (só as ativas) — entram no bloco de observações de
+  // cada viatura, na tela e no PDF.
+  const { orientacoes } = useOrientacoesCartao(true);
+  const tipoEmEdicao = cartaoEditando ? tipoDoCartao(cartaoEditando) : tipoAtivo;
+  const textosOrientacoes = orientacoesDoTipo(orientacoes, tipoEmEdicao).map((o) => o.texto);
+
   const recarregarAtivo = useCallback(async () => {
     if (templateAberto) {
       try {
@@ -59,7 +82,7 @@ export default function CartaoProgramaPage() {
         const detalhe = (await res.json()) as CartaoDetalhado;
         setTemplateAberto(detalhe);
       } catch (erro) {
-        console.error('Erro ao recarregar cartão padrão:', erro);
+        console.error('Erro ao recarregar modelo de cartão:', erro);
       }
     } else {
       await recarregar();
@@ -74,9 +97,12 @@ export default function CartaoProgramaPage() {
 
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarTemplatesPanel, setMostrarTemplatesPanel] = useState(false);
+  const [mostrarOrientacoesPanel, setMostrarOrientacoesPanel] = useState(false);
   const [modalNovoTemplateAberto, setModalNovoTemplateAberto] = useState(false);
   const [modalCopiarAberto, setModalCopiarAberto] = useState(false);
+  const [modalNovoReforcoAberto, setModalNovoReforcoAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
+  const [modalPdfAberto, setModalPdfAberto] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -88,10 +114,15 @@ export default function CartaoProgramaPage() {
     return () => document.removeEventListener('mousedown', handleClickFora);
   }, [menuAberto]);
 
-  // Cartão Programa é a única tela que Adjunto/Oficial podem editar — só a
-  // exclusão de cartão e a gestão de templates seguem P3-only.
-  const podeEditar = usuario?.role === 'P3' || usuario?.role === 'Adjunto';
   const ehP3 = usuario?.role === 'P3';
+  // Adjunto e Oficial têm exatamente os mesmos poderes no Cartão Programa, limitados
+  // pelo prazo (08h do dia seguinte, America/Fortaleza). A P3 não tem prazo. A checagem
+  // real é do servidor (403) — isto trava a UI antes e explica o motivo.
+  const podeEditar = cartaoEditando
+    ? podeEditarCartao(cartaoEditando, usuario?.role)
+    : usuario?.role === 'P3' || usuario?.role === 'Adjunto' || usuario?.role === 'Oficial';
+  const motivoBloqueio = cartaoEditando ? motivoBloqueioCartao(cartaoEditando, usuario?.role) : null;
+  const ehModelo = !!cartaoEditando?.is_template;
 
   async function handleCriarCartao() {
     const resultado = await criarCartao();
@@ -117,8 +148,8 @@ export default function CartaoProgramaPage() {
       setTemplateAberto(detalhe);
       setMostrarTemplatesPanel(false);
     } catch (erro) {
-      console.error('Erro ao abrir cartão padrão:', erro);
-      toast('Falha ao abrir o cartão padrão.', 'danger');
+      console.error('Erro ao abrir modelo de cartão:', erro);
+      toast('Falha ao abrir o modelo de cartão.', 'danger');
     }
   }
 
@@ -126,12 +157,17 @@ export default function CartaoProgramaPage() {
     if (templateAberto?.id === id) setTemplateAberto(null);
   }
 
+  function handleTrocarTipo(tipo: typeof tipoAtivo) {
+    setTemplateAberto(null);
+    setTipoAtivo(tipo);
+  }
+
   function handleImprimir() {
-    if (!cartaoEditando) {
+    if (!cartaoOrdinario && reforcos.length === 0) {
       toast('Não há Cartão Programa nesta data para imprimir.', 'warning');
       return;
     }
-    window.print();
+    setModalPdfAberto(true);
   }
 
   function handleAbrirExcluir() {
@@ -142,10 +178,14 @@ export default function CartaoProgramaPage() {
     setModalExcluirAberto(true);
   }
 
-  async function handleConfirmarExclusao() {
+  async function handleConfirmarExclusao(justificativa: string) {
     if (!cartaoEditando) return;
     try {
-      const res = await apiFetch(`/api/cartoes/${cartaoEditando.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/cartoes/${cartaoEditando.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ justificativa }),
+      });
       if (!res.ok) {
         const corpo = (await res.json().catch(() => ({}))) as { error?: string };
         toast(corpo.error || 'Falha ao excluir o Cartão Programa.', 'danger');
@@ -153,7 +193,7 @@ export default function CartaoProgramaPage() {
       }
       setModalExcluirAberto(false);
       const eraTemplate = !!templateAberto;
-      toast(eraTemplate ? 'Cartão padrão excluído.' : 'Cartão Programa excluído.', 'info');
+      toast(eraTemplate ? 'Modelo excluído.' : 'Cartão Programa excluído.', 'info');
       if (eraTemplate) {
         setTemplateAberto(null);
         setMostrarTemplatesPanel(false);
@@ -176,6 +216,8 @@ export default function CartaoProgramaPage() {
     }
   }
 
+  const ehReforcoAtivo = tipoAtivo === 'reforco' && !templateAberto;
+
   return (
     <>
       <div className="panel cartao-toolbar-panel">
@@ -191,9 +233,12 @@ export default function CartaoProgramaPage() {
               onDeslocarDia={deslocarDia}
               temCartao={temCartao}
             />
-            <button type="button" className="btn btn-primary btn-sm" onClick={handleCriarCartao}>
-              <Plus /> Criar Cartão
-            </button>
+            <TipoCartaoSwitch tipoAtivo={tipoAtivo} onTrocar={handleTrocarTipo} qtdReforcos={reforcos.length} />
+            {!ehReforcoAtivo && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={handleCriarCartao}>
+                <Plus /> Criar Cartão
+              </button>
+            )}
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleAbrirCopiar}>
               <Copy /> Copiar
             </button>
@@ -213,18 +258,24 @@ export default function CartaoProgramaPage() {
                     type="button" className="dropdown-item"
                     onClick={() => { setMostrarTemplatesPanel((v) => !v); setMenuAberto(false); }}
                   >
-                    <LayoutTemplate /> Cartões Padrão
+                    <LayoutTemplate /> Modelos de Cartão
                   </button>
                   <button
                     type="button" className="dropdown-item"
                     onClick={() => { setModalNovoTemplateAberto(true); setMenuAberto(false); }}
                   >
-                    <FilePlus2 /> Novo Cartão Padrão
+                    <FilePlus2 /> Novo Modelo de Cartão
+                  </button>
+                  <button
+                    type="button" className="dropdown-item"
+                    onClick={() => { setMostrarOrientacoesPanel((v) => !v); setMenuAberto(false); }}
+                  >
+                    <ClipboardList /> Orientações da P3
                   </button>
                 </div>
               </div>
             )}
-            {ehP3 && (
+            {cartaoEditando && podeEditar && (
               <button type="button" className="btn btn-danger btn-sm" onClick={handleAbrirExcluir}>
                 <Trash2 /> Excluir
               </button>
@@ -237,23 +288,62 @@ export default function CartaoProgramaPage() {
         <TemplatesPanel onAbrir={handleAbrirTemplate} onExcluido={handleTemplateExcluido} />
       )}
 
+      {mostrarOrientacoesPanel && ehP3 && <OrientacoesPanel />}
+
+      {ehReforcoAtivo && (
+        <FaixaReforcos
+          reforcos={reforcos}
+          selecionadoId={reforcoSelecionadoId}
+          operacoes={dados.operacoes}
+          podeCriar={usuario?.role === 'P3' || usuario?.role === 'Adjunto' || usuario?.role === 'Oficial'}
+          onSelecionar={selecionarReforco}
+          onNovo={() => setModalNovoReforcoAberto(true)}
+        />
+      )}
+
       <CartoesRecentes dataSelecionada={dataSelecionada} onAbrir={setDataSelecionada} />
 
       {temCartao === false && !templateAberto && (
         <div className="cartao-empty-state">
           <ClipboardX />
-          <h3>Nenhum Cartão Programa para esta data</h3>
-          <p>Crie um cartão em branco, copie a estrutura do dia anterior, ou importe um cartão padrão pronto.</p>
-          <SugestaoTemplate dataSelecionada={dataSelecionada} onClonado={() => void recarregar()} />
+          {ehReforcoAtivo ? (
+            <>
+              <h3>Nenhum cartão de reforço nesta data</h3>
+              <p>
+                Use &quot;Novo Reforço&quot; para gerar um a partir de um padrão da P3 — ou em branco. Vários
+                reforços podem coexistir na mesma data.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3>Nenhum Cartão Programa para esta data</h3>
+              <p>Crie um cartão em branco, copie a estrutura do dia anterior, ou importe um modelo pronto.</p>
+              <SugestaoTemplate dataSelecionada={dataSelecionada} onClonado={() => void recarregar()} />
+            </>
+          )}
         </div>
       )}
 
       {cartaoEditando && (
         <>
+          {motivoBloqueio && (
+            <div className="cartao-prazo-aviso" role="status">
+              <Lock />
+              <span>
+                <strong>Somente leitura.</strong> {motivoBloqueio}
+              </span>
+            </div>
+          )}
           <ConflitoBanner alertas={calcularAlertasCartao(cartaoEditando, dados.pessoal)} />
           <div className="dash-layout">
           <div className="dash-main">
-            <CartaoHeader cartao={cartaoEditando} pessoal={dados.pessoal} onAtualizar={atualizarCabecalho} />
+            <CartaoHeader
+              cartao={cartaoEditando}
+              pessoal={dados.pessoal}
+              operacoes={dados.operacoes}
+              podeEditar={podeEditar}
+              onAtualizar={atualizarCabecalho}
+            />
             <QuadroResumo viaturas={cartaoEditando.viaturas} />
 
             <div className="panel cartao-abas-panel">
@@ -282,6 +372,7 @@ export default function CartaoProgramaPage() {
                 <ViaturasTabela
                   viaturas={cartaoEditando.viaturas}
                   podeEditar={podeEditar}
+                  ehModelo={ehModelo}
                   onEditar={setVtrEmEdicao}
                   onExcluir={handleExcluirViatura}
                 />
@@ -291,6 +382,8 @@ export default function CartaoProgramaPage() {
                   dataCartao={cartaoEditando.data || dataSelecionada}
                   eventos={dados.eventos}
                   podeEditar={podeEditar}
+                  ehModelo={ehModelo}
+                  orientacoes={textosOrientacoes}
                   onAdicionarItem={adicionarItem}
                   onExcluirItem={removerItem}
                   onSalvarAtividade={atualizarAtividade}
@@ -301,7 +394,11 @@ export default function CartaoProgramaPage() {
             </div>
 
             {podeEditar && (
-              <FormAdicionarViatura viaturasCadastradas={dados.viaturas} onAdicionar={adicionarViatura} />
+              <FormAdicionarViatura
+                viaturasCadastradas={dados.viaturas}
+                onAdicionar={adicionarViatura}
+                ehModelo={ehModelo}
+              />
             )}
           </div>
 
@@ -313,6 +410,7 @@ export default function CartaoProgramaPage() {
       {vtrEmEdicao && (
         <ModalEditarViatura
           viatura={vtrEmEdicao}
+          ehModelo={ehModelo}
           onFechar={() => setVtrEmEdicao(null)}
           onSalvar={editarViatura}
         />
@@ -325,6 +423,15 @@ export default function CartaoProgramaPage() {
         />
       )}
 
+      {modalNovoReforcoAberto && (
+        <ModalNovoReforco
+          dataAlvo={dataSelecionada}
+          operacoes={dados.operacoes}
+          onFechar={() => setModalNovoReforcoAberto(false)}
+          onCriado={() => { setModalNovoReforcoAberto(false); void recarregar(); }}
+        />
+      )}
+
       {modalCopiarAberto && (
         <ModalCopiarCartao
           dataAlvo={dataSelecionada}
@@ -333,18 +440,32 @@ export default function CartaoProgramaPage() {
         />
       )}
 
+      {modalPdfAberto && (
+        <CartaoProgramaPdf
+          dataSelecionada={dataSelecionada}
+          cartaoOrdinario={cartaoOrdinario}
+          reforcos={reforcos}
+          orientacoes={orientacoes}
+          operacoes={dados.operacoes}
+          onFechar={() => setModalPdfAberto(false)}
+        />
+      )}
+
       {modalExcluirAberto && cartaoEditando && (
-        <ModalConfirmarExclusaoForte
-          titulo={templateAberto ? 'Excluir Cartão Padrão' : 'Excluir Cartão Programa'}
+        <ModalExcluirCartao
+          titulo={templateAberto ? 'Excluir Modelo de Cartão' : 'Excluir Cartão Programa'}
           aviso={
             templateAberto
-              ? 'Isso excluirá permanentemente este cartão padrão, com todas as viaturas e roteiros associados.'
-              : 'Isso excluirá permanentemente o Cartão Programa desta data, com todas as viaturas e roteiros associados.'
+              ? 'Isso excluirá este modelo, com todas as viaturas e roteiros associados.'
+              : 'O cartão sai das listagens e das estatísticas. O registro é preservado no banco com autor, data e justificativa da exclusão.'
           }
-          label={`Digite "${templateAberto ? cartaoEditando.nome_template : cartaoEditando.data?.split('-').reverse().join('/')}" para confirmar`}
-          valorEsperado={(templateAberto ? cartaoEditando.nome_template : cartaoEditando.data?.split('-').reverse().join('/')) || ''}
+          valorEsperado={
+            (templateAberto ? cartaoEditando.nome_template : cartaoEditando.data?.split('-').reverse().join('/')) || ''
+          }
+          foraDoPrazo={!cartaoEditando.is_template && !dentroDoPrazoCartao(cartaoEditando.data)}
+          dataCartao={cartaoEditando.data}
           onFechar={() => setModalExcluirAberto(false)}
-          onConfirmar={() => void handleConfirmarExclusao()}
+          onConfirmar={(justificativa) => void handleConfirmarExclusao(justificativa)}
         />
       )}
     </>

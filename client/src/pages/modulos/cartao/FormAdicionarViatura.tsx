@@ -2,19 +2,25 @@ import { useState, type FormEvent } from 'react';
 import { Car, Plus } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { CATEGORIAS_VIATURA, COMPANHIAS } from '../../../lib/categoriasViatura';
+import { QTD_DIARIAS_PADRAO } from '../../../lib/cartaoConflitos';
 import { useToast } from '../../../context/useToast';
 import type { ViaturaPayload } from './useViaturasCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
 
-const VAZIO: ViaturaPayload = { prefixo: '', setor: '', companhia: '', categoria: 'Ordinária', comandante: '', observacao: '' };
+const VAZIO: ViaturaPayload = {
+  prefixo: '', setor: '', companhia: '', categoria: 'Ordinária', comandante: '', observacao: '',
+  qtd_diarias: QTD_DIARIAS_PADRAO,
+};
 
 interface FormAdicionarViaturaProps {
   viaturasCadastradas: Tables<'viaturas'>[];
   onAdicionar: (payload: ViaturaPayload) => Promise<ResultadoAcao>;
+  /** Modelo não tem diária: o modelo só define os lugares de patrulhamento. */
+  ehModelo: boolean;
 }
 
 // Espelha o form #form-cartao-vtr de public/index.html + handleAddCartaoVtr().
-export function FormAdicionarViatura({ viaturasCadastradas, onAdicionar }: FormAdicionarViaturaProps) {
+export function FormAdicionarViatura({ viaturasCadastradas, onAdicionar, ehModelo }: FormAdicionarViaturaProps) {
   const { toast } = useToast();
   const [form, setForm] = useState<ViaturaPayload>(VAZIO);
   const [enviando, setEnviando] = useState(false);
@@ -28,6 +34,7 @@ export function FormAdicionarViatura({ viaturasCadastradas, onAdicionar }: FormA
       comandante: form.comandante.trim(),
       observacao: form.observacao.trim(),
     };
+    if (ehModelo) delete payload.qtd_diarias;
     setEnviando(true);
     const resultado = await onAdicionar(payload);
     setEnviando(false);
@@ -85,13 +92,23 @@ export function FormAdicionarViatura({ viaturasCadastradas, onAdicionar }: FormA
               {CATEGORIAS_VIATURA.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div className="form-group col-md-4">
+          <div className={ehModelo ? 'form-group col-md-4' : 'form-group col-md-2'}>
             <label htmlFor="vtr_observacao">Obs. / Turno da Madrugada</label>
             <input
               type="text" id="vtr_observacao" placeholder="Ex: 1º TURNO - HEMISFÉRIO SUL"
               value={form.observacao} onChange={(e) => setForm({ ...form, observacao: e.target.value })}
             />
           </div>
+          {!ehModelo && (
+            <div className="form-group col-md-2">
+              <label htmlFor="vtr_diarias">Diárias</label>
+              <input
+                type="number" id="vtr_diarias" min={0} step={1}
+                value={form.qtd_diarias ?? QTD_DIARIAS_PADRAO}
+                onChange={(e) => setForm({ ...form, qtd_diarias: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
+              />
+            </div>
+          )}
         </div>
         <div className="form-row" style={{ justifyContent: 'flex-end' }}>
           <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>

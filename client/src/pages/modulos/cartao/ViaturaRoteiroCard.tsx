@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pencil, Trash2, Check, X, Plus, CalendarCheck } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
-import { formatHoraCartao, itensSobrepostos } from '../../../lib/cartaoConflitos';
+import { formatHoraCartao, itensSobrepostos, diariasDaViatura } from '../../../lib/cartaoConflitos';
 import { useToast } from '../../../context/useToast';
 import { ATIVIDADES_CARTAO, atividadeBadgeClass, categoriaBadgeClass } from './constantes';
 import { eventosNoSetorDaVtr } from './eventosNoSetor';
@@ -19,6 +19,11 @@ interface ViaturaRoteiroCardProps {
   dataCartao: string;
   eventos: Tables<'eventos'>[];
   podeEditar: boolean;
+  /** Modelo não tem diária. */
+  ehModelo: boolean;
+  /** Orientações permanentes da P3 aplicáveis a este tipo de cartão. Vão no bloco de
+   * observações da viatura — nunca na linha do roteiro. */
+  orientacoes: string[];
   editandoAtividade: EdicaoAtividade | null;
   onIniciarEdicaoAtividade: (vtrId: string, itemId: string) => void;
   onCancelarEdicaoAtividade: () => void;
@@ -38,6 +43,8 @@ export function ViaturaRoteiroCard({
   dataCartao,
   eventos,
   podeEditar,
+  ehModelo,
+  orientacoes,
   editandoAtividade,
   onIniciarEdicaoAtividade,
   onCancelarEdicaoAtividade,
@@ -122,7 +129,7 @@ export function ViaturaRoteiroCard({
           <div className="vtr-meta">
             <span><strong>Companhia:</strong> {vtr.companhia || 'Não informada'}</span>
             <span><strong>Comandante:</strong> {vtr.comandante || 'Não informado'}</span>
-            {vtr.observacao && <span><strong>Obs:</strong> {vtr.observacao}</span>}
+            {!ehModelo && <span><strong>Diárias:</strong> {diariasDaViatura(vtr)}</span>}
           </div>
         </div>
         {podeEditar && (
@@ -152,6 +159,18 @@ export function ViaturaRoteiroCard({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {(vtr.observacao || orientacoes.length > 0) && (
+          <div className="cartao-vtr-observacoes">
+            <strong>OBSERVAÇÕES</strong>
+            {vtr.observacao && <p className="cartao-obs-propria">{vtr.observacao}</p>}
+            {orientacoes.length > 0 && (
+              <ul className="cartao-obs-orientacoes">
+                {orientacoes.map((texto, i) => <li key={i}>{texto}</li>)}
+              </ul>
+            )}
           </div>
         )}
 

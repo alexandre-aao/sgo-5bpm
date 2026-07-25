@@ -1,16 +1,20 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
+import { diariasDaViatura } from '../../../lib/cartaoConflitos';
 import { categoriaBadgeClass } from './constantes';
 
 interface ViaturasTabelaProps {
   viaturas: CartaoViatura[];
   podeEditar: boolean;
+  /** Modelo não tem diária — a coluna some. */
+  ehModelo: boolean;
   onEditar: (vtr: CartaoViatura) => void;
   onExcluir: (vtr: CartaoViatura) => void;
 }
 
 // Tabela enxuta da sub-aba "Viaturas" — espelha renderCartaoViaturasTabela().
-export function ViaturasTabela({ viaturas, podeEditar, onEditar, onExcluir }: ViaturasTabelaProps) {
+export function ViaturasTabela({ viaturas, podeEditar, ehModelo, onEditar, onExcluir }: ViaturasTabelaProps) {
+  const colunas = ehModelo ? 7 : 8;
   return (
     <div className="table-responsive">
       <table className="styled-table table-cards-mobile">
@@ -22,13 +26,14 @@ export function ViaturasTabela({ viaturas, podeEditar, onEditar, onExcluir }: Vi
             <th>Categoria</th>
             <th>Comandante</th>
             <th>Observação</th>
+            {!ehModelo && <th className="text-center">Diárias</th>}
             <th className="text-right">Ações</th>
           </tr>
         </thead>
         <tbody>
           {viaturas.length === 0 ? (
             <tr>
-              <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+              <td colSpan={colunas} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
                 Nenhuma viatura adicionada. Use o formulário abaixo para montar o cartão.
               </td>
             </tr>
@@ -43,6 +48,7 @@ export function ViaturasTabela({ viaturas, podeEditar, onEditar, onExcluir }: Vi
                 </td>
                 <td data-label="Comandante">{vtr.comandante || 'Não informado'}</td>
                 <td data-label="Observação" style={{ color: 'var(--text-muted)' }}>{vtr.observacao || '-'}</td>
+                {!ehModelo && <td className="text-center" data-label="Diárias">{diariasDaViatura(vtr)}</td>}
                 <td className="text-right" data-label="Ações">
                   {podeEditar ? (
                     <div className="acoes-linha">

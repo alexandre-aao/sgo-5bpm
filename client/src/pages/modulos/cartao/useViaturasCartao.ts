@@ -9,6 +9,9 @@ export interface ViaturaPayload {
   categoria: string;
   comandante: string;
   observacao: string;
+  /** Diária da guarnição — só vai no payload de cartão real; em MODELO o campo nem
+   * aparece no form e o servidor ignora se vier. */
+  qtd_diarias?: number;
 }
 
 async function extrairErro(res: Response, padrao: string): Promise<string> {

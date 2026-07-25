@@ -7,10 +7,11 @@ interface UseCartaoPorData {
   carregando: boolean;
 }
 
-/** Busca o Cartão Programa de uma data (se existir) — espelha a busca por
- * data + detalhe usada em vários pontos de public/app.js (renderDashboardOperacional(),
- * renderTurnoTab()). Descarta a resposta se `data` mudar antes dela chegar
- * (mesmo padrão de useCartaoPrograma.ts/CalendarioDiarias.tsx). */
+/** Busca o Cartão Programa ORDINÁRIO de uma data (se existir) — usado por Dashboard,
+ * Meu Turno e Mapa como "o cartão do dia". O `tipo=padrao` é obrigatório: sem ele a
+ * listagem devolve também os cartões de reforço da data, e um reforço poderia ser
+ * exibido no lugar do policiamento ordinário. Descarta a resposta se `data` mudar antes
+ * dela chegar (mesmo padrão de useCartaoPrograma.ts/CalendarioDiarias.tsx). */
 export function useCartaoPorData(data: string): UseCartaoPorData {
   const [cartao, setCartao] = useState<CartaoDetalhado | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -21,7 +22,7 @@ export function useCartaoPorData(data: string): UseCartaoPorData {
     async function buscar() {
       setCarregando(true);
       try {
-        const res = await apiFetch(`/api/cartoes?data=${data}`);
+        const res = await apiFetch(`/api/cartoes?data=${data}&tipo=padrao`);
         const lista = (await res.json()) as { id: string }[];
         let detalhe: CartaoDetalhado | null = null;
         if (Array.isArray(lista) && lista.length > 0) {

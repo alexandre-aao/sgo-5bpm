@@ -119,6 +119,13 @@ export type Database = {
         Row: {
           adjunto: string | null
           data: string | null
+          excluido_em: string | null
+          excluido_por: string | null
+          justificativa_exclusao: string | null
+          observacoes: string | null
+          operacao_id: string | null
+          tipo: string
+          titulo: string | null
           fiscal: string | null
           id: string
           is_template: boolean
@@ -132,6 +139,13 @@ export type Database = {
         Insert: {
           adjunto?: string | null
           data?: string | null
+          excluido_em?: string | null
+          excluido_por?: string | null
+          justificativa_exclusao?: string | null
+          observacoes?: string | null
+          operacao_id?: string | null
+          tipo?: string
+          titulo?: string | null
           fiscal?: string | null
           id: string
           is_template?: boolean
@@ -145,6 +159,13 @@ export type Database = {
         Update: {
           adjunto?: string | null
           data?: string | null
+          excluido_em?: string | null
+          excluido_por?: string | null
+          justificativa_exclusao?: string | null
+          observacoes?: string | null
+          operacao_id?: string | null
+          tipo?: string
+          titulo?: string | null
           fiscal?: string | null
           id?: string
           is_template?: boolean
@@ -161,6 +182,13 @@ export type Database = {
             columns: ["origem_template_id"]
             isOneToOne: false
             referencedRelation: "cartoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cartoes_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes"
             referencedColumns: ["id"]
           },
         ]
@@ -361,6 +389,33 @@ export type Database = {
           situacao?: string
           tipo_operacao?: string
           tipo_recorrencia?: string | null
+        }
+        Relationships: []
+      }
+      orientacoes_cartao: {
+        Row: {
+          ativo: boolean
+          created_at: string | null
+          id: string
+          ordem: number
+          texto: string
+          tipo_cartao: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string | null
+          id: string
+          ordem?: number
+          texto: string
+          tipo_cartao?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string | null
+          id?: string
+          ordem?: number
+          texto?: string
+          tipo_cartao?: string | null
         }
         Relationships: []
       }

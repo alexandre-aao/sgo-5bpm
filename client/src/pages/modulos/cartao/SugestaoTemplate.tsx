@@ -9,7 +9,7 @@ interface SugestaoTemplateProps {
   onClonado: () => void;
 }
 
-// Bloco "Buscar Cartão Padrão Sugerido" do estado vazio — espelha
+// Bloco "Buscar Modelo Sugerido" do estado vazio — espelha
 // handleBuscarTemplateSugerido()/handleImportarClonarTemplate() em public/app.js.
 // Aberto a todos que podem editar o Cartão Programa (a clonagem não exige P3).
 export function SugestaoTemplate({ dataSelecionada, onClonado }: SugestaoTemplateProps) {
@@ -33,7 +33,7 @@ export function SugestaoTemplate({ dataSelecionada, onClonado }: SugestaoTemplat
       setResultado(templates.length > 0 ? templates[0] : 'nenhum');
     } catch (erro) {
       console.error('Erro ao buscar template sugerido:', erro);
-      toast('Falha ao buscar cartão padrão.', 'danger');
+      toast('Falha ao buscar modelo de cartão.', 'danger');
     } finally {
       setBuscando(false);
     }
@@ -54,11 +54,11 @@ export function SugestaoTemplate({ dataSelecionada, onClonado }: SugestaoTemplat
       }
       if (res.ok) {
         const criado = (await res.json()) as { viaturas: unknown[] };
-        toast(`Cartão criado a partir do cartão padrão, com ${criado.viaturas.length} viatura(s). Preencha os comandantes.`, 'success');
+        toast(`Cartão criado a partir do modelo, com ${criado.viaturas.length} viatura(s). Preencha os comandantes.`, 'success');
         onClonado();
       } else {
         const corpo = (await res.json().catch(() => ({}))) as { error?: string };
-        toast(corpo.error || 'Falha ao importar o cartão padrão.', 'danger');
+        toast(corpo.error || 'Falha ao importar o modelo.', 'danger');
       }
     } catch (erro) {
       console.error('Erro ao clonar template:', erro);
@@ -87,23 +87,23 @@ export function SugestaoTemplate({ dataSelecionada, onClonado }: SugestaoTemplat
           </select>
         </div>
         <button type="button" className={`btn btn-secondary btn-sm${buscando ? ' btn-carregando' : ''}`} disabled={buscando} onClick={handleBuscar}>
-          <Search /> Buscar Cartão Padrão Sugerido
+          <Search /> Buscar Modelo Sugerido
         </button>
       </div>
       <div id="cartao-sugestao-resultado">
         {resultado === 'nenhum' && (
           <div className="template-sugerido-box nao-encontrado">
             <span>
-              <AlertTriangle style={{ width: 14, height: 14, verticalAlign: 'middle' }} /> Nenhum cartão padrão cadastrado para{' '}
+              <AlertTriangle style={{ width: 14, height: 14, verticalAlign: 'middle' }} /> Nenhum modelo cadastrado para{' '}
               <strong>{tipoPeriodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'}</strong> com <strong>{qtdViaturas}</strong> viaturas.
-              Crie o cartão manualmente abaixo, ou cadastre um cartão padrão em "Novo Cartão Padrão".
+              Crie o cartão manualmente abaixo, ou cadastre um em "Novo Modelo de Cartão".
             </span>
           </div>
         )}
         {resultado && resultado !== 'nenhum' && (
           <div className="template-sugerido-box encontrado">
             <span>
-              <LayoutTemplate style={{ width: 14, height: 14, verticalAlign: 'middle' }} /> Cartão padrão sugerido:{' '}
+              <LayoutTemplate style={{ width: 14, height: 14, verticalAlign: 'middle' }} /> Modelo sugerido:{' '}
               <strong>{resultado.nome_template}</strong> ({resultado.qtd_viaturas} viatura(s) cadastradas)
             </span>
             <button

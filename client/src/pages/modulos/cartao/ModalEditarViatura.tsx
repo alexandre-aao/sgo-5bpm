@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Car, X, Check } from 'lucide-react';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
 import { CATEGORIAS_VIATURA, COMPANHIAS } from '../../../lib/categoriasViatura';
+import { QTD_DIARIAS_PADRAO, diariasDaViatura } from '../../../lib/cartaoConflitos';
 import { useToast } from '../../../context/useToast';
 import type { ViaturaPayload } from './useViaturasCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
@@ -10,13 +11,15 @@ interface ModalEditarViaturaProps {
   viatura: CartaoViatura;
   onFechar: () => void;
   onSalvar: (vtrId: string, payload: ViaturaPayload) => Promise<ResultadoAcao>;
+  /** Modelo não tem diária — o campo some do form. */
+  ehModelo: boolean;
 }
 
 // Espelha #modal-editar-vtr de public/index.html + handleSalvarEdicaoVtr(). O pai
 // (index.tsx) só monta este componente quando há uma viatura em edição e o
 // desmonta ao fechar — cada abertura já é uma instância nova, então o estado
 // inicial (lazy) é suficiente; não precisa de useEffect pra resincronizar.
-export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarViaturaProps) {
+export function ModalEditarViatura({ viatura, onFechar, onSalvar, ehModelo }: ModalEditarViaturaProps) {
   const { toast } = useToast();
   const [form, setForm] = useState<ViaturaPayload>(() => ({
     prefixo: viatura.prefixo || '',
@@ -25,6 +28,7 @@ export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarV
     categoria: viatura.categoria || 'Ordinária',
     comandante: viatura.comandante || '',
     observacao: viatura.observacao || '',
+    qtd_diarias: diariasDaViatura(viatura),
   }));
   const [enviando, setEnviando] = useState(false);
 
@@ -37,6 +41,7 @@ export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarV
       comandante: form.comandante.trim(),
       observacao: form.observacao.trim(),
     };
+    if (ehModelo) delete payload.qtd_diarias;
     setEnviando(true);
     const resultado = await onSalvar(viatura.id, payload);
     setEnviando(false);
@@ -94,12 +99,24 @@ export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarV
               value={form.comandante} onChange={(e) => setForm({ ...form, comandante: e.target.value })}
             />
           </div>
-          <div className="form-group">
-            <label htmlFor="edit-vtr-observacao">Observação / Turno da Madrugada</label>
-            <input
-              type="text" id="edit-vtr-observacao"
-              value={form.observacao} onChange={(e) => setForm({ ...form, observacao: e.target.value })}
-            />
+          <div className="form-row">
+            <div className={ehModelo ? 'form-group' : 'form-group col-md-8'}>
+              <label htmlFor="edit-vtr-observacao">Observação / Turno da Madrugada</label>
+              <input
+                type="text" id="edit-vtr-observacao"
+                value={form.observacao} onChange={(e) => setForm({ ...form, observacao: e.target.value })}
+              />
+            </div>
+            {!ehModelo && (
+              <div className="form-group col-md-4">
+                <label htmlFor="edit-vtr-diarias">Diárias da guarnição</label>
+                <input
+                  type="number" id="edit-vtr-diarias" min={0} step={1}
+                  value={form.qtd_diarias ?? QTD_DIARIAS_PADRAO}
+                  onChange={(e) => setForm({ ...form, qtd_diarias: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
+                />
+              </div>
+            )}
           </div>
           <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>

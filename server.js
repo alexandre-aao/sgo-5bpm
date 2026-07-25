@@ -114,7 +114,7 @@ const CHAVE_PRIMARIA = { usuarios: 'usuario', sessoes: 'token' };
 // `operacoes` usa chave 'id' (default de chavePrimariaDe), como eventos/escalas/alocacoes — por
 // isso não entra em CHAVE_PRIMARIA. `missoes_planejadas` foi migrada para `operacoes` e a tabela
 // foi removida do banco (DROP), então saiu desta lista.
-const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'operacoes', 'alocacoes', 'escalas', 'cartoes', 'viaturas'];
+const TABELAS = ['usuarios', 'sessoes', 'bairros_coordenadas', 'pessoal', 'eventos', 'operacoes', 'alocacoes', 'escalas', 'cartoes', 'viaturas', 'orientacoes_cartao'];
 const TABELAS_E_CONFIG = [...TABELAS, 'config'];
 
 function chavePrimariaDe(tabela) {
@@ -290,18 +290,23 @@ async function buscarCartaoPorId(id) {
   return data;
 }
 
-async function buscarCartoesFiltrados({ data: dataFiltro, ano, mes }) {
+async function buscarCartoesFiltrados({ data: dataFiltro, ano, mes, tipo }) {
   // `data` é coluna `date` no Postgres — LIKE não se aplica (operador de texto), usa faixa
   // (gte/lt) em vez de prefixo. Exceção: filtro só por mês (sem ano, todo histórico) não dá
   // pra expressar como faixa contígua — busca só a tabela cartoes (ainda bem mais barato que
   // readDB() inteiro) e filtra o mês em JS, igual à lógica original.
+  // Cartão excluído logicamente nunca aparece em listagem — is('excluido_em', null)
+  // em todas as variantes abaixo.
   if (!dataFiltro && !ano && mes) {
-    const { data, error } = await supabase.from('cartoes').select('*').eq('is_template', false);
+    let queryMes = supabase.from('cartoes').select('*').eq('is_template', false).is('excluido_em', null);
+    if (tipo) queryMes = queryMes.eq('tipo', tipo);
+    const { data, error } = await queryMes;
     if (error) throw new Error(`Falha ao listar cartões: ${error.message}`);
     return (data || []).filter(c => c.data && c.data.split('-')[1] === mes);
   }
 
-  let query = supabase.from('cartoes').select('*').eq('is_template', false);
+  let query = supabase.from('cartoes').select('*').eq('is_template', false).is('excluido_em', null);
+  if (tipo) query = query.eq('tipo', tipo);
   if (dataFiltro) {
     query = query.eq('data', dataFiltro);
   } else if (ano && mes) {
@@ -468,6 +473,98 @@ function exigirP3(req, res, next) {
     return res.status(403).json({ error: 'Apenas o perfil P3 tem permissão para esta ação.' });
   }
   next();
+}
+
+// -------------------------------------------------------------
+// CARTÃO PROGRAMA — TIPOS E PRAZO DE EDIÇÃO
+// -------------------------------------------------------------
+
+// 'padrao'  = policiamento ordinário (um cartão ativo por data)
+// 'reforco' = reforço operacional (vários por data, vínculo opcional a operação)
+const TIPOS_CARTAO = ['padrao', 'reforco'];
+
+// Prazo de edição/exclusão pelo Adjunto/Oficial: até 08h00 do dia SEGUINTE à data
+// do serviço, no fuso America/Fortaleza. Fortaleza é UTC-3 o ano inteiro — o Ceará
+// nunca adotou horário de verão e o Brasil o extinguiu em 2019 —, então o offset
+// fixo '-03:00' basta e evita puxar uma lib de fuso só para isto.
+const OFFSET_FORTALEZA = '-03:00';
+
+function prazoEdicaoCartao(dataCartao) {
+  if (!dataCartao) return null; // modelo (sem data) não tem prazo
+  const diaSeguinte = new Date(`${dataCartao}T00:00:00${OFFSET_FORTALEZA}`);
+  diaSeguinte.setUTCDate(diaSeguinte.getUTCDate() + 1);
+  const ano = diaSeguinte.getUTCFullYear();
+  const mes = String(diaSeguinte.getUTCMonth() + 1).padStart(2, '0');
+  const dia = String(diaSeguinte.getUTCDate()).padStart(2, '0');
+  return new Date(`${ano}-${mes}-${dia}T08:00:00${OFFSET_FORTALEZA}`);
+}
+
+function dentroDoPrazoCartao(dataCartao, agora = new Date()) {
+  const limite = prazoEdicaoCartao(dataCartao);
+  if (!limite) return true;
+  return agora.getTime() <= limite.getTime();
+}
+
+// Diária da guarnição da viatura: inteiro, pré-preenchido com 2, ajustável, SEM teto
+// máximo (regra do usuário). Vale para o cartão do dia dos dois tipos; MODELOS não
+// carregam diária nenhuma (o modelo só define os lugares de patrulhamento).
+const QTD_DIARIAS_PADRAO = 2;
+
+function normalizarQtdDiarias(valor, padrao = QTD_DIARIAS_PADRAO) {
+  if (valor === undefined || valor === null || valor === '') return padrao;
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n < 0) return null; // inválido — quem chama devolve 400
+  return n;
+}
+
+// Deep clone de uma viatura do cartão (com os itens de roteiro), reusado pelas três
+// origens de cópia: "Copiar" de outro cartão, clonagem de modelo e geração de reforço.
+// `manterComandante` distingue a cópia de um cartão real (mantém a guarnição) da
+// clonagem de um modelo (comandante em branco, preenchido pelo Adjunto no dia).
+// `comDiarias=false` gera viatura de MODELO — sem o campo qtd_diarias.
+function clonarViaturaCartao(v, { manterComandante = false, comDiarias = true } = {}) {
+  const nova = {
+    id: generateId('cpv'),
+    prefixo: v.prefixo,
+    setor: v.setor,
+    companhia: v.companhia || '',
+    categoria: v.categoria || 'Ordinária',
+    comandante: manterComandante ? (v.comandante || '') : '',
+    observacao: v.observacao || '',
+    itens: (v.itens || []).map(i => ({
+      id: generateId('cpi'),
+      inicio: i.inicio,
+      fim: i.fim,
+      local: i.local,
+      atividade: i.atividade
+    }))
+  };
+  // Modelo não tem diária; ao virar cartão do dia a viatura nasce com o padrão (2).
+  if (comDiarias) nova.qtd_diarias = normalizarQtdDiarias(v.qtd_diarias) ?? QTD_DIARIAS_PADRAO;
+  return nova;
+}
+
+// Regra única de quem pode mexer no cartão, usada por todas as rotas de escrita do
+// Cartão Programa (cabeçalho, viaturas, itens de roteiro e exclusão). Adjunto e
+// Oficial têm exatamente os mesmos poderes; a P3 não tem prazo.
+// Devolve null quando pode, ou a mensagem de erro (403) quando não pode.
+function bloqueioEdicaoCartao(cartao, user) {
+  if (!user) return 'Sessão inválida.';
+  if (user.role === 'P3') return null;
+  if (!['Adjunto', 'Oficial'].includes(user.role)) {
+    return 'Seu perfil não tem permissão para editar o Cartão Programa.';
+  }
+  // Modelos (is_template) são exclusivos da P3 — Adjunto/Oficial usam, não editam.
+  if (cartao.is_template) {
+    return 'Apenas o perfil P3 tem permissão para editar modelos de cartão.';
+  }
+  if (!dentroDoPrazoCartao(cartao.data)) {
+    const limite = prazoEdicaoCartao(cartao.data);
+    const dataBr = String(cartao.data || '').split('-').reverse().join('/');
+    return `Prazo encerrado: o Cartão Programa de ${dataBr} só podia ser alterado até às 08h00 do dia seguinte `
+      + `(${limite.toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}). Solicite a alteração à P3.`;
+  }
+  return null;
 }
 
 // -------------------------------------------------------------
@@ -1723,7 +1820,9 @@ app.get('/api/estatisticas-cartao', asyncRoute(async (req, res) => {
   const db = await readDB();
   const anoFiltro = req.query.ano || String(new Date().getFullYear());
 
-  const cartoesDoAno = (db.cartoes || []).filter(c => !c.is_template && c.data && c.data.startsWith(anoFiltro));
+  // Ordinário e reforço entram juntos na estatística (os dois são patrulhamento
+  // efetivamente realizado); cartão excluído logicamente fica de fora.
+  const cartoesDoAno = (db.cartoes || []).filter(c => !c.is_template && !c.excluido_em && c.data && c.data.startsWith(anoFiltro));
 
   let totalItensRoteiro = 0;
   let totalHoras = 0;
@@ -1807,15 +1906,22 @@ app.get('/api/estatisticas-cartao', asyncRoute(async (req, res) => {
 // ROTAS DO CARTÃO PROGRAMA (PATRULHAMENTO DIÁRIO POR VIATURA)
 // -------------------------------------------------------------
 
-// Lista resumida (filtrável por data exata, ou por mês/ano para o histórico) — nunca inclui templates
+// Lista resumida (filtrável por data exata, ou por mês/ano para o histórico, e por
+// tipo) — nunca inclui modelos nem cartões excluídos logicamente.
+// ATENÇÃO: sem ?tipo= vêm ordinários E reforços juntos. Quem precisa do "cartão do
+// dia" (Dashboard, Meu Turno, Mapa) tem que passar tipo=padrao explicitamente.
 app.get('/api/cartoes', asyncRoute(async (req, res) => {
-  const cartoes = await buscarCartoesFiltrados({ data: req.query.data, ano: req.query.ano, mes: req.query.mes });
+  const tipo = TIPOS_CARTAO.includes(req.query.tipo) ? req.query.tipo : null;
+  const cartoes = await buscarCartoesFiltrados({ data: req.query.data, ano: req.query.ano, mes: req.query.mes, tipo });
 
   const resumo = cartoes
     .sort((a, b) => b.data.localeCompare(a.data))
     .map(c => ({
       id: c.id,
       data: c.data,
+      tipo: c.tipo || 'padrao',
+      titulo: c.titulo || '',
+      operacao_id: c.operacao_id || null,
       fiscal: c.fiscal,
       adjunto: c.adjunto,
       qtd_viaturas: (c.viaturas || []).length
@@ -1828,6 +1934,12 @@ app.get('/api/cartoes', asyncRoute(async (req, res) => {
 // IMPORTANTE: precisa vir antes de /api/cartoes/:id para o Express não tratar "templates" como :id
 app.get('/api/cartoes/templates', asyncRoute(async (req, res) => {
   let templates = await readTabela('cartoes', { is_template: true });
+  templates = templates.filter(c => !c.excluido_em);
+
+  // Sem ?tipo= mantém o comportamento antigo (só modelos de ordinário), pra não
+  // fazer modelo de reforço aparecer na sugestão do cartão do dia.
+  const tipo = TIPOS_CARTAO.includes(req.query.tipo) ? req.query.tipo : 'padrao';
+  templates = templates.filter(c => (c.tipo || 'padrao') === tipo);
 
   if (req.query.tipo_periodo) {
     templates = templates.filter(c => c.tipo_periodo === req.query.tipo_periodo);
@@ -1840,8 +1952,10 @@ app.get('/api/cartoes/templates', asyncRoute(async (req, res) => {
   res.json(templates.map(c => ({
     id: c.id,
     nome_template: c.nome_template,
+    tipo: c.tipo || 'padrao',
     tipo_periodo: c.tipo_periodo,
     qtd_viaturas_base: c.qtd_viaturas_base,
+    observacoes: c.observacoes || '',
     qtd_viaturas: (c.viaturas || []).length
   })));
 }));
@@ -1849,13 +1963,18 @@ app.get('/api/cartoes/templates', asyncRoute(async (req, res) => {
 // Detalhe completo de um cartão (ou template)
 app.get('/api/cartoes/:id', asyncRoute(async (req, res) => {
   const cartao = await buscarCartaoPorId(req.params.id);
-  if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (!cartao || cartao.excluido_em) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
 
   // Reordena os itens por turno na leitura — cartões salvos antes desta mudança ainda estão
   // em ordem alfabética simples; isso corrige a exibição sem exigir migração de dados.
+  // `pode_editar`/`prazo_edicao` vêm calculados do servidor (mesma regra que ele aplica na
+  // escrita) para a tela travar a edição sem reimplementar a conta do prazo.
   const cartaoOrdenado = {
     ...cartao,
-    viaturas: (cartao.viaturas || []).map(v => ({ ...v, itens: ordenarPorTurno(v.itens || []) }))
+    tipo: cartao.tipo || 'padrao',
+    viaturas: (cartao.viaturas || []).map(v => ({ ...v, itens: ordenarPorTurno(v.itens || []) })),
+    pode_editar: bloqueioEdicaoCartao(cartao, req.user) === null,
+    prazo_edicao: cartao.data ? prazoEdicaoCartao(cartao.data).toISOString() : null
   };
   res.json(cartaoOrdenado);
 }));
@@ -1865,19 +1984,27 @@ app.get('/api/cartoes/:id', asyncRoute(async (req, res) => {
 app.post('/api/cartoes', asyncRoute(async (req, res) => {
   const db = await readDB();
 
+  const tipoCartao = TIPOS_CARTAO.includes(req.body.tipo) ? req.body.tipo : 'padrao';
+
   if (req.body.is_template) {
     if (!req.user || req.user.role !== 'P3') {
-      return res.status(403).json({ error: 'Apenas o perfil P3 tem permissão para criar templates.' });
+      return res.status(403).json({ error: 'Apenas o perfil P3 tem permissão para criar modelos de cartão.' });
     }
     const { nome_template, tipo_periodo, qtd_viaturas_base } = req.body;
     if (!nome_template) {
-      return res.status(400).json({ error: 'O nome do template é obrigatório.' });
+      return res.status(400).json({ error: 'O nome do modelo é obrigatório.' });
     }
-    if (!['semana', 'fim_de_semana'].includes(tipo_periodo)) {
-      return res.status(400).json({ error: "tipo_periodo deve ser 'semana' ou 'fim_de_semana'." });
-    }
-    if (![5, 6, 7].includes(parseInt(qtd_viaturas_base, 10))) {
-      return res.status(400).json({ error: 'qtd_viaturas_base deve ser 5, 6 ou 7.' });
+
+    // Modelo de ORDINÁRIO continua exigindo período + qtd. de viaturas base (é o que
+    // alimenta a busca de modelo sugerido do cartão do dia). Modelo de REFORÇO não tem
+    // esses conceitos: o reforço é montado caso a caso, então os dois campos ficam nulos.
+    if (tipoCartao === 'padrao') {
+      if (!['semana', 'fim_de_semana'].includes(tipo_periodo)) {
+        return res.status(400).json({ error: "tipo_periodo deve ser 'semana' ou 'fim_de_semana'." });
+      }
+      if (![5, 6, 7].includes(parseInt(qtd_viaturas_base, 10))) {
+        return res.status(400).json({ error: 'qtd_viaturas_base deve ser 5, 6 ou 7.' });
+      }
     }
 
     const novoTemplate = {
@@ -1888,8 +2015,12 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
       oficial_sobreaviso: '',
       is_template: true,
       nome_template,
-      tipo_periodo,
-      qtd_viaturas_base: parseInt(qtd_viaturas_base, 10),
+      tipo: tipoCartao,
+      titulo: '',
+      operacao_id: null,
+      observacoes: typeof req.body.observacoes === 'string' ? req.body.observacoes.slice(0, 2000) : '',
+      tipo_periodo: tipoCartao === 'padrao' ? tipo_periodo : null,
+      qtd_viaturas_base: tipoCartao === 'padrao' ? parseInt(qtd_viaturas_base, 10) : null,
       origem_template_id: null,
       viaturas: []
     };
@@ -1902,8 +2033,21 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
   if (!dataCartao) {
     return res.status(400).json({ error: 'A data do Cartão Programa é obrigatória.' });
   }
-  if (db.cartoes.some(c => !c.is_template && c.data === dataCartao)) {
+  // "Um por data" vale só para o ORDINÁRIO — vários reforços podem coexistir na mesma
+  // data. Cartão excluído logicamente não ocupa a data (mesma regra do índice único).
+  if (tipoCartao === 'padrao'
+      && db.cartoes.some(c => !c.is_template && (c.tipo || 'padrao') === 'padrao' && !c.excluido_em && c.data === dataCartao)) {
     return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
+  }
+
+  const operacaoId = req.body.operacao_id || null;
+  if (operacaoId) {
+    if (tipoCartao !== 'reforco') {
+      return res.status(400).json({ error: 'Só o cartão de reforço pode ser vinculado a uma operação.' });
+    }
+    if (!(db.operacoes || []).some(op => op.id === operacaoId)) {
+      return res.status(400).json({ error: 'Operação vinculada não encontrada.' });
+    }
   }
 
   const novoCartao = {
@@ -1914,6 +2058,10 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
     oficial_sobreaviso: req.body.oficial_sobreaviso || '',
     is_template: false,
     nome_template: null,
+    tipo: tipoCartao,
+    titulo: typeof req.body.titulo === 'string' ? req.body.titulo.trim().slice(0, 150) : '',
+    operacao_id: operacaoId,
+    observacoes: typeof req.body.observacoes === 'string' ? req.body.observacoes.slice(0, 2000) : '',
     tipo_periodo: ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo) ? req.body.tipo_periodo : null,
     qtd_viaturas_base: null,
     origem_template_id: null,
@@ -1924,34 +2072,21 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
   // (o operador escolhe qualquer cartão no modal "Copiar").
   if (req.body.copiar_de) {
     let base = null;
+    const copiaveis = (db.cartoes || []).filter(c => !c.is_template && !c.excluido_em);
     if (req.body.copiar_de === 'ultimo') {
-      const anteriores = db.cartoes
-        .filter(c => !c.is_template && c.data < dataCartao)
+      const anteriores = copiaveis
+        .filter(c => (c.tipo || 'padrao') === tipoCartao && c.data < dataCartao)
         .sort((a, b) => b.data.localeCompare(a.data));
       base = anteriores[0] || null;
     } else {
-      base = (db.cartoes || []).find(c => c.id === req.body.copiar_de && !c.is_template) || null;
+      base = copiaveis.find(c => c.id === req.body.copiar_de) || null;
     }
     if (base) {
       novoCartao.fiscal = novoCartao.fiscal || base.fiscal;
       novoCartao.adjunto = novoCartao.adjunto || base.adjunto;
       if (!novoCartao.tipo_periodo) novoCartao.tipo_periodo = base.tipo_periodo || null;
-      novoCartao.viaturas = (base.viaturas || []).map(v => ({
-        id: generateId('cpv'),
-        prefixo: v.prefixo,
-        setor: v.setor,
-        companhia: v.companhia || '',
-        categoria: v.categoria || 'Ordinária',
-        comandante: v.comandante,
-        observacao: v.observacao || '',
-        itens: (v.itens || []).map(i => ({
-          id: generateId('cpi'),
-          inicio: i.inicio,
-          fim: i.fim,
-          local: i.local,
-          atividade: i.atividade
-        }))
-      }));
+      if (!novoCartao.observacoes) novoCartao.observacoes = base.observacoes || '';
+      novoCartao.viaturas = (base.viaturas || []).map(v => clonarViaturaCartao(v, { manterComandante: true }));
     }
   }
 
@@ -1964,16 +2099,32 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
 // prontos e o campo Comandante em branco para o Adjunto preencher
 app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const template = (db.cartoes || []).find(c => c.id === req.params.id);
-  if (!template) return res.status(404).json({ error: 'Template não encontrado' });
-  if (!template.is_template) return res.status(400).json({ error: 'Este cartão não é um template.' });
+  const template = (db.cartoes || []).find(c => c.id === req.params.id && !c.excluido_em);
+  if (!template) return res.status(404).json({ error: 'Modelo de cartão não encontrado' });
+  if (!template.is_template) return res.status(400).json({ error: 'Este cartão não é um modelo.' });
 
   const dataCartao = req.body.data;
   if (!dataCartao) {
     return res.status(400).json({ error: 'A data do Cartão Programa é obrigatória.' });
   }
-  if (db.cartoes.some(c => !c.is_template && c.data === dataCartao)) {
+
+  // O tipo do cartão gerado é sempre o do modelo — é o que faz o mesmo endpoint servir
+  // tanto "Importar e Clonar" do ordinário quanto o fluxo do Adjunto aplicando um
+  // padrão de reforço. O 409 de "um por data" só vale para o ordinário.
+  const tipoCartao = template.tipo || 'padrao';
+  if (tipoCartao === 'padrao'
+      && db.cartoes.some(c => !c.is_template && (c.tipo || 'padrao') === 'padrao' && !c.excluido_em && c.data === dataCartao)) {
     return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
+  }
+
+  const operacaoId = req.body.operacao_id || null;
+  if (operacaoId) {
+    if (tipoCartao !== 'reforco') {
+      return res.status(400).json({ error: 'Só o cartão de reforço pode ser vinculado a uma operação.' });
+    }
+    if (!(db.operacoes || []).some(op => op.id === operacaoId)) {
+      return res.status(400).json({ error: 'Operação vinculada não encontrada.' });
+    }
   }
 
   const novoCartao = {
@@ -1984,25 +2135,16 @@ app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
     oficial_sobreaviso: '',
     is_template: false,
     nome_template: null,
+    tipo: tipoCartao,
+    titulo: typeof req.body.titulo === 'string' ? req.body.titulo.trim().slice(0, 150) : '',
+    operacao_id: operacaoId,
+    // O modelo de reforço traz suas "observações padrão" — o Adjunto ajusta depois.
+    observacoes: template.observacoes || '',
     tipo_periodo: template.tipo_periodo,
     qtd_viaturas_base: template.qtd_viaturas_base,
     origem_template_id: template.id,
-    viaturas: (template.viaturas || []).map(v => ({
-      id: generateId('cpv'),
-      prefixo: v.prefixo,
-      setor: v.setor,
-      companhia: v.companhia || '',
-      categoria: v.categoria || 'Ordinária',
-      comandante: '', // em branco: preenchido pelo Adjunto no dia
-      observacao: v.observacao || '',
-      itens: (v.itens || []).map(i => ({
-        id: generateId('cpi'),
-        inicio: i.inicio,
-        fim: i.fim,
-        local: i.local,
-        atividade: i.atividade
-      }))
-    }))
+    // Comandante em branco (preenchido pelo Adjunto no dia) e diária nascendo no padrão.
+    viaturas: (template.viaturas || []).map(v => clonarViaturaCartao(v))
   };
 
   db.cartoes.push(novoCartao);
@@ -2013,46 +2155,86 @@ app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
 // Atualizar cabeçalho do cartão (fiscal / adjunto / oficial de sobreaviso)
 app.put('/api/cartoes/:id', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = (db.cartoes || []).find(c => c.id === req.params.id && !c.excluido_em);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const bloqueio = bloqueioEdicaoCartao(cartao, req.user);
+  if (bloqueio) return res.status(403).json({ error: bloqueio });
 
   // padrao:'' de propósito nos três — o frontend manda string vazia para "limpar" a seleção
   // (voltar para "Selecione..."), e isso precisa continuar entrando em valores explicitamente.
   const v = validarCampos(req.body, {
     fiscal: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Fiscal de Operações' },
     adjunto: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Adjunto' },
-    oficial_sobreaviso: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Oficial de Sobreaviso' }
+    oficial_sobreaviso: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Oficial de Sobreaviso' },
+    titulo: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Título do reforço' },
+    observacoes: { obrigatorio: false, tipo: 'string', max: 2000, padrao: '', label: 'Observações' }
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
   if (req.body.fiscal !== undefined) cartao.fiscal = v.valores.fiscal;
   if (req.body.adjunto !== undefined) cartao.adjunto = v.valores.adjunto;
   if (req.body.oficial_sobreaviso !== undefined) cartao.oficial_sobreaviso = v.valores.oficial_sobreaviso;
+  if (req.body.titulo !== undefined) cartao.titulo = v.valores.titulo;
+  if (req.body.observacoes !== undefined) cartao.observacoes = v.valores.observacoes;
 
   // tipo_periodo escolhido manualmente (Dia Útil / Fim de Semana). String vazia limpa (null).
   if (req.body.tipo_periodo !== undefined) {
     cartao.tipo_periodo = ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo) ? req.body.tipo_periodo : null;
   }
 
+  // Vínculo com operação: exclusivo do reforço, opcional, e string vazia desvincula.
+  if (req.body.operacao_id !== undefined) {
+    const operacaoId = req.body.operacao_id || null;
+    if (operacaoId) {
+      if ((cartao.tipo || 'padrao') !== 'reforco') {
+        return res.status(400).json({ error: 'Só o cartão de reforço pode ser vinculado a uma operação.' });
+      }
+      if (!(db.operacoes || []).some(op => op.id === operacaoId)) {
+        return res.status(400).json({ error: 'Operação vinculada não encontrada.' });
+      }
+    }
+    cartao.operacao_id = operacaoId;
+  }
+
   await writeRow('cartoes', cartao);
   res.json(cartao);
 }));
 
-// Excluir cartão — só o P3 pode excluir, seja template ou o roteiro operacional de um dia
-app.delete('/api/cartoes/:id', exigirP3, asyncRoute(async (req, res) => {
-  const { data: cartaoAlvo } = await supabase.from('cartoes').select('data, is_template, nome_template').eq('id', req.params.id).maybeSingle();
-  await deleteRow('cartoes', req.params.id);
-  const descricaoAlvo = cartaoAlvo && cartaoAlvo.is_template
-    ? `Template "${cartaoAlvo.nome_template}" excluído.`
-    : `Cartão Programa de ${cartaoAlvo ? cartaoAlvo.data : req.params.id} excluído, com viaturas e itens de roteiro associados.`;
-  res.json({ message: 'Cartão Programa excluído' });
+// Excluir cartão — sempre EXCLUSÃO LÓGICA (o registro fica, com quem excluiu e quando).
+// Adjunto/Oficial podem até às 08h00 do dia seguinte à data do serviço; passado o prazo,
+// só a P3, e aí a justificativa é obrigatória. Modelos seguem P3-only (bloqueioEdicaoCartao).
+app.delete('/api/cartoes/:id', asyncRoute(async (req, res) => {
+  const cartao = await buscarCartaoPorId(req.params.id);
+  if (!cartao || cartao.excluido_em) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const bloqueio = bloqueioEdicaoCartao(cartao, req.user);
+  if (bloqueio) return res.status(403).json({ error: bloqueio });
+
+  const foraDoPrazo = !cartao.is_template && !dentroDoPrazoCartao(cartao.data);
+  const justificativa = typeof req.body.justificativa === 'string' ? req.body.justificativa.trim() : '';
+  if (foraDoPrazo && justificativa.length < 10) {
+    return res.status(400).json({
+      error: 'Fora do prazo de edição, a exclusão exige justificativa com pelo menos 10 caracteres.'
+    });
+  }
+
+  cartao.excluido_em = new Date().toISOString();
+  cartao.excluido_por = req.user ? req.user.usuario : null;
+  cartao.justificativa_exclusao = justificativa || null;
+  await writeRow('cartoes', cartao);
+
+  res.json({ message: cartao.is_template ? 'Modelo de cartão excluído' : 'Cartão Programa excluído' });
 }));
 
 // Adicionar viatura ao cartão
 app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = (db.cartoes || []).find(c => c.id === req.params.id && !c.excluido_em);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const bloqueio = bloqueioEdicaoCartao(cartao, req.user);
+  if (bloqueio) return res.status(403).json({ error: bloqueio });
 
   const v = validarCampos(req.body, {
     prefixo: { obrigatorio: true, tipo: 'string', max: 30, label: 'Prefixo da VTR' },
@@ -2064,6 +2246,13 @@ app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
+  // Diária: inteiro >= 0, sem teto, pré-preenchida com 2. Modelo não tem diária —
+  // o campo só existe na viatura de um cartão real.
+  const qtdDiarias = normalizarQtdDiarias(req.body.qtd_diarias);
+  if (qtdDiarias === null) {
+    return res.status(400).json({ error: 'Quantidade de diárias deve ser um número inteiro maior ou igual a zero.' });
+  }
+
   const novaViatura = {
     id: generateId('cpv'),
     prefixo: v.valores.prefixo,
@@ -2074,6 +2263,7 @@ app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
     observacao: v.valores.observacao,
     itens: []
   };
+  if (!cartao.is_template) novaViatura.qtd_diarias = qtdDiarias;
 
   cartao.viaturas.push(novaViatura);
   await writeRow('cartoes', cartao);
@@ -2083,8 +2273,11 @@ app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
 // Atualizar viatura
 app.put('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = (db.cartoes || []).find(c => c.id === req.params.id && !c.excluido_em);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const bloqueio = bloqueioEdicaoCartao(cartao, req.user);
+  if (bloqueio) return res.status(403).json({ error: bloqueio });
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
@@ -2100,6 +2293,16 @@ app.put('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
     if (req.body[campo] !== undefined) viatura[campo] = req.body[campo];
   });
 
+  // Diária ajustável pelo Adjunto/Oficial (dentro do prazo) e pela P3. Só no cartão
+  // real: em modelo, o campo é ignorado de propósito.
+  if (req.body.qtd_diarias !== undefined && !cartao.is_template) {
+    const qtdDiarias = normalizarQtdDiarias(req.body.qtd_diarias);
+    if (qtdDiarias === null) {
+      return res.status(400).json({ error: 'Quantidade de diárias deve ser um número inteiro maior ou igual a zero.' });
+    }
+    viatura.qtd_diarias = qtdDiarias;
+  }
+
   await writeRow('cartoes', cartao);
   res.json(viatura);
 }));
@@ -2107,8 +2310,11 @@ app.put('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
 // Remover viatura do cartão
 app.delete('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = (db.cartoes || []).find(c => c.id === req.params.id && !c.excluido_em);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const bloqueio = bloqueioEdicaoCartao(cartao, req.user);
+  if (bloqueio) return res.status(403).json({ error: bloqueio });
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   cartao.viaturas = cartao.viaturas.filter(v => v.id !== req.params.vid);
@@ -2119,8 +2325,11 @@ app.delete('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
 // Adicionar item de roteiro à viatura
 app.post('/api/cartoes/:id/viaturas/:vid/itens', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = (db.cartoes || []).find(c => c.id === req.params.id && !c.excluido_em);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const bloqueio = bloqueioEdicaoCartao(cartao, req.user);
+  if (bloqueio) return res.status(403).json({ error: bloqueio });
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
@@ -2150,8 +2359,11 @@ app.post('/api/cartoes/:id/viaturas/:vid/itens', asyncRoute(async (req, res) => 
 // Atualizar item de roteiro
 app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = (db.cartoes || []).find(c => c.id === req.params.id && !c.excluido_em);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const bloqueio = bloqueioEdicaoCartao(cartao, req.user);
+  if (bloqueio) return res.status(403).json({ error: bloqueio });
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
@@ -2171,8 +2383,11 @@ app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res)
 // Remover item de roteiro
 app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res) => {
   const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = (db.cartoes || []).find(c => c.id === req.params.id && !c.excluido_em);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const bloqueio = bloqueioEdicaoCartao(cartao, req.user);
+  if (bloqueio) return res.status(403).json({ error: bloqueio });
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
@@ -2180,6 +2395,87 @@ app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, r
   viatura.itens = viatura.itens.filter(i => i.id !== req.params.iid);
   await writeRow('cartoes', cartao);
   res.json({ message: 'Item de roteiro removido' });
+}));
+
+
+// -------------------------------------------------------------
+// ORIENTAÇÕES PERMANENTES DA P3 (bloco de observações da viatura)
+//
+// Aparecem no bloco de observações da VIATURA, no cartão individual e no PDF —
+// nunca na linha do roteiro. Controle só por ativo/inativo, sem vigência por data.
+// Não são copiadas para dentro do cartão: desativar uma orientação some de todos os
+// cartões, inclusive nas reimpressões (e é o que mantém o banco pequeno).
+// Leitura liberada a qualquer perfil autenticado (o Adjunto precisa ver ao montar o
+// cartão); escrita é P3-only.
+// -------------------------------------------------------------
+
+app.get('/api/orientacoes-cartao', asyncRoute(async (req, res) => {
+  let orientacoes = await readTabela('orientacoes_cartao');
+
+  // ?ativo=true traz só as vigentes (é o que a tela do cartão e o PDF usam); a tela
+  // de gestão da P3 chama sem filtro para poder reativar as inativas.
+  if (req.query.ativo === 'true') orientacoes = orientacoes.filter(o => o.ativo);
+  if (TIPOS_CARTAO.includes(req.query.tipo)) {
+    // tipo_cartao null = vale para os dois tipos.
+    orientacoes = orientacoes.filter(o => !o.tipo_cartao || o.tipo_cartao === req.query.tipo);
+  }
+
+  orientacoes.sort((a, b) => (a.ordem - b.ordem) || String(a.texto).localeCompare(String(b.texto), 'pt-BR'));
+  res.json(orientacoes);
+}));
+
+app.post('/api/orientacoes-cartao', exigirP3, asyncRoute(async (req, res) => {
+  const v = validarCampos(req.body, {
+    texto: { obrigatorio: true, tipo: 'string', max: 500, label: 'Texto da orientação' },
+    ordem: { obrigatorio: false, tipo: 'number', padrao: 0, label: 'Ordem' }
+  });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
+  if (req.body.tipo_cartao && !TIPOS_CARTAO.includes(req.body.tipo_cartao)) {
+    return res.status(400).json({ error: 'Tipo de cartão inválido para a orientação.' });
+  }
+
+  const nova = {
+    id: generateId('ori'),
+    texto: v.valores.texto,
+    ativo: req.body.ativo === undefined ? true : !!req.body.ativo,
+    tipo_cartao: req.body.tipo_cartao || null, // null = vale para os dois tipos
+    ordem: v.valores.ordem || 0
+  };
+
+  await writeRow('orientacoes_cartao', nova);
+  res.status(201).json(nova);
+}));
+
+app.put('/api/orientacoes-cartao/:id', exigirP3, asyncRoute(async (req, res) => {
+  const { data: orientacao, error } = await supabase
+    .from('orientacoes_cartao').select('*').eq('id', req.params.id).maybeSingle();
+  if (error) throw new Error(`Falha ao buscar orientação: ${error.message}`);
+  if (!orientacao) return res.status(404).json({ error: 'Orientação não encontrada' });
+
+  if (req.body.texto !== undefined) {
+    const texto = String(req.body.texto).trim();
+    if (!texto) return res.status(400).json({ error: 'O texto da orientação é obrigatório.' });
+    orientacao.texto = texto.slice(0, 500);
+  }
+  if (req.body.ativo !== undefined) orientacao.ativo = !!req.body.ativo;
+  if (req.body.ordem !== undefined) orientacao.ordem = parseInt(req.body.ordem, 10) || 0;
+  if (req.body.tipo_cartao !== undefined) {
+    if (req.body.tipo_cartao && !TIPOS_CARTAO.includes(req.body.tipo_cartao)) {
+      return res.status(400).json({ error: 'Tipo de cartão inválido para a orientação.' });
+    }
+    orientacao.tipo_cartao = req.body.tipo_cartao || null;
+  }
+
+  await writeRow('orientacoes_cartao', orientacao);
+  res.json(orientacao);
+}));
+
+// Exclusão física aqui é segura: orientação não é registro operacional de um dia (o
+// caminho normal de "aposentar" uma orientação é desativá-la, não excluir).
+app.delete('/api/orientacoes-cartao/:id', exigirP3, asyncRoute(async (req, res) => {
+  await deleteRow('orientacoes_cartao', req.params.id);
+  res.json({ message: 'Orientação excluída' });
 }));
 
 

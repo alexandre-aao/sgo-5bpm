@@ -10,6 +10,9 @@ interface RoteiroGridProps {
   dataCartao: string;
   eventos: Tables<'eventos'>[];
   podeEditar: boolean;
+  ehModelo: boolean;
+  /** Orientações permanentes da P3 do tipo deste cartão (bloco de observações da viatura). */
+  orientacoes: string[];
   onAdicionarItem: (vtrId: string, payload: ItemPayload) => Promise<ResultadoAcao>;
   onExcluirItem: (vtrId: string, itemId: string) => Promise<ResultadoAcao>;
   onSalvarAtividade: (vtrId: string, itemId: string, atividade: string) => Promise<ResultadoAcao>;
@@ -25,6 +28,8 @@ export function RoteiroGrid({
   dataCartao,
   eventos,
   podeEditar,
+  ehModelo,
+  orientacoes,
   onAdicionarItem,
   onExcluirItem,
   onSalvarAtividade,
@@ -56,6 +61,8 @@ export function RoteiroGrid({
           dataCartao={dataCartao}
           eventos={eventos}
           podeEditar={podeEditar}
+          ehModelo={ehModelo}
+          orientacoes={orientacoes}
           editandoAtividade={editandoAtividade}
           onIniciarEdicaoAtividade={(vtrId, itemId) => setEditandoAtividade({ vtrId, itemId })}
           onCancelarEdicaoAtividade={() => setEditandoAtividade(null)}

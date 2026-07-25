@@ -19,9 +19,31 @@ export interface CartaoViatura {
   comandante: string;
   observacao: string;
   itens: CartaoItem[];
+  /** Diária da guarnição — inteiro, sem teto, pré-preenchido com 2. Ausente nas
+   * viaturas de MODELO (o modelo só define os lugares de patrulhamento) e nos
+   * cartões salvos antes desta versão; nesses casos vale QTD_DIARIAS_PADRAO. */
+  qtd_diarias?: number;
 }
 
-export type CartaoDetalhado = Tables<'cartoes'> & { viaturas: CartaoViatura[] };
+export const QTD_DIARIAS_PADRAO = 2;
+
+export function diariasDaViatura(vtr: Pick<CartaoViatura, 'qtd_diarias'>): number {
+  return typeof vtr.qtd_diarias === 'number' ? vtr.qtd_diarias : QTD_DIARIAS_PADRAO;
+}
+
+export type TipoCartao = 'padrao' | 'reforco';
+
+/** `pode_editar` e `prazo_edicao` vêm calculados por GET /api/cartoes/:id — a tela
+ * usa o veredito do servidor em vez de reimplementar a regra de prazo. */
+export type CartaoDetalhado = Tables<'cartoes'> & {
+  viaturas: CartaoViatura[];
+  pode_editar?: boolean;
+  prazo_edicao?: string | null;
+};
+
+export function tipoDoCartao(cartao: Pick<CartaoDetalhado, 'tipo'>): TipoCartao {
+  return cartao.tipo === 'reforco' ? 'reforco' : 'padrao';
+}
 
 export interface AlertaConflito {
   tipo: 'sobreaviso-pendente' | 'sobreposicao' | 'cobertura';

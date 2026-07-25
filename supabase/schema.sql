@@ -125,6 +125,7 @@ create table if not exists pessoal (
   categorias text[] not null default '{}', -- pode ficar vazio: efetivo geral sem papel no Cartão Programa ainda
   ativo boolean not null default true,
   matricula text default '', -- RE (matrícula), opcional, alimentado pela importação do relatório de efetivo do SGEPM
+  nome_guerra text default '', -- nome de guerra, usado na busca do autocomplete de escala (existia só no banco; faltava aqui)
   subunidade text default '' -- PCS / 1ª Companhia / 2ª Companhia / 3ª Companhia, texto livre (mesmo domínio de `companhia` em viaturas, mas sem "Não informada")
 );
 
@@ -148,7 +149,7 @@ create table if not exists viaturas (
 -- nada da estrutura ou das regras de negócio já implementadas.
 create table if not exists cartoes (
   id text primary key,
-  data date, -- null para templates
+  data date, -- null para modelos (is_template)
   fiscal text default '',
   adjunto text default '',
   oficial_sobreaviso text default '',
@@ -157,14 +158,57 @@ create table if not exists cartoes (
   tipo_periodo text check (tipo_periodo is null or tipo_periodo in ('semana', 'fim_de_semana')),
   qtd_viaturas_base int,
   origem_template_id text references cartoes(id) on delete set null,
-  viaturas jsonb not null default '[]'::jsonb
+  viaturas jsonb not null default '[]'::jsonb,
+
+  -- Tipo do cartão: 'padrao' = policiamento ordinário (um por data);
+  -- 'reforco' = reforço operacional (vários por data, vínculo opcional a operação).
+  tipo text not null default 'padrao' check (tipo in ('padrao', 'reforco')),
+  -- Vínculo OPCIONAL do reforço a uma operação. set null (não cascade): apagar a
+  -- operação não pode levar junto o roteiro já entregue à tropa.
+  operacao_id text references operacoes(id) on delete set null,
+  titulo text default '',      -- identifica cada reforço quando há vários na mesma data
+  observacoes text default '', -- orientações da P3 neste cartão / "observações padrão" do modelo
+
+  -- Exclusão lógica: Adjunto/Oficial excluem dentro do prazo (08h do dia seguinte,
+  -- America/Fortaleza); fora do prazo só a P3, com justificativa obrigatória.
+  excluido_em timestamptz,
+  excluido_por text,
+  justificativa_exclusao text,
+
+  -- Diária por viatura vive no JSONB `viaturas`. Não há coluna escalar pra receber
+  -- CHECK, mas jsonb_path_exists é immutable e aceito em CHECK: rejeita a linha se
+  -- alguma viatura tiver qtd_diarias não-numérica ou negativa. Sem teto máximo, de
+  -- propósito. Ausente é válido (modelos não têm diária) — o app trata como 2.
+  constraint cartoes_qtd_diarias_valida check (
+    not jsonb_path_exists(viaturas, '$[*].qtd_diarias ? (@.type() != "number" || @ < 0)')
+  )
 );
 
--- Garante no banco a regra "só um Cartão Programa por data" (templates, com data
--- null, ficam de fora do índice — vários templates podem coexistir sem data).
+-- "Só um Cartão Programa ORDINÁRIO ativo por data". Modelos (data null) ficam de
+-- fora; reforços podem coexistir vários na mesma data; e a data volta a ficar livre
+-- se o ordinário for excluído logicamente.
 create unique index if not exists cartoes_data_unica
   on cartoes (data)
-  where is_template = false;
+  where is_template = false and tipo = 'padrao' and excluido_em is null;
+
+create index if not exists idx_cartoes_data_tipo
+  on cartoes (data, tipo)
+  where is_template = false and excluido_em is null;
+create index if not exists idx_cartoes_operacao_id on cartoes (operacao_id);
+
+-- Orientações permanentes da P3: aparecem no bloco de observações da VIATURA (no
+-- cartão individual e no PDF), nunca na linha do roteiro. Só ativo/inativo, sem
+-- vigência por data. Não são copiadas para dentro do cartão — desativar some de
+-- todos, inclusive nas reimpressões.
+create table if not exists orientacoes_cartao (
+  id text primary key,
+  texto text not null,
+  ativo boolean not null default true,
+  tipo_cartao text check (tipo_cartao is null or tipo_cartao in ('padrao', 'reforco')), -- null = os dois
+  ordem int not null default 0,
+  created_at timestamptz default now()
+);
+create index if not exists idx_orientacoes_cartao_ativo on orientacoes_cartao (ativo);
 
 
 -- =================================================================
@@ -202,3 +246,4 @@ alter table if exists pessoal             enable row level security;
 alter table if exists cartoes             enable row level security;
 alter table if exists operacoes           enable row level security;
 alter table if exists viaturas            enable row level security;
+alter table if exists orientacoes_cartao  enable row level security;

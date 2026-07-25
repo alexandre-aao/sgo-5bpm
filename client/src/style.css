@@ -4485,3 +4485,97 @@ body.sgo-sincronizando .topbar::before {
   }
   .table-cards-mobile .card-title-cell::before { content: none; }
 }
+
+/* -------------------------------------------------------------
+   CARTÃO PROGRAMA — TIPOS (ORDINÁRIO × REFORÇO), PRAZO E ORIENTAÇÕES
+   Todas as cores por var(): o tema claro é o padrão e literais quebram nele.
+   ------------------------------------------------------------- */
+
+/* Segmentado Ordinário | Reforço na toolbar (reusa .sub-abas). */
+.cartao-tipo-switch { margin: 0; border-bottom: none; flex-shrink: 0; }
+
+/* Faixa dos reforços da data — vários podem coexistir. */
+.cartao-reforcos-faixa {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; padding: 12px 16px;
+}
+.cartao-reforcos-lista { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cartao-reforcos-rotulo {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
+}
+.cartao-reforcos-rotulo svg { width: 15px; height: 15px; }
+.cartao-reforcos-vazio { font-size: 0.78rem; color: var(--text-muted); }
+.cartao-reforco-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 6px 12px; border-radius: 8px; cursor: pointer; text-align: left;
+  background: var(--surface-2); border: 1px solid var(--border-color); color: var(--text-main);
+  transition: border-color .15s, background .15s;
+}
+.cartao-reforco-chip:hover { border-color: var(--primary); }
+.cartao-reforco-chip.ativo { border-color: var(--primary); background: var(--primary-bg); }
+.cartao-reforco-chip strong { font-size: 0.8rem; }
+.cartao-reforco-chip span { font-size: 0.7rem; color: var(--text-muted); }
+
+/* Aviso de somente-leitura (prazo encerrado) e de exclusão fora do prazo. */
+.cartao-prazo-aviso {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 14px; margin-bottom: 12px; border-radius: 8px;
+  background: var(--warning-bg); border: 1px solid var(--warning-border);
+  color: var(--warning-fg); font-size: 0.8rem; line-height: 1.5;
+}
+.cartao-prazo-aviso svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* Observações da P3 no cabeçalho do cartão. */
+.cartao-observacoes-campo { padding: 0 20px 16px; }
+
+/* Bloco de observações dentro do card da viatura — nunca na linha do roteiro. */
+.cartao-vtr-observacoes {
+  margin-bottom: 12px; padding: 10px 12px; border-radius: 6px;
+  background: var(--surface-2); border-left: 3px solid var(--primary);
+  font-size: 0.76rem; line-height: 1.5; color: var(--text-main);
+}
+.cartao-vtr-observacoes > strong {
+  display: block; font-size: 0.68rem; letter-spacing: .04em;
+  color: var(--text-muted); margin-bottom: 4px;
+}
+.cartao-obs-propria { margin: 0 0 4px; }
+.cartao-obs-orientacoes { margin: 0; padding-left: 18px; }
+.cartao-obs-orientacoes li { margin-bottom: 2px; }
+
+/* Controles de recorte do PDF (dentro do modal, fora da área impressa). */
+.relatorio-pdf-controles { margin-bottom: 10px; }
+
+/* -------------------------------------------------------------
+   PDF DO CARTÃO PROGRAMA (mesmo padrão SGEPM dos demais relatórios)
+   Preto no branco é proposital aqui, como no resto do bloco .rel-pdf-*.
+   ------------------------------------------------------------- */
+.cartao-pdf-bloco { break-before: auto; }
+.cartao-pdf-identificacao { padding: 8px 18px; border-bottom: 1px solid #cbd5e1; }
+.cartao-pdf-id-titulo { font-size: 11px; font-weight: 700; color: #002145; }
+.cartao-pdf-id-linha {
+  display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 3px; font-size: 9.5px; color: #333;
+}
+.cartao-pdf-vtr { padding: 8px 18px 10px; break-inside: avoid; }
+.cartao-pdf-vtr-header {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px;
+  padding: 4px 8px; margin-bottom: 4px; background: #dbe4f0; color: #002145;
+  font-size: 10px; border-radius: 3px;
+}
+.cartao-pdf-vtr-header strong { font-size: 10.5px; }
+.cartao-pdf-obs {
+  margin-top: 5px; padding: 5px 8px; font-size: 9px; color: #111;
+  border: 1px solid #cbd5e1; border-left: 3px solid #002145; border-radius: 3px;
+}
+.cartao-pdf-obs > strong { display: block; font-size: 8.5px; color: #002145; margin-bottom: 2px; }
+
+@page relatorioPdfPortrait { size: A4 portrait; margin: 10mm; }
+
+@media print {
+  /* Controles de recorte não saem no papel. */
+  .relatorio-pdf-controles { display: none !important; }
+  /* Recorte por viatura: folha de bolso, em retrato. */
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area:has(.cartao-pdf-retrato) {
+    page: relatorioPdfPortrait;
+  }
+}
