@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Car, X, Check } from 'lucide-react';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
+import { CATEGORIAS_VIATURA, COMPANHIAS } from '../../../lib/categoriasViatura';
 import { useToast } from '../../../context/useToast';
 import type { ViaturaPayload } from './useViaturasCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
@@ -76,17 +77,13 @@ export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarV
               <label htmlFor="edit-vtr-companhia">Companhia</label>
               <select id="edit-vtr-companhia" value={form.companhia} onChange={(e) => setForm({ ...form, companhia: e.target.value })}>
                 <option value="">Não informada</option>
-                <option value="1ª Companhia">1ª Companhia</option>
-                <option value="2ª Companhia">2ª Companhia</option>
-                <option value="3ª Companhia">3ª Companhia</option>
+                {COMPANHIAS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="form-group col-md-6">
               <label htmlFor="edit-vtr-categoria">Categoria da Viatura</label>
               <select id="edit-vtr-categoria" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
-                <option value="Ordinária">Ordinária</option>
-                <option value="Força Tática">Força Tática</option>
-                <option value="Suplementar">Suplementar</option>
+                {CATEGORIAS_VIATURA.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>

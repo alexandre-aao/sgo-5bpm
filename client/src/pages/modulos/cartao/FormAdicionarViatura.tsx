@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Car, Plus } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
+import { CATEGORIAS_VIATURA, COMPANHIAS } from '../../../lib/categoriasViatura';
 import { useToast } from '../../../context/useToast';
 import type { ViaturaPayload } from './useViaturasCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
@@ -75,17 +76,13 @@ export function FormAdicionarViatura({ viaturasCadastradas, onAdicionar }: FormA
             <label htmlFor="vtr_companhia">Companhia</label>
             <select id="vtr_companhia" value={form.companhia} onChange={(e) => setForm({ ...form, companhia: e.target.value })}>
               <option value="">Não informada</option>
-              <option value="1ª Companhia">1ª Companhia</option>
-              <option value="2ª Companhia">2ª Companhia</option>
-              <option value="3ª Companhia">3ª Companhia</option>
+              {COMPANHIAS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="form-group col-md-4">
             <label htmlFor="vtr_categoria">Categoria da Viatura</label>
             <select id="vtr_categoria" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
-              <option value="Ordinária">Ordinária</option>
-              <option value="Força Tática">Força Tática</option>
-              <option value="Suplementar">Suplementar</option>
+              {CATEGORIAS_VIATURA.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="form-group col-md-4">
