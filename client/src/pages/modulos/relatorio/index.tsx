@@ -7,7 +7,10 @@ import { ModalRelatorioPdf } from '../../../components/relatorioPdf/ModalRelator
 import { RelatorioKpis } from './RelatorioKpis';
 import { TabelaConsolidado } from './TabelaConsolidado';
 import { RelatorioConsolidadoPdf } from './RelatorioConsolidadoPdf';
+import { RelatorioDiarioTexto } from './RelatorioDiarioTexto';
+import { RelatorioDiarioPdf } from './RelatorioDiarioPdf';
 import { useRelatorioDiarias } from './useRelatorioDiarias';
+import { useRelatorioDiario } from './useRelatorioDiario';
 
 const CABECALHO_CSV = ['Matrícula', 'Nome do Militar', 'Quantidade de Escalas', 'Total de Aparições', 'Total de Diárias (Un.)'];
 const BOM_UTF8 = '﻿';
@@ -17,7 +20,11 @@ export default function RelatorioPage() {
   const [{ mes, ano }, setPeriodo] = useState(periodoInicial);
   const [busca, setBusca] = useState('');
   const { lista } = useRelatorioDiarias(mes, ano);
-  const [modalPdfAberto, setModalPdfAberto] = useState(false);
+  const [modalConsolidadoAberto, setModalConsolidadoAberto] = useState(false);
+
+  const [agrupar, setAgrupar] = useState<'data' | 'operacao'>('data');
+  const { dados: dadosDiario, carregando: carregandoDiario, erro: erroDiario } = useRelatorioDiario(mes, ano, agrupar);
+  const [modalDiarioAberto, setModalDiarioAberto] = useState(false);
 
   const buscaNormalizada = busca.toLowerCase().trim();
   const listaFiltrada = lista.filter(
@@ -42,12 +49,20 @@ export default function RelatorioPage() {
     toast('Planilha CSV gerada e baixada.', 'success');
   }
 
-  function handleAbrirPdf() {
+  function handleAbrirPdfConsolidado() {
     if (listaFiltrada.length === 0) {
       toast('Nenhum militar no período/filtro selecionado.', 'warning');
       return;
     }
-    setModalPdfAberto(true);
+    setModalConsolidadoAberto(true);
+  }
+
+  function handleAbrirPdfDiario() {
+    if (!dadosDiario || dadosDiario.grupos.length === 0) {
+      toast('Nenhuma diária no período selecionado.', 'warning');
+      return;
+    }
+    setModalDiarioAberto(true);
   }
 
   return (
@@ -73,7 +88,7 @@ export default function RelatorioPage() {
                 value={busca} onChange={(e) => setBusca(e.target.value)}
               />
             </div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={handleAbrirPdf}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleAbrirPdfConsolidado}>
               <FileDown /> Relatório (PDF)
             </button>
             <button type="button" className="btn btn-success" onClick={handleExportarCsv}>
@@ -85,9 +100,20 @@ export default function RelatorioPage() {
         <TabelaConsolidado lista={listaFiltrada} />
       </div>
 
-      {modalPdfAberto && (
-        <ModalRelatorioPdf onFechar={() => setModalPdfAberto(false)}>
+      <RelatorioDiarioTexto
+        agrupar={agrupar} onMudarAgrupar={setAgrupar} onAbrirPdf={handleAbrirPdfDiario}
+        dados={dadosDiario} carregando={carregandoDiario} erro={erroDiario}
+      />
+
+      {modalConsolidadoAberto && (
+        <ModalRelatorioPdf onFechar={() => setModalConsolidadoAberto(false)}>
           <RelatorioConsolidadoPdf lista={listaFiltrada} mes={mes} ano={ano} busca={buscaNormalizada} />
+        </ModalRelatorioPdf>
+      )}
+
+      {modalDiarioAberto && dadosDiario && (
+        <ModalRelatorioPdf onFechar={() => setModalDiarioAberto(false)}>
+          <RelatorioDiarioPdf dados={dadosDiario} />
         </ModalRelatorioPdf>
       )}
     </>

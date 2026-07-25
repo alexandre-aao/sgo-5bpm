@@ -1,7 +1,6 @@
 import { CabecalhoRelatorioPdf } from '../../../components/relatorioPdf/CabecalhoRelatorioPdf';
+import { nomeMes } from './mesesNomes';
 import type { RelatorioDiariaItem } from './useRelatorioDiarias';
-
-const MESES_NOMES = ['', 'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 
 interface RelatorioConsolidadoPdfProps {
   lista: RelatorioDiariaItem[];
@@ -11,7 +10,7 @@ interface RelatorioConsolidadoPdfProps {
 }
 
 export function RelatorioConsolidadoPdf({ lista, mes, ano, busca }: RelatorioConsolidadoPdfProps) {
-  let sub = `${MESES_NOMES[parseInt(mes, 10)] || ''}/${ano}`;
+  let sub = `${nomeMes(mes)}/${ano}`;
   if (busca) sub += ` — filtro: "${busca}"`;
   const totalDiarias = lista.reduce((s, m) => s + (Number(m.total_diarias) || 0), 0);
 
