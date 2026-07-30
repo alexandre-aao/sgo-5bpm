@@ -10,10 +10,14 @@ export interface OperacaoComResumo extends Tables<'operacoes'> {
 export interface FiltrosOperacoes {
   situacao: string;
   busca: string;
+  /** Filtro por período (Etapa 1, item 6) — client-side, sobre a lista já
+   *  carregada; a rota /api/operacoes não mudou. */
+  dataInicio: string;
+  dataFim: string;
 }
 
 export function filtrosVazios(): FiltrosOperacoes {
-  return { situacao: '', busca: '' };
+  return { situacao: '', busca: '', dataInicio: '', dataFim: '' };
 }
 
 /** Diária de cada operação (real se há escala, estimada se não) + filtro de
@@ -34,6 +38,8 @@ export function getOperacoesFiltradas(
   });
 
   if (filtros.situacao) lista = lista.filter((op) => op.situacao === filtros.situacao);
+  if (filtros.dataInicio) lista = lista.filter((op) => op.data_inicio >= filtros.dataInicio);
+  if (filtros.dataFim) lista = lista.filter((op) => op.data_inicio <= filtros.dataFim);
   if (filtros.busca) {
     const termo = normalizarTexto(filtros.busca);
     lista = lista.filter((op) =>

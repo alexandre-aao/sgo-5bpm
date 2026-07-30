@@ -3,6 +3,7 @@ import { FileSpreadsheet, FileDown, Download } from 'lucide-react';
 import { useToast } from '../../../context/useToast';
 import { periodoInicial } from '../../../lib/periodo';
 import { FiltroMesAno } from '../../../components/FiltroMesAno';
+import { MenuOpcoes } from '../../../components/MenuOpcoes';
 import { ModalRelatorioPdf } from '../../../components/relatorioPdf/ModalRelatorioPdf';
 import { RelatorioKpis } from './RelatorioKpis';
 import { TabelaConsolidado } from './TabelaConsolidado';
@@ -88,12 +89,14 @@ export default function RelatorioPage() {
                 value={busca} onChange={(e) => setBusca(e.target.value)}
               />
             </div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={handleAbrirPdfConsolidado}>
-              <FileDown /> Relatório (PDF)
-            </button>
-            <button type="button" className="btn btn-success" onClick={handleExportarCsv}>
-              <Download /> <span>Exportar</span>
-            </button>
+            {/* Gerar PDF e exportar CSV são ações pontuais: saíram da barra para
+                o menu de opções (Etapa 1, item 2). */}
+            <MenuOpcoes
+              itens={[
+                { rotulo: 'Relatório (PDF)', icone: FileDown, onClick: handleAbrirPdfConsolidado },
+                { rotulo: 'Exportar planilha (CSV)', icone: Download, onClick: handleExportarCsv },
+              ]}
+            />
           </div>
         </div>
 

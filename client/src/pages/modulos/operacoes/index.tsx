@@ -7,6 +7,8 @@ import { TabelaOperacoes } from './TabelaOperacoes';
 import { DrawerOperacao } from './DrawerOperacao';
 import { ModalOperacao } from './ModalOperacao';
 import { filtrosVazios, getOperacoesFiltradas, type FiltrosOperacoes } from './filtros';
+import { FiltrosAtivos, type FiltroAtivo } from '../../../components/tabela/FiltrosAtivos';
+import { paraDataBr } from '../../../lib/periodo';
 import type { OperacaoPayload } from './useOperacaoDrawer';
 
 // Aba Operações (P3) — lista + filtros + Nova/Editar Operação, reaproveitando
@@ -42,6 +44,26 @@ export default function OperacoesPage() {
     void recarregar();
   }
 
+  // Chips do indicador de filtros ativos (Etapa 1, item 6)
+  const filtrosAtivos: FiltroAtivo[] = [
+    filtros.situacao && {
+      rotulo: `Situação: ${filtros.situacao}`,
+      onRemover: () => setFiltros({ ...filtros, situacao: '' }),
+    },
+    filtros.dataInicio && {
+      rotulo: `A partir de ${paraDataBr(filtros.dataInicio)}`,
+      onRemover: () => setFiltros({ ...filtros, dataInicio: '' }),
+    },
+    filtros.dataFim && {
+      rotulo: `Até ${paraDataBr(filtros.dataFim)}`,
+      onRemover: () => setFiltros({ ...filtros, dataFim: '' }),
+    },
+    filtros.busca.trim() && {
+      rotulo: `Texto: "${filtros.busca.trim()}"`,
+      onRemover: () => setFiltros({ ...filtros, busca: '' }),
+    },
+  ].filter(Boolean) as FiltroAtivo[];
+
   return (
     <>
       <div className="panel">
@@ -57,7 +79,12 @@ export default function OperacoesPage() {
           <strong>Executadas</strong>. A diária mostrada é a real quando há efetivo escalado, ou a estimativa
           enquanto ainda não há.
         </p>
-        <TabelaOperacoes operacoes={operacoesFiltradas} onAbrir={setOperacaoAbertaId} />
+        <FiltrosAtivos filtros={filtrosAtivos} onLimparTudo={() => setFiltros(filtrosVazios())} />
+
+        <TabelaOperacoes
+          operacoes={operacoesFiltradas} temFiltro={filtrosAtivos.length > 0}
+          onAbrir={setOperacaoAbertaId} onLimparFiltros={() => setFiltros(filtrosVazios())}
+        />
       </div>
 
       {operacaoAbertaId && (

@@ -4,6 +4,8 @@ import { useAppData } from '../../../context/useAppData';
 import { useAuth } from '../../../context/useAuth';
 import { useToast } from '../../../context/useToast';
 import { ModalRelatorioPdf } from '../../../components/relatorioPdf/ModalRelatorioPdf';
+import { FiltrosAtivos, type FiltroAtivo } from '../../../components/tabela/FiltrosAtivos';
+import { paraDataBr } from '../../../lib/periodo';
 import { EventosKpis } from './EventosKpis';
 import { FiltrosEventosBar } from './FiltrosEventosBar';
 import { TabelaEventos } from './TabelaEventos';
@@ -46,6 +48,22 @@ export default function EventosPage() {
     setPagina(1);
   }
 
+  // Chips do indicador de filtros ativos (Etapa 1, item 6)
+  const filtrosAtivos: FiltroAtivo[] = [
+    filtros.dataInicio && {
+      rotulo: `A partir de ${paraDataBr(filtros.dataInicio)}`,
+      onRemover: () => handleMudarFiltros({ ...filtros, dataInicio: '' }),
+    },
+    filtros.dataFim && {
+      rotulo: `Até ${paraDataBr(filtros.dataFim)}`,
+      onRemover: () => handleMudarFiltros({ ...filtros, dataFim: '' }),
+    },
+    filtros.busca.trim() && {
+      rotulo: `Texto: "${filtros.busca.trim()}"`,
+      onRemover: () => handleMudarFiltros({ ...filtros, busca: '' }),
+    },
+  ].filter(Boolean) as FiltroAtivo[];
+
   return (
     <>
       <EventosKpis eventosFiltrados={eventosFiltrados} todosEventos={dados.eventos} />
@@ -57,14 +75,18 @@ export default function EventosPage() {
             <h2>Listar Eventos</h2>
           </div>
           <FiltrosEventosBar
-            filtros={filtros} onMudar={handleMudarFiltros} onLimpar={handleLimparFiltros}
+            filtros={filtros} onMudar={handleMudarFiltros}
             onRelatorio={handleAbrirRelatorio} podeCriar={usuario?.role === 'P3'}
           />
         </div>
 
+        <FiltrosAtivos filtros={filtrosAtivos} onLimparTudo={handleLimparFiltros} />
+
         <TabelaEventos
           eventos={eventosFiltrados} totalGeral={dados.eventos.length}
-          pagina={pagina} onMudarPagina={setPagina} onAbrir={setEventoAbertoId}
+          pagina={pagina} temFiltro={filtrosAtivos.length > 0}
+          onMudarPagina={setPagina} onAbrir={setEventoAbertoId}
+          onLimparFiltros={handleLimparFiltros}
         />
       </div>
 

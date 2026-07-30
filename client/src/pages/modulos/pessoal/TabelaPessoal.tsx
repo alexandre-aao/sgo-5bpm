@@ -1,69 +1,114 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, SearchX, UserPlus } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
+import { SemDados } from '../../../components/estado/SemDados';
+import { MenuOpcoes } from '../../../components/MenuOpcoes';
 import { categoriaPessoalBadgeClass } from '../../../lib/categoriaPessoalBadge';
+import { ThOrdenavel } from '../../../components/tabela/ThOrdenavel';
+import { useOrdenacao, ordenarLista, type Acessores } from '../../../components/tabela/ordenacao';
+import { BarraPaginacao } from '../../../components/tabela/BarraPaginacao';
+import { paginar, usePaginaLista } from '../../../components/tabela/paginacao';
+
+type ColunaPessoal = 'matricula' | 'nome' | 'subunidade' | 'posto' | 'tipo';
+
+const ACESSORES: Acessores<Tables<'pessoal'>, ColunaPessoal> = {
+  matricula: (p) => p.matricula || '',
+  nome: (p) => p.nome || '',
+  subunidade: (p) => p.subunidade || '',
+  posto: (p) => p.posto_graduacao || '',
+  tipo: (p) => p.tipo || '',
+};
 
 interface TabelaPessoalProps {
   pessoal: Tables<'pessoal'>[];
   filtroAtivo: boolean;
   onEditar: (pessoa: Tables<'pessoal'>) => void;
   onExcluir: (pessoa: Tables<'pessoal'>) => void;
+  onLimparFiltros: () => void;
 }
 
-// Tabela do Cadastro de Pessoal — espelha renderPessoalTab() em public/app.js.
-export function TabelaPessoal({ pessoal, filtroAtivo, onEditar, onExcluir }: TabelaPessoalProps) {
+// Tabela do Cadastro de Pessoal: ordenação por coluna, cabeçalho fixo e
+// paginação (Etapa 1, item 6) — são 244 militares cadastrados, a lista inteira
+// numa página só era a pior rolagem do sistema no celular.
+export function TabelaPessoal({ pessoal, filtroAtivo, onEditar, onExcluir, onLimparFiltros }: TabelaPessoalProps) {
+  const { ordenacao, alternar } = useOrdenacao<ColunaPessoal>({ coluna: 'nome', direcao: 'asc' });
+  const { pagina, setPagina } = usePaginaLista(pessoal.length);
+
+  const ordenados = ordenarLista(pessoal, ordenacao, ACESSORES);
+  const { itens, paginaAtual, totalPaginas } = paginar(ordenados, pagina);
+
   return (
-    <div className="table-responsive">
-      <table className="styled-table">
-        <thead>
-          <tr>
-            <th>Matrícula</th>
-            <th>Nome</th>
-            <th>Subunidade</th>
-            <th>Posto/Graduação</th>
-            <th>Tipo</th>
-            <th>Categorias</th>
-            <th className="text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pessoal.length === 0 ? (
+    <>
+      <div className="table-responsive tabela-scroll">
+        <table className="styled-table">
+          <thead>
             <tr>
-              <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
-                Nenhuma pessoa cadastrada{filtroAtivo ? ' nesta categoria' : ''}.
-              </td>
+              <ThOrdenavel coluna="matricula" ordenacao={ordenacao} onAlternar={alternar}>Matrícula</ThOrdenavel>
+              <ThOrdenavel coluna="nome" ordenacao={ordenacao} onAlternar={alternar}>Nome</ThOrdenavel>
+              <ThOrdenavel coluna="subunidade" ordenacao={ordenacao} onAlternar={alternar}>Subunidade</ThOrdenavel>
+              <ThOrdenavel coluna="posto" ordenacao={ordenacao} onAlternar={alternar}>Posto/Graduação</ThOrdenavel>
+              <ThOrdenavel coluna="tipo" ordenacao={ordenacao} onAlternar={alternar}>Tipo</ThOrdenavel>
+              <th>Categorias</th>
+              <th className="text-right">Ações</th>
             </tr>
-          ) : (
-            pessoal.map((p) => (
-              <tr key={p.id}>
-                <td>{p.matricula || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                <td><strong>{p.nome}</strong></td>
-                <td>{p.subunidade || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                <td>{p.posto_graduacao}</td>
-                <td><span className={`badge tipo-${p.tipo === 'Praça' ? 'praca' : 'oficial'}`}>{p.tipo}</span></td>
-                <td>
-                  {p.categorias.length > 0 ? (
-                    p.categorias.map((c) => (
-                      <span key={c} className={`badge ${categoriaPessoalBadgeClass(c)}`} style={{ margin: 2 }}>{c}</span>
-                    ))
+          </thead>
+          <tbody>
+            {itens.length === 0 ? (
+              <tr>
+                <td colSpan={7}>
+                  {filtroAtivo ? (
+                    <SemDados
+                      icone={SearchX}
+                      titulo="Nenhum militar para estes filtros"
+                      orientacao="Revise a categoria selecionada ou o texto da pesquisa."
+                      acao={{ rotulo: 'Limpar filtros', onClick: onLimparFiltros }}
+                    />
                   ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Sem categoria</span>
+                    <SemDados
+                      icone={UserPlus}
+                      titulo="Nenhuma pessoa cadastrada"
+                      orientacao="O efetivo cadastrado aqui alimenta os seletores de Fiscal, Adjunto e Sobreaviso do Cartão Programa."
+                    />
                   )}
                 </td>
-                <td className="text-right">
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <button type="button" className="btn-icon btn-sm" title="Editar" aria-label="Editar" onClick={() => onEditar(p)}>
-                      <Pencil style={{ width: 14, height: 14 }} />
-                    </button>
-                    <button type="button" className="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onClick={() => onExcluir(p)}>
-                      <Trash2 style={{ width: 14, height: 14 }} />
-                    </button>
-                  </div>
-                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+            ) : (
+              itens.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.matricula || <span className="celula-vazia">—</span>}</td>
+                  <td><strong>{p.nome}</strong></td>
+                  <td>{p.subunidade || <span className="celula-vazia">—</span>}</td>
+                  <td>{p.posto_graduacao}</td>
+                  <td><span className={`badge tipo-${p.tipo === 'Praça' ? 'praca' : 'oficial'}`}>{p.tipo}</span></td>
+                  <td>
+                    {p.categorias.length > 0 ? (
+                      p.categorias.map((c) => (
+                        <span key={c} className={`badge ${categoriaPessoalBadgeClass(c)}`} style={{ margin: 2 }}>{c}</span>
+                      ))
+                    ) : (
+                      <span className="celula-vazia">Sem categoria</span>
+                    )}
+                  </td>
+                  <td className="text-right">
+                    <div className="acoes-linha">
+                      <button type="button" className="btn-icon btn-sm" title="Editar" aria-label="Editar" onClick={() => onEditar(p)}>
+                        <Pencil />
+                      </button>
+                      <MenuOpcoes
+                        rotulo={`Mais opções de ${p.nome}`}
+                        itens={[{ rotulo: 'Excluir cadastro', icone: Trash2, onClick: () => onExcluir(p), perigo: true }]}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <BarraPaginacao
+        info={`${pessoal.length} militar(es) na lista.`}
+        pagina={paginaAtual} totalPaginas={totalPaginas} onMudarPagina={setPagina}
+      />
+    </>
   );
 }

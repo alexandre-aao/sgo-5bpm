@@ -7,6 +7,8 @@ import { FiltroCategoriasPessoal } from './FiltroCategoriasPessoal';
 import { TabelaPessoal } from './TabelaPessoal';
 import { ModalPessoa } from './ModalPessoa';
 import { usePessoalCrud } from './usePessoalCrud';
+import { FiltrosAtivos, type FiltroAtivo } from '../../../components/tabela/FiltrosAtivos';
+import { normalizarTexto } from '../../../lib/cartaoConflitos';
 
 // Cadastro de Pessoal (P3) — Adjuntos, Fiscais/Oficiais de Operações, Oficiais
 // de Sobreaviso e Executores, com filtro por categoria. Espelha #tab-pessoal +
@@ -17,15 +19,40 @@ export default function PessoalPage() {
   const { toast } = useToast();
   const { criarPessoa, atualizarPessoa, excluirPessoa } = usePessoalCrud(recarregar);
   const [categoria, setCategoria] = useState('');
+  const [busca, setBusca] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [pessoaEditando, setPessoaEditando] = useState<Tables<'pessoal'> | null>(null);
 
-  const pessoalFiltrado =
+  const porCategoria =
     categoria === '__sem_categoria__'
       ? dados.pessoal.filter((p) => !p.categorias || p.categorias.length === 0)
       : categoria
         ? dados.pessoal.filter((p) => p.categorias.includes(categoria))
         : dados.pessoal;
+
+  // Pesquisa (Etapa 1, item 6): nome, nome de guerra e matrícula, acento- e
+  // case-insensitive, no mesmo padrão do autocomplete de escala.
+  const termo = normalizarTexto(busca.trim());
+  const pessoalFiltrado = termo
+    ? porCategoria.filter((p) =>
+        normalizarTexto(p.nome || '').includes(termo) ||
+        normalizarTexto(p.nome_guerra || '').includes(termo) ||
+        (p.matricula || '').toLowerCase().includes(busca.trim().toLowerCase()),
+      )
+    : porCategoria;
+
+  const filtrosAtivos: FiltroAtivo[] = [
+    categoria && {
+      rotulo: categoria === '__sem_categoria__' ? 'Sem categoria' : `Categoria: ${categoria}`,
+      onRemover: () => setCategoria(''),
+    },
+    busca.trim() && { rotulo: `Texto: "${busca.trim()}"`, onRemover: () => setBusca('') },
+  ].filter(Boolean) as FiltroAtivo[];
+
+  function handleLimparFiltros() {
+    setCategoria('');
+    setBusca('');
+  }
 
   function handleNovaPessoa() {
     setPessoaEditando(null);
@@ -55,14 +82,29 @@ export default function PessoalPage() {
             <Contact />
             <h2>Cadastro de Pessoal</h2>
           </div>
-          <button type="button" className="btn btn-primary btn-sm" onClick={handleNovaPessoa}>
-            <UserPlus /> Nova Pessoa
-          </button>
+          <div className="events-filters-bar">
+            <div className="filter-search">
+              <label htmlFor="filter-pessoal-busca">Pesquisar</label>
+              <input
+                type="text" id="filter-pessoal-busca" placeholder="Nome, nome de guerra ou matrícula..."
+                value={busca} onChange={(e) => setBusca(e.target.value)}
+              />
+            </div>
+            <button type="button" className="btn btn-primary btn-sm" onClick={handleNovaPessoa}>
+              <UserPlus /> Nova Pessoa
+            </button>
+          </div>
         </div>
 
         <FiltroCategoriasPessoal categoria={categoria} onMudar={setCategoria} />
 
-        <TabelaPessoal pessoal={pessoalFiltrado} filtroAtivo={!!categoria} onEditar={handleEditar} onExcluir={handleExcluir} />
+        <FiltrosAtivos filtros={filtrosAtivos} onLimparTudo={handleLimparFiltros} />
+
+        <TabelaPessoal
+          pessoal={pessoalFiltrado} filtroAtivo={!!categoria || !!termo}
+          onEditar={handleEditar} onExcluir={handleExcluir}
+          onLimparFiltros={handleLimparFiltros}
+        />
       </div>
 
       {modalAberto && (

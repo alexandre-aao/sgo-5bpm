@@ -8,6 +8,8 @@ import { FiltroStatusViaturas } from './FiltroStatusViaturas';
 import { TabelaViaturas } from './TabelaViaturas';
 import { ModalViatura } from './ModalViatura';
 import { useViaturasCrud } from './useViaturasCrud';
+import { FiltrosAtivos, type FiltroAtivo } from '../../../components/tabela/FiltrosAtivos';
+import { normalizarTexto } from '../../../lib/cartaoConflitos';
 
 // Cadastro de Viaturas — registro central que alimenta a sugestão de prefixo
 // no Cartão Programa. Aberto a P3/Adjunto/Oficial pra criar/editar; só a
@@ -19,11 +21,32 @@ export default function ViaturasPage() {
   const { toast } = useToast();
   const { criarViatura, atualizarViatura, excluirViatura } = useViaturasCrud(recarregar);
   const [status, setStatus] = useState('');
+  const [busca, setBusca] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [viaturaEditando, setViaturaEditando] = useState<Tables<'viaturas'> | null>(null);
   const podeExcluir = usuario?.role === 'P3';
 
-  const viaturasFiltradas = status ? dados.viaturas.filter((v) => v.status === status) : dados.viaturas;
+  const porStatus = status ? dados.viaturas.filter((v) => v.status === status) : dados.viaturas;
+
+  // Pesquisa (Etapa 1, item 6) — prefixo, companhia e observação
+  const termo = normalizarTexto(busca.trim());
+  const viaturasFiltradas = termo
+    ? porStatus.filter((v) =>
+        normalizarTexto(v.prefixo || '').includes(termo) ||
+        normalizarTexto(v.companhia || '').includes(termo) ||
+        normalizarTexto(v.observacao || '').includes(termo),
+      )
+    : porStatus;
+
+  const filtrosAtivos: FiltroAtivo[] = [
+    status && { rotulo: `Status: ${status}`, onRemover: () => setStatus('') },
+    busca.trim() && { rotulo: `Texto: "${busca.trim()}"`, onRemover: () => setBusca('') },
+  ].filter(Boolean) as FiltroAtivo[];
+
+  function handleLimparFiltros() {
+    setStatus('');
+    setBusca('');
+  }
 
   function handleNovaViatura() {
     setViaturaEditando(null);
@@ -53,16 +76,28 @@ export default function ViaturasPage() {
             <Car />
             <h2>Cadastro de Viaturas</h2>
           </div>
-          <button type="button" className="btn btn-primary btn-sm" onClick={handleNovaViatura}>
-            <Plus /> Nova Viatura
-          </button>
+          <div className="events-filters-bar">
+            <div className="filter-search">
+              <label htmlFor="filter-viaturas-busca">Pesquisar</label>
+              <input
+                type="text" id="filter-viaturas-busca" placeholder="Prefixo, companhia ou observação..."
+                value={busca} onChange={(e) => setBusca(e.target.value)}
+              />
+            </div>
+            <button type="button" className="btn btn-primary btn-sm" onClick={handleNovaViatura}>
+              <Plus /> Nova Viatura
+            </button>
+          </div>
         </div>
 
         <FiltroStatusViaturas status={status} onMudar={setStatus} />
 
+        <FiltrosAtivos filtros={filtrosAtivos} onLimparTudo={handleLimparFiltros} />
+
         <TabelaViaturas
-          viaturas={viaturasFiltradas} filtroAtivo={!!status} podeExcluir={podeExcluir}
+          viaturas={viaturasFiltradas} filtroAtivo={!!status || !!termo} podeExcluir={podeExcluir}
           onEditar={handleEditar} onExcluir={handleExcluir}
+          onLimparFiltros={handleLimparFiltros}
         />
       </div>
 

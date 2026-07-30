@@ -23,6 +23,20 @@ export function FiltrosOperacoesBar({ filtros, onMudar, onNova }: FiltrosOperaco
           <option value="Executada">Executada</option>
         </select>
       </div>
+      <div className="filter-group">
+        <label htmlFor="filter-operacoes-inicio">Data Inicial</label>
+        <input
+          type="date" id="filter-operacoes-inicio"
+          value={filtros.dataInicio} onChange={(e) => onMudar({ ...filtros, dataInicio: e.target.value })}
+        />
+      </div>
+      <div className="filter-group">
+        <label htmlFor="filter-operacoes-fim">Data Final</label>
+        <input
+          type="date" id="filter-operacoes-fim"
+          value={filtros.dataFim} onChange={(e) => onMudar({ ...filtros, dataFim: e.target.value })}
+        />
+      </div>
       <div className="filter-search">
         <label htmlFor="filter-operacoes-search">Filtrar Texto</label>
         <input

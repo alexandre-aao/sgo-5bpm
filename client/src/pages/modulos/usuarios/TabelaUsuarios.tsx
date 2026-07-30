@@ -1,5 +1,17 @@
-import { Pencil, KeyRound, Trash2 } from 'lucide-react';
+import { Pencil, KeyRound, Trash2, UserPlus } from 'lucide-react';
 import type { UsuarioPublico } from './useUsuariosCrud';
+import { SemDados } from '../../../components/estado/SemDados';
+import { MenuOpcoes } from '../../../components/MenuOpcoes';
+import { ThOrdenavel } from '../../../components/tabela/ThOrdenavel';
+import { useOrdenacao, ordenarLista, type Acessores } from '../../../components/tabela/ordenacao';
+
+type ColunaUsuario = 'login' | 'nome' | 'perfil';
+
+const ACESSORES: Acessores<UsuarioPublico, ColunaUsuario> = {
+  login: (u) => u.usuario || '',
+  nome: (u) => u.nome || '',
+  perfil: (u) => u.role || '',
+};
 
 interface TabelaUsuariosProps {
   usuarios: UsuarioPublico[];
@@ -8,45 +20,54 @@ interface TabelaUsuariosProps {
   onExcluir: (usuario: UsuarioPublico) => void;
 }
 
+// Tabela de Usuários — ordenação por coluna e cabeçalho fixo (Etapa 1, item 6).
+// Sem paginação: são poucas contas de login, uma página sempre dá conta.
 export function TabelaUsuarios({ usuarios, onEditar, onResetarSenha, onExcluir }: TabelaUsuariosProps) {
+  const { ordenacao, alternar } = useOrdenacao<ColunaUsuario>({ coluna: 'login', direcao: 'asc' });
+  const ordenados = ordenarLista(usuarios, ordenacao, ACESSORES);
+
   return (
-    <div className="table-responsive">
+    <div className="table-responsive tabela-scroll">
       <table className="styled-table">
         <thead>
           <tr>
-            <th>Login</th>
-            <th>Nome</th>
-            <th>Perfil</th>
+            <ThOrdenavel coluna="login" ordenacao={ordenacao} onAlternar={alternar}>Login</ThOrdenavel>
+            <ThOrdenavel coluna="nome" ordenacao={ordenacao} onAlternar={alternar}>Nome</ThOrdenavel>
+            <ThOrdenavel coluna="perfil" ordenacao={ordenacao} onAlternar={alternar}>Perfil</ThOrdenavel>
             <th className="text-right">Ações</th>
           </tr>
         </thead>
         <tbody>
-          {usuarios.length === 0 ? (
+          {ordenados.length === 0 ? (
             <tr>
-              <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
-                Nenhum usuário cadastrado.
+              <td colSpan={4}>
+                <SemDados
+                  icone={UserPlus}
+                  titulo="Nenhum usuário cadastrado"
+                  orientacao="Use “Novo Usuário” para criar as contas de acesso da P3, dos Adjuntos e dos Oficiais."
+                />
               </td>
             </tr>
           ) : (
-            usuarios.map((u) => (
+            ordenados.map((u) => (
               <tr key={u.usuario}>
                 <td><strong>{u.usuario}</strong></td>
                 <td>{u.nome}</td>
                 <td><span className={`badge perfil-${u.role.toLowerCase()}`}>{u.role}</span></td>
+                {/* Editar fica no botão direto; resetar senha e excluir são
+                    pouco frequentes e vão pro menu (Etapa 1, item 2). */}
                 <td className="text-right">
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <div className="acoes-linha">
                     <button type="button" className="btn-icon btn-sm" title="Editar" aria-label="Editar" onClick={() => onEditar(u)}>
-                      <Pencil style={{ width: 14, height: 14 }} />
+                      <Pencil />
                     </button>
-                    <button
-                      type="button" className="btn-icon btn-sm" title="Resetar Senha" aria-label="Resetar Senha"
-                      onClick={() => onResetarSenha(u)}
-                    >
-                      <KeyRound style={{ width: 14, height: 14 }} />
-                    </button>
-                    <button type="button" className="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir" onClick={() => onExcluir(u)}>
-                      <Trash2 style={{ width: 14, height: 14 }} />
-                    </button>
+                    <MenuOpcoes
+                      rotulo={`Mais opções de ${u.usuario}`}
+                      itens={[
+                        { rotulo: 'Resetar senha', icone: KeyRound, onClick: () => onResetarSenha(u) },
+                        { rotulo: 'Excluir usuário', icone: Trash2, onClick: () => onExcluir(u), perigo: true },
+                      ]}
+                    />
                   </div>
                 </td>
               </tr>
