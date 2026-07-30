@@ -7,10 +7,12 @@ const ROTULO_CONFLITO: Record<AlertaConflito['tipo'], string> = {
   'sobreaviso-pendente': 'Fiscal Praça sem Oficial de Sobreaviso',
 };
 
+// Categoria de viatura é classificação, não situação — por isso saiu do
+// vermelho/amarelo (Etapa 1, item 3) e ficou na família azul/roxo.
 const CORES_CATEGORIA: Record<string, string> = {
   'Ordinária': 'var(--primary)',
-  'Força Tática': 'var(--danger-fg)',
-  'Suplementar': 'var(--warning-fg)',
+  'Força Tática': 'var(--roxo)',
+  'Suplementar': 'var(--info-fg)',
 };
 
 interface TrilhoCartaoProps {
@@ -30,7 +32,7 @@ export function TrilhoCartao({ viaturas, alertas }: TrilhoCartaoProps) {
   const cards = [
     { valor: viaturas.length, rotulo: 'Viaturas', Icone: Car, cor: 'var(--primary)', bg: 'var(--primary-soft)' },
     { valor: setores.size, rotulo: 'Setores', Icone: MapIcon, cor: 'var(--info-fg)', bg: 'var(--info-bg)' },
-    { valor: atividades.size, rotulo: 'Atividades', Icone: Activity, cor: 'var(--success-fg)', bg: 'var(--success-bg)' },
+    { valor: atividades.size, rotulo: 'Atividades', Icone: Activity, cor: 'var(--roxo)', bg: 'var(--roxo-bg)' },
     {
       valor: conflitos, rotulo: 'Conflitos', Icone: AlertTriangle,
       cor: conflitos ? 'var(--danger-fg)' : 'var(--success-fg)',

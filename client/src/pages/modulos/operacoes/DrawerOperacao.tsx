@@ -156,15 +156,17 @@ export function DrawerOperacao({
             <button className="btn btn-secondary" onClick={() => setModalEditarAberto(true)}>
               <Pencil /> Editar Operação
             </button>
+            {/* Ação principal do rodapé — antes era verde (btn-success) e o
+                "Fechar" é que vinha preenchido, invertendo a hierarquia. */}
             {operacao.situacao !== 'Executada' && (
               <button
-                className={`btn btn-success${marcandoExecutada ? ' btn-carregando' : ''}`} disabled={marcandoExecutada}
+                className={`btn btn-primary${marcandoExecutada ? ' btn-carregando' : ''}`} disabled={marcandoExecutada}
                 onClick={handleMarcarExecutada}
               >
                 <CheckCircle /> Marcar como Executada
               </button>
             )}
-            <button className="btn btn-primary" onClick={onFechar}>Fechar</button>
+            <button className="btn btn-ghost" onClick={onFechar}>Fechar</button>
           </div>
         </div>
       </div>

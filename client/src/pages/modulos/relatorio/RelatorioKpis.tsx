@@ -22,14 +22,14 @@ export function RelatorioKpis({ lista }: RelatorioKpisProps) {
         </div>
       </div>
       <div className="kpi-card kpi-card-horizontal">
-        <span className="kpi-icone" style={{ background: 'var(--warning-bg)', color: 'var(--warning-fg)' }}><Wallet /></span>
+        <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><Wallet /></span>
         <div>
           <div className="kpi-valor">{diarias}</div>
           <div className="kpi-label-sob">Total de diárias</div>
         </div>
       </div>
       <div className="kpi-card kpi-card-horizontal">
-        <span className="kpi-icone" style={{ background: 'var(--success-bg)', color: 'var(--success-fg)' }}><ListChecks /></span>
+        <span className="kpi-icone" style={{ background: 'var(--roxo-bg)', color: 'var(--roxo)' }}><ListChecks /></span>
         <div>
           <div className="kpi-valor">{escalas}</div>
           <div className="kpi-label-sob">Escalas lançadas</div>

@@ -24,7 +24,7 @@ export function EscalasList({ escalas, onRemover }: EscalasListProps) {
             <h5>{item.militar_nome} ({item.militar_id})</h5>
             <p>
               <strong>Aparições:</strong> {item.qtd_aparicoes} | <strong>Total de Diárias:</strong>{' '}
-              <span style={{ color: 'var(--warning-fg)', fontWeight: 700 }}>{item.total_diarias} un.</span>
+              <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{item.total_diarias} un.</span>
             </p>
           </div>
           <button

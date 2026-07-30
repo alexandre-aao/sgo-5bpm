@@ -58,7 +58,7 @@ export function OperacoesRecentes({ operacoes, escalas }: OperacoesRecentesProps
                         {op.situacao || 'Planejada'}
                       </span>
                     </td>
-                    <td className="text-center" data-label="Diárias" style={{ color: 'var(--warning-fg)', fontWeight: 700 }}>
+                    <td className="text-center" data-label="Diárias" style={{ color: 'var(--text-main)', fontWeight: 700 }}>
                       {diarias}
                       {!temEscala && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.72rem' }}> (est.)</span>}
                     </td>

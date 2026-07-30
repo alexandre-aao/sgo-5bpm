@@ -35,7 +35,8 @@ export function EventosKpis({ eventosFiltrados, todosEventos }: EventosKpisProps
         </div>
       </div>
       <div className="kpi-card kpi-card-horizontal">
-        <span className="kpi-icone" style={{ background: 'var(--success-bg)', color: 'var(--success-fg)' }}><CalendarClock /></span>
+        {/* Contagem simples — verde fica reservado aos dois KPIs de pendência ao lado */}
+        <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><CalendarClock /></span>
         <div>
           <div className="kpi-valor">{proximos}</div>
           <div className="kpi-label-sob">Próximos 7 dias</div>

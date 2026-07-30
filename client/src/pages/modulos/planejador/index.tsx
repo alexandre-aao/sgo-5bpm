@@ -129,8 +129,9 @@ export default function PlanejadorPage() {
 
         <div className="kpi-card">
           <div className="kpi-topo">
-            <span className="kpi-label" style={{ color: 'var(--success-fg)' }}>Consumido</span>
-            <span className="kpi-icone" style={{ background: 'var(--success-bg)', color: 'var(--success-fg)' }}>
+            {/* Medida de consumo, não situação — azul institucional. */}
+            <span className="kpi-label" style={{ color: 'var(--primary)' }}>Consumido</span>
+            <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
               <CheckCircle />
             </span>
           </div>
@@ -151,14 +152,16 @@ export default function PlanejadorPage() {
 
         <div className="kpi-card">
           <div className="kpi-topo">
-            <span className="kpi-label" style={{ color: estourou ? 'var(--danger-fg)' : 'var(--warning-fg)' }}>
+            {/* Único KPI de situação da tela: cota estourada (vermelho) x saldo
+                positivo (verde). O amarelo do estado normal era decorativo. */}
+            <span className="kpi-label" style={{ color: estourou ? 'var(--danger-fg)' : 'var(--success-fg)' }}>
               Disponível
             </span>
             <span
               className="kpi-icone"
               style={{
-                background: estourou ? 'var(--danger-bg)' : 'var(--warning-bg)',
-                color: estourou ? 'var(--danger-fg)' : 'var(--warning-fg)',
+                background: estourou ? 'var(--danger-bg)' : 'var(--success-bg)',
+                color: estourou ? 'var(--danger-fg)' : 'var(--success-fg)',
               }}
             >
               <PiggyBank />

@@ -5,7 +5,12 @@ interface DiariasPorTipoProps {
   operacoes: OperacaoDoMes[];
 }
 
-const CORES = ['var(--primary)', 'var(--warning-fg)', 'var(--info-fg)', 'var(--roxo)', 'var(--success)', 'var(--badge-neutro)'];
+// Série categórica (tipo de operação) — família azul/roxo, sem verde/amarelo:
+// aqui a cor distingue categorias, não sinaliza situação.
+const CORES = [
+  'var(--primary)', 'var(--info-fg)', 'var(--roxo)',
+  'var(--badge-evento-1)', 'var(--badge-evento-4)', 'var(--badge-neutro)',
+];
 
 // Barras "Diárias por Tipo de Operação" do trilho do Planejador — espelha
 // renderDiariasPorTipo() em public/app.js.

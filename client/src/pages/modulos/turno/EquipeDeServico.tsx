@@ -10,7 +10,7 @@ interface EquipeDeServicoProps {
 export function EquipeDeServico({ cartao }: EquipeDeServicoProps) {
   const equipe = [
     { papel: 'Fiscal de Operações', nome: cartao?.fiscal, Icone: ShieldCheck, cor: 'var(--primary)', bg: 'var(--primary-soft)' },
-    { papel: 'Adjunto', nome: cartao?.adjunto, Icone: UserCheck, cor: 'var(--success-fg)', bg: 'var(--success-bg)' },
+    { papel: 'Adjunto', nome: cartao?.adjunto, Icone: UserCheck, cor: 'var(--info-fg)', bg: 'var(--info-bg)' },
     { papel: 'Oficial de Sobreaviso', nome: cartao?.oficial_sobreaviso, Icone: PhoneCall, cor: 'var(--roxo)', bg: 'var(--roxo-bg)' },
   ];
 

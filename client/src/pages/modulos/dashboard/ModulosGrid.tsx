@@ -39,12 +39,12 @@ export function ModulosGrid({ resumo, cartaoHoje }: ModulosGridProps) {
           <span className="mod-desc">{descCartao}</span>
         </Link>
         <Link to="/planejador" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--warning-bg)', color: 'var(--warning-fg)' }}><ClipboardList /></span>
+          <span className="mod-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><ClipboardList /></span>
           <span className="mod-nome">Planejador de Diárias</span>
           <span className="mod-desc">{descPlanejador}</span>
         </Link>
         <Link to="/relatorio" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--success-bg)', color: 'var(--success-fg)' }}><FileText /></span>
+          <span className="mod-icone" style={{ background: 'var(--roxo-bg)', color: 'var(--roxo)' }}><FileText /></span>
           <span className="mod-nome">Relatório de Diárias</span>
           <span className="mod-desc">Consolidado por militar</span>
         </Link>

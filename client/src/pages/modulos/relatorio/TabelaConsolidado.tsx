@@ -31,7 +31,7 @@ export function TabelaConsolidado({ lista }: TabelaConsolidadoProps) {
                 <td className="card-title-cell">{item.militar_nome}</td>
                 <td className="text-center" data-label="Qtd. Escalas">{item.escalas_count}</td>
                 <td className="text-center" data-label="Total Aparições">{item.qtd_aparicoes}</td>
-                <td className="text-right" data-label="Total Diárias" style={{ color: 'var(--warning-fg)', fontWeight: 700 }}>
+                <td className="text-right" data-label="Total Diárias" style={{ color: 'var(--text-main)', fontWeight: 700 }}>
                   {item.total_diarias}
                 </td>
               </tr>

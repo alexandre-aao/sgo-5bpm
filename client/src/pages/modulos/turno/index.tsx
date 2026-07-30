@@ -101,7 +101,7 @@ export default function TurnoPage() {
           </div>
         </div>
         <div className="kpi-card kpi-card-horizontal">
-          <span className="kpi-icone" style={{ background: 'var(--success-bg)', color: 'var(--success-fg)' }}><Users /></span>
+          <span className="kpi-icone" style={{ background: 'var(--roxo-bg)', color: 'var(--roxo)' }}><Users /></span>
           <div>
             <div className="kpi-valor">{totalEfetivo}</div>
             <div className="kpi-label-sob">Efetivo empregado</div>

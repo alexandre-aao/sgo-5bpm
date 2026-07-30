@@ -56,8 +56,10 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
 
       <div className="kpi-card">
         <div className="kpi-topo">
-          <span className="kpi-label" style={{ color: 'var(--success-fg)' }}>Operações (período)</span>
-          <span className="kpi-icone" style={{ background: 'var(--success-bg)', color: 'var(--success-fg)' }}>
+          {/* Contagem de operações não é situação nem prioridade — sai do verde
+              e volta pro azul institucional (Etapa 1, item 3). */}
+          <span className="kpi-label" style={{ color: 'var(--primary)' }}>Operações (período)</span>
+          <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
             <ShieldAlert />
           </span>
         </div>
@@ -75,8 +77,10 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
 
       <div className="kpi-card">
         <div className="kpi-topo">
-          <span className="kpi-label" style={{ color: 'var(--warning-fg)' }}>Diárias Consumidas</span>
-          <span className="kpi-icone" style={{ background: 'var(--warning-bg)', color: 'var(--warning-fg)' }}>
+          {/* O amarelo daqui era decorativo; o estouro de cota continua sinalizado
+              em vermelho no próprio número, logo abaixo. */}
+          <span className="kpi-label" style={{ color: 'var(--primary)' }}>Diárias Consumidas</span>
+          <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
             <Wallet />
           </span>
         </div>

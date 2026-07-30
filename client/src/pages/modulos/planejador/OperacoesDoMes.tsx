@@ -54,7 +54,7 @@ export function OperacoesDoMes({ operacoes, onAbrir }: OperacoesDoMesProps) {
                       <span className="badge-tint badge-tint-alerta">Sem escala</span>
                     )}
                   </td>
-                  <td className="text-right" data-label="Diárias" style={{ color: 'var(--warning-fg)', fontWeight: 700 }}>
+                  <td className="text-right" data-label="Diárias" style={{ color: 'var(--text-main)', fontWeight: 700 }}>
                     {op.total_diarias}
                     {!op.tem_escala && (
                       <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.72rem' }}> (est.)</span>

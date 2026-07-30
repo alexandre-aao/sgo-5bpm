@@ -7,7 +7,7 @@ const CORES_TIPO_EVENTO: Record<string, string> = {
   Show: 'var(--badge-evento-1)',
   Futebol: 'var(--badge-evento-2)',
   Religioso: 'var(--badge-evento-3)',
-  'Ato Público': 'var(--warning)',
+  'Ato Público': 'var(--badge-evento-7)',
   Cultural: 'var(--badge-evento-4)',
   'Evento Junino': 'var(--badge-evento-6)',
   'Missão Avulsa': 'var(--badge-evento-5)',
@@ -59,8 +59,10 @@ function DonutDiariasSvg({ consumido, planejado, cota }: { consumido: number; pl
   const circ = 2 * Math.PI * r;
 
   const fatias = [
-    { valor: consumido, cor: 'var(--success)', rotulo: 'Consumido (escalas reais)' },
-    { valor: planejado, cor: 'var(--primary-solid)', rotulo: 'Planejado (estimado)' },
+    // Consumido/planejado são medida de ocupação, não situação — os dois na
+    // família azul; o alerta de cota estourada continua no KPI, em vermelho.
+    { valor: consumido, cor: 'var(--primary-solid)', rotulo: 'Consumido (escalas reais)' },
+    { valor: planejado, cor: 'var(--info)', rotulo: 'Planejado (estimado)' },
     { valor: disponivel, cor: 'var(--border-color)', rotulo: 'Disponível' },
   ].filter((f) => f.valor > 0);
 

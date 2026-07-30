@@ -48,6 +48,11 @@
   --nav-active-fg: #2563eb;
   --link: #2563eb;
   --link-hover: #1d4ed8;
+  /* Contorno de controle (botão secundário, botão de ícone). --border-color é
+     divisor de superfície e fica em ~1.6:1 no tema escuro — abaixo dos 3:1 que
+     a WCAG 1.4.11 pede para limite de componente. Este vale nos dois temas:
+     3.60:1 no claro (sobre branco) e 4.65:1 no escuro (sobre o painel). */
+  --border-controle: #7c8899;
 
   /* Status — `-fg` é a cor de TEXTO legível sobre o tint `-bg`;
      a var sem sufixo é a cor sólida (badge/botão, texto branco em cima). */
@@ -88,6 +93,7 @@
   --badge-evento-4: #c026d3;
   --badge-evento-5: #db2777;
   --badge-evento-6: #9d174d;
+  --badge-evento-7: #5b21b6;  /* Ato Público — era --warning; amarelo agora é só situação/prioridade */
   --badge-neutro: #64748b;
   --badge-neutro-escuro: #475569;
   --badge-pessoal-1: #2563eb;
@@ -192,6 +198,15 @@ body {
 
 button, input, select, textarea {
   font-family: inherit;
+  color: inherit;
+}
+
+/* Nenhum nome ou link do sistema sai sublinhado (Etapa 1, item 1). O sublinhado
+   do navegador aparecia em todo <Link> que não é .btn — atalhos do Dashboard,
+   cards de módulo, "Ver todos". A distinção de link fica por cor + peso; o
+   estado de foco continua vindo do :focus-visible mais abaixo. */
+a {
+  text-decoration: none;
   color: inherit;
 }
 
@@ -332,6 +347,30 @@ button, input, select, textarea {
   padding-left: 6px;
 }
 
+/* Botão de recolher/expandir o menu (Etapa 1, item 5) */
+.btn-recolher-sidebar {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-recolher-sidebar:hover {
+  background-color: var(--surface-2);
+  color: var(--text-main);
+}
+
+.btn-recolher-sidebar svg { width: 17px; height: 17px; }
+
 .brand-icon {
   background: linear-gradient(135deg, #1e3a8a, var(--primary-solid));
   color: var(--primary-fg);
@@ -403,13 +442,6 @@ button, input, select, textarea {
   margin-top: 1px;
 }
 
-.perfil-online {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--success-fg);
-  flex-shrink: 0;
-}
 
 /* Card "Cota Mensal de Diárias" no rodapé da sidebar (protótipo do redesign) */
 .cota-card {
@@ -544,9 +576,27 @@ button, input, select, textarea {
   color: var(--text-main);
 }
 
+/* Módulo ativo com marcador à esquerda além do fundo — o fundo sozinho é sutil
+   demais no tema claro (Etapa 1, item 5). */
 .nav-btn.active {
   background-color: var(--nav-active-bg);
   color: var(--nav-active-fg);
+  box-shadow: inset 3px 0 0 0 var(--primary);
+}
+
+/* Contador de pendência: só é renderizado quando há pendência de verdade,
+   então não existe estado "zero" aqui. */
+.nav-contador {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background-color: var(--warning-bg);
+  color: var(--warning-fg);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .nav-btn.hidden-role {
@@ -578,52 +628,66 @@ button, input, select, textarea {
   padding-top: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
-.user-display {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background-color: var(--surface-2);
-}
+/* O card de perfil desceu do topo da sidebar pro rodapé (Etapa 1, item 5) */
+.sidebar-footer .perfil-card { margin-bottom: 6px; }
 
-.user-display h4 {
-  font-family: var(--font-title);
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.user-display span {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-}
-
-.btn-logout {
+.btn-sidebar-acao {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.btn-sidebar-acao svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* -------------------------------------------------------------
+   SIDEBAR RECOLHIDA (só ícones) — Etapa 1, item 5.
+   Preferência em localStorage; ver useSidebarRecolhida.ts.
+   ------------------------------------------------------------- */
+.sidebar-recolhida { width: 76px; padding-left: 10px; padding-right: 10px; }
+
+.sidebar-recolhida .brand-text,
+.sidebar-recolhida .nav-section-label,
+.sidebar-recolhida .nav-btn-label,
+.sidebar-recolhida .perfil-info { display: none; }
+
+.sidebar-recolhida .brand {
+  flex-direction: column;
   gap: 8px;
-  padding: 8px;
-  background: none;
-  border: 1px solid var(--danger-border);
-  color: var(--danger-fg);
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition-fast);
+  padding-left: 0;
 }
 
-.btn-logout:hover {
-  background-color: var(--danger-bg);
-  color: var(--danger-fg);
+.sidebar-recolhida .btn-recolher-sidebar { margin-left: 0; }
+
+.sidebar-recolhida .nav-btn,
+.sidebar-recolhida .btn-sidebar-acao,
+.sidebar-recolhida .perfil-card { justify-content: center; }
+
+.sidebar-recolhida .perfil-card { padding: 8px; }
+
+/* Recolhida não cabe número: o contador vira um ponto sobre o ícone */
+.sidebar-recolhida .nav-btn { position: relative; }
+
+.sidebar-recolhida .nav-contador {
+  position: absolute;
+  top: 5px;
+  right: 12px;
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  overflow: hidden;
+  text-indent: -99px;
+  background-color: var(--warning-fg);
 }
 
-.btn-logout i {
-  width: 14px;
-  height: 14px;
-}
+
+
+
+
+
 
 /* Barra de abas inferior: só existe no celular (regras em @media 768px) */
 .bottom-tabs { display: none; }
@@ -869,7 +933,7 @@ button, input, select, textarea {
 
 .btn-icon {
   background: none;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-controle);
   color: var(--text-muted);
   width: 34px;
   height: 34px;
@@ -885,6 +949,165 @@ button, input, select, textarea {
   background-color: var(--surface-2);
   color: var(--text-main);
 }
+
+/* Tamanho do ícone padronizado no CSS (Etapa 1, item 2) — cada tabela definia
+   o seu por style inline, e os botões de paginação nem definiam. */
+.btn-icon svg { width: 16px; height: 16px; }
+.btn-icon.btn-sm { width: 28px; height: 28px; padding: 0; }
+.btn-icon.btn-sm svg { width: 14px; height: 14px; }
+
+/* Valor ausente numa célula ("—", "Sem categoria") */
+.celula-vazia { color: var(--text-muted); }
+
+/* Número em destaque numa célula: peso, não cor (Etapa 1, item 3).
+   Precisa do `td` no seletor: `.styled-table td` já define a cor e ganharia
+   por especificidade. */
+.styled-table td.celula-numero { color: var(--text-main); font-weight: 700; }
+.celula-nota { color: var(--text-muted); font-weight: 400; font-size: 0.72rem; }
+
+/* -------------------------------------------------------------
+   ESTADOS DE CARREGANDO / ERRO / SEM DADOS (Etapa 1, item 7)
+   ------------------------------------------------------------- */
+.estado-carregando {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.estado-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: sgo-spin 0.6s linear infinite;
+}
+
+.estado-erro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--danger-bg);
+}
+
+.estado-erro-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-panel);
+  color: var(--danger-fg);
+  flex-shrink: 0;
+}
+
+.estado-erro-icone svg { width: 16px; height: 16px; }
+
+.estado-erro-texto {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 180px;
+  font-size: 0.79rem;
+  color: var(--text-main);
+}
+
+.estado-erro-texto span { color: var(--text-body); font-size: 0.75rem; }
+
+.estado-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.estado-vazio-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-2);
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.estado-vazio-icone svg { width: 22px; height: 22px; }
+
+.estado-vazio h3 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.estado-vazio p {
+  font-size: 0.79rem;
+  color: var(--text-muted);
+  max-width: 42ch;
+}
+
+.estado-vazio .btn { margin-top: 8px; }
+
+/* -------------------------------------------------------------
+   MENU DE OPÇÕES (Etapa 1, item 2)
+   ------------------------------------------------------------- */
+.menu-opcoes { position: relative; display: inline-flex; }
+
+.menu-opcoes-painel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-panel);
+  box-shadow: var(--shadow-lg);
+}
+
+.menu-opcoes-painel.alinha-esquerda { right: auto; left: 0; }
+
+.menu-opcoes-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-family: inherit;
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: var(--text-body);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-opcoes-item:hover {
+  background-color: var(--surface-2);
+  color: var(--text-main);
+}
+
+.menu-opcoes-item.perigo { color: var(--danger-fg); }
+.menu-opcoes-item.perigo:hover { background-color: var(--danger-bg); }
+
+.menu-opcoes-item svg { width: 15px; height: 15px; flex-shrink: 0; }
 
 /* Indicador de foco para navegação por teclado — só dispara em :focus-visible
    (teclado), não em clique de mouse, então não conflita com os outline:none
@@ -907,23 +1130,30 @@ textarea:focus-visible {
   background-color: var(--primary-hover);
 }
 
+/* Nível 2 — ação secundária: contorno, sem preenchimento. Era fundo sólido
+   (--surface-2), que competia com o botão principal e lia como um terceiro
+   nível. Agora a hierarquia é preenchido > contorno > texto (.btn-ghost). */
 .btn-secondary {
-  background-color: var(--surface-2);
-  border-color: var(--border-color);
+  background-color: transparent;
+  border-color: var(--border-controle);
   color: var(--text-main);
 }
 
 .btn-secondary:hover {
-  background-color: var(--surface-3);
+  background-color: var(--surface-2);
+  border-color: var(--text-body);
 }
 
-.btn-success {
-  background-color: var(--success);
-  color: var(--primary-fg);
+/* Nível 3 — ação discreta: só texto/ícone, sem borda nem fundo em repouso. */
+.btn-ghost {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--text-body);
 }
 
-.btn-success:hover {
-  background-color: var(--success-hover);
+.btn-ghost:hover {
+  background-color: var(--surface-2);
+  color: var(--text-main);
 }
 
 .btn-danger {
@@ -1007,11 +1237,13 @@ body.sgo-sincronizando .topbar::before {
 }
 
 /* Cores de badge por tipo */
-/* Tipos de evento: família magenta/roxo (Ato Público fica na família "alerta" abaixo, de propósito) */
+/* Tipos de evento: família magenta/roxo inteira. Ato Público ficava em amarelo
+   (--warning) para sinalizar risco; saiu na Etapa 1 porque tipo de evento não é
+   situação nem prioridade, e amarelo passou a ser exclusivo dessas duas. */
 .badge.show { background-color: var(--badge-evento-1); color: #fff; }
 .badge.futebol { background-color: var(--badge-evento-2); color: #fff; }
 .badge.religioso { background-color: var(--badge-evento-3); color: #fff; }
-.badge.ato-publico { background-color: var(--warning); color: #000; }
+.badge.ato-publico { background-color: var(--badge-evento-7); color: #fff; }
 .badge.cultural { background-color: var(--badge-evento-4); color: #fff; }
 .badge.evento-junino { background-color: var(--badge-evento-6); color: #fff; }
 .badge.missao-avulsa { background-color: var(--badge-evento-5); color: #fff; }
@@ -1277,7 +1509,7 @@ body.sgo-sincronizando .topbar::before {
   cursor: pointer;
 }
 
-.link-btn:hover { color: var(--link-hover); text-decoration: underline; }
+.link-btn:hover { color: var(--link-hover); }
 
 .panel-header-sub {
   font-size: 0.74rem;
@@ -2281,6 +2513,122 @@ body.sgo-sincronizando .topbar::before {
   overflow-x: auto;
 }
 
+/* -------------------------------------------------------------
+   TABELAS-LISTA: cabeçalho fixo, ordenação, filtros ativos
+   (Etapa 1, item 6). Só as listas navegáveis usam estas classes;
+   as tabelas de leitura (Quadro Resumo, trilhos, PDF) seguem
+   como estavam.
+   ------------------------------------------------------------- */
+
+/* Cabeçalho fixo exige um container que role por conta própria: com
+   overflow-x:auto sozinho o sticky não tem contra o que grudar. */
+.table-responsive.tabela-scroll {
+  overflow: auto;
+  max-height: min(60vh, 620px);
+}
+
+.tabela-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  /* --surface-2 é semitransparente em nenhum tema, mas o th precisa ser opaco
+     para as linhas não aparecerem por baixo ao rolar */
+  background-color: var(--surface-2);
+}
+
+.th-ordenavel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+}
+
+.th-ordenavel:hover { color: var(--text-main); }
+/* --link, não --primary: sobre o fundo do cabeçalho (--surface-2) o #3B82F6 do
+   tema escuro dá 4.04:1 e reprova AA em texto de 11px. */
+.th-ordenavel.ativa { color: var(--link); }
+
+.th-ordenavel svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.th-ordenavel.ativa svg { opacity: 1; }
+
+/* Coluna alinhada à direita (números): o botão acompanha */
+.styled-table th.text-right .th-ordenavel { justify-content: flex-end; }
+.styled-table th.text-center .th-ordenavel { justify-content: center; }
+
+.filtros-ativos {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--divider);
+  background-color: var(--surface-hover);
+}
+
+.filtros-ativos-titulo {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.filtro-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px 3px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-panel);
+  font-size: 0.72rem;
+  color: var(--text-body);
+}
+
+.filtro-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.filtro-chip button:hover {
+  background-color: var(--surface-3);
+  color: var(--text-main);
+}
+
+.filtro-chip svg { width: 11px; height: 11px; }
+
+/* Linha de lista que abre a gaveta ao clique — era style inline em cada tabela */
+.styled-table tr.linha-clicavel { cursor: pointer; }
+
+/* Célula única de "nenhum resultado" dentro da tabela; o estado vazio com
+   orientação de próxima ação fica no componente SemDados, fora da tabela. */
+
+.styled-table code { color: var(--primary); }
+
 .styled-table {
   width: 100%;
   border-collapse: collapse;
@@ -2653,32 +3001,8 @@ body.sgo-sincronizando .topbar::before {
   gap: 16px;
 }
 
-.btn-alterar-senha {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px;
-  background: none;
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
 
-.btn-alterar-senha:hover {
-  background-color: var(--surface-2);
-  color: var(--text-main);
-}
 
-.btn-alterar-senha i {
-  width: 14px;
-  height: 14px;
-}
 
 /* -------------------------------------------------------------
    TOAST NOTIFICATION SYSTEM
@@ -4378,6 +4702,31 @@ body.sgo-sincronizando .topbar::before {
   }
   .sidebar.nav-drawer-open {
     transform: translateX(0);
+  }
+  /* Recolher é recurso de desktop: no celular a sidebar já é um drawer que abre
+     inteiro, e meia-largura só de ícones não ajudaria ninguém. */
+  .sidebar.sidebar-recolhida {
+    width: 280px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .sidebar-recolhida .brand-text,
+  .sidebar-recolhida .nav-section-label,
+  .sidebar-recolhida .nav-btn-label,
+  .sidebar-recolhida .perfil-info { display: revert; }
+  .sidebar-recolhida .brand { flex-direction: row; padding-left: 6px; }
+  .sidebar-recolhida .btn-recolher-sidebar { display: none; }
+  .sidebar-recolhida .nav-btn,
+  .sidebar-recolhida .btn-sidebar-acao { justify-content: flex-start; }
+  .sidebar-recolhida .perfil-card { justify-content: flex-start; padding: 12px; }
+  .sidebar-recolhida .nav-contador {
+    position: static;
+    width: auto;
+    min-width: 20px;
+    height: auto;
+    padding: 1px 6px;
+    text-indent: 0;
+    background-color: var(--warning-bg);
   }
   .nav-drawer-toggle.btn-icon {
     display: inline-flex;
