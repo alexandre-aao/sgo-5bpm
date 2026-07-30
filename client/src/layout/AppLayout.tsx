@@ -27,6 +27,18 @@ export function AppLayout() {
     setDrawerAberto(false);
   }
 
+  // "Tentar de novo" precisa remontar a rota, não só rebuscar o AppDataContext:
+  // as telas com busca própria (Usuários, Cartão, Relatório, Planejador) só
+  // buscam ao montar. Sem o remount, uma busca que falhou continuaria exibindo
+  // o estado vazio — que diria "Nenhum usuário cadastrado" quando o que houve
+  // foi erro de rede. Trocar a `key` do AppRoutes é o jeito de forçar isso.
+  const [tentativa, setTentativa] = useState(0);
+
+  function handleTentarDeNovo() {
+    setTentativa((n) => n + 1);
+    void recarregar();
+  }
+
   return (
     <div className="app-container">
       <div
@@ -50,8 +62,8 @@ export function AppLayout() {
           {/* Estados explícitos (Etapa 1, item 7): o erro é uma faixa acima do
               conteúdo — os dados anteriores continuam válidos e visíveis, só
               possivelmente desatualizados. */}
-          {erro && <ErroAoCarregar mensagem={erro} onTentarDeNovo={() => void recarregar()} />}
-          {carregandoNucleo ? <Carregando mensagem="Carregando dados do batalhão..." /> : <AppRoutes />}
+          {erro && <ErroAoCarregar mensagem={erro} onTentarDeNovo={handleTentarDeNovo} />}
+          {carregandoNucleo ? <Carregando mensagem="Carregando dados do batalhão..." /> : <AppRoutes key={tentativa} />}
         </div>
       </main>
 
