@@ -30,6 +30,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const { usuario } = useAuth();
   const [dados, setDados] = useState<AppData>(DADOS_VAZIOS);
   const [carregandoNucleo, setCarregandoNucleo] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
   const recarregar = useCallback(async () => {
     // operacoes/escalas exigem P3 no server (ver server.js) — nenhuma tela de
@@ -71,11 +72,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         pessoal: usarLista(pessoalResp, atual.pessoal),
         viaturas: usarLista(viaturasResp, atual.viaturas),
       }));
-    } catch (erro) {
+      setErro(null);
+    } catch (falha) {
       // Falha total (ex.: Promise.all rejeitado por erro de rede/parse) — mantém o
-      // estado anterior, só loga. Sem toast ainda (sistema de toast entra num lote
-      // futuro, quando alguma tela realmente precisar dele).
-      console.error('Erro ao buscar dados do servidor:', erro);
+      // estado anterior e agora também expõe o erro pra tela (Etapa 1, item 7):
+      // antes isso só ia pro console e o operador via uma tela vazia sem saber
+      // que os dados podiam estar desatualizados.
+      console.error('Erro ao buscar dados do servidor:', falha);
+      setErro(falha instanceof Error ? falha.message : 'Falha na comunicação com o servidor.');
       setCarregandoNucleo(false);
     }
   }, [usuario]);
@@ -94,7 +98,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useAutoRefresh(recarregar, !!usuario);
 
   return (
-    <AppDataContext.Provider value={{ dados, carregandoNucleo, recarregar }}>
+    <AppDataContext.Provider value={{ dados, carregandoNucleo, erro, recarregar }}>
       {children}
     </AppDataContext.Provider>
   );

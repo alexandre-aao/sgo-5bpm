@@ -2,7 +2,7 @@ import { AlertTriangle, AlertCircle, Route, ClipboardX, Plus, CheckCircle } from
 import { Link } from 'react-router-dom';
 import type { Tables } from '../../../types/supabase';
 import { calcularAlertasCartao, type CartaoDetalhado } from '../../../lib/cartaoConflitos';
-import { calcularAlertasEventosUrgentes } from './alertasEventos';
+import { calcularAlertasEventosUrgentes } from '../../../lib/alertasEventos';
 
 interface AlertaExibicao {
   mensagem: string;

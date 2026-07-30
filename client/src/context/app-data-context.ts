@@ -15,6 +15,9 @@ export interface AppDataContextValue {
   dados: AppData;
   /** true enquanto a 1ª onda (núcleo) ainda não terminou a primeira carga */
   carregandoNucleo: boolean;
+  /** Falha na última busca. O estado anterior é preservado (ver usarLista), então
+   *  isto sinaliza "dados possivelmente desatualizados", não "sem dados". */
+  erro: string | null;
   /** dispara as duas ondas de novo — mesmo papel do fetchData() do app antigo */
   recarregar: () => Promise<void>;
 }
