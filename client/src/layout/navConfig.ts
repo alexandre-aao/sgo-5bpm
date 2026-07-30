@@ -45,43 +45,50 @@ export interface NavSection {
   items: NavItem[];
 }
 
-// Espelha o <nav class="nav-menu"> de public/index.html, na mesma ordem. Cadastro de
-// Viaturas fica aberto a Adjunto/Oficial de propósito (exceção documentada no
-// CLAUDE.md e em applyRolePermissions — não é erro de digitação).
+// Agrupamento em 5 blocos (Etapa 1, item 5). Só entram telas que existem: os
+// destinos "Agenda", "Pendências", "Escalas", "Bairros", "Estatísticas",
+// "Configurações" e "Modelos" pedidos no agrupamento não têm rota própria —
+// Escalas vive na gaveta de Operações, Bairros num painel do Mapa, Modelos nos
+// Templates do Cartão, e Estatísticas nunca foi portada do app vanilla.
+// Os `roles` de cada item são os mesmos de antes — o reagrupamento não mexe em
+// permissão. Cadastro de Viaturas segue aberto a Adjunto/Oficial de propósito
+// (exceção documentada no CLAUDE.md e em applyRolePermissions).
 export const NAV_SECTIONS: NavSection[] = [
   {
-    label: null,
-    items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['P3'] }],
-  },
-  {
-    label: 'Eventos',
+    label: 'Visão geral',
     items: [
-      { id: 'cadastro', label: 'Novo Evento', icon: FilePlus2, roles: ['P3'] },
-      { id: 'eventos', label: 'Listar Eventos', icon: CalendarRange, roles: ['P3', 'Adjunto', 'Oficial'] },
-      { id: 'mapa', label: 'Mapa', icon: Map, roles: ['P3', 'Adjunto', 'Oficial'] },
+      { id: 'dashboard', label: 'Início', icon: LayoutDashboard, roles: ['P3'] },
+      { id: 'turno', label: 'Meu Turno', icon: UserCheck, roles: ['P3', 'Adjunto', 'Oficial'] },
     ],
   },
   {
-    label: 'Patrulhamento',
+    label: 'Planejamento',
     items: [
-      { id: 'turno', label: 'Meu Turno', icon: UserCheck, roles: ['P3', 'Adjunto', 'Oficial'] },
+      { id: 'cadastro', label: 'Novo Evento', icon: FilePlus2, roles: ['P3'] },
+      { id: 'eventos', label: 'Eventos', icon: CalendarRange, roles: ['P3', 'Adjunto', 'Oficial'] },
+      { id: 'operacoes', label: 'Operações', icon: ShieldAlert, roles: ['P3'] },
       { id: 'cartao', label: 'Cartão Programa', icon: Route, roles: ['P3', 'Adjunto', 'Oficial'] },
     ],
   },
   {
-    label: 'Diárias',
+    label: 'Recursos',
     items: [
-      { id: 'operacoes', label: 'Operações', icon: ShieldAlert, roles: ['P3'] },
-      { id: 'planejador', label: 'Planejador Diárias', icon: Wallet, roles: ['P3'] },
-      { id: 'relatorio', label: 'Relatório Diárias', icon: FileText, roles: ['P3'] },
+      { id: 'pessoal', label: 'Pessoal', icon: Contact, roles: ['P3'] },
+      { id: 'viaturas', label: 'Viaturas', icon: Car, roles: ['P3', 'Adjunto', 'Oficial'] },
+    ],
+  },
+  {
+    label: 'Análise',
+    items: [
+      { id: 'mapa', label: 'Mapa', icon: Map, roles: ['P3', 'Adjunto', 'Oficial'] },
+      { id: 'planejador', label: 'Planejador de Diárias', icon: Wallet, roles: ['P3'] },
+      { id: 'relatorio', label: 'Relatório de Diárias', icon: FileText, roles: ['P3'] },
     ],
   },
   {
     label: 'Administração',
     items: [
       { id: 'usuarios', label: 'Usuários', icon: UsersRound, roles: ['P3'] },
-      { id: 'pessoal', label: 'Cadastro de Pessoal', icon: Contact, roles: ['P3'] },
-      { id: 'viaturas', label: 'Cadastro de Viaturas', icon: Car, roles: ['P3', 'Adjunto', 'Oficial'] },
     ],
   },
 ];

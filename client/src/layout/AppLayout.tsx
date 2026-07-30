@@ -4,9 +4,15 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { BottomTabs } from './BottomTabs';
 import { AppRoutes } from '../routes/AppRoutes';
+import { useSidebarRecolhida } from '../hooks/useSidebarRecolhida';
+import { useAppData } from '../context/useAppData';
+import { Carregando } from '../components/estado/Carregando';
+import { ErroAoCarregar } from '../components/estado/ErroAoCarregar';
 
 export function AppLayout() {
   const [drawerAberto, setDrawerAberto] = useState(false);
+  const { recolhida, alternar } = useSidebarRecolhida();
+  const { carregandoNucleo, erro, recarregar } = useAppData();
   const { pathname } = useLocation();
 
   // Fecha o drawer mobile sempre que a rota muda — mesmo papel do fecharNavDrawer()
@@ -27,7 +33,12 @@ export function AppLayout() {
         className={`nav-drawer-overlay${drawerAberto ? ' open' : ''}`}
         onClick={() => setDrawerAberto(false)}
       />
-      <Sidebar drawerAberto={drawerAberto} onNavigate={() => setDrawerAberto(false)} />
+      <Sidebar
+        drawerAberto={drawerAberto}
+        recolhida={recolhida}
+        onAlternarRecolhida={alternar}
+        onNavigate={() => setDrawerAberto(false)}
+      />
 
       <main className="main-content">
         <Topbar onAbrirDrawer={() => setDrawerAberto(true)} />
@@ -36,7 +47,11 @@ export function AppLayout() {
             toggle active/inativo que existia no app antigo (múltiplas seções
             no DOM ao mesmo tempo) não se aplica mais aqui. */}
         <div className="tab-content active">
-          <AppRoutes />
+          {/* Estados explícitos (Etapa 1, item 7): o erro é uma faixa acima do
+              conteúdo — os dados anteriores continuam válidos e visíveis, só
+              possivelmente desatualizados. */}
+          {erro && <ErroAoCarregar mensagem={erro} onTentarDeNovo={() => void recarregar()} />}
+          {carregandoNucleo ? <Carregando mensagem="Carregando dados do batalhão..." /> : <AppRoutes />}
         </div>
       </main>
 
