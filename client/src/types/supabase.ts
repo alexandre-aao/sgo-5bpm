@@ -94,23 +94,82 @@ export type Database = {
         }
         Relationships: []
       }
+      avisos: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string | null
+          bairro_id: string | null
+          categoria: string
+          companhia: string | null
+          criado_em: string
+          criado_por: string | null
+          data_fim: string | null
+          data_inicio: string
+          id: string
+          permanente: boolean
+          prioridade: string
+          texto: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string | null
+          bairro_id?: string | null
+          categoria?: string
+          companhia?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          id: string
+          permanente?: boolean
+          prioridade?: string
+          texto: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string | null
+          bairro_id?: string | null
+          categoria?: string
+          companhia?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          id?: string
+          permanente?: boolean
+          prioridade?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avisos_bairro_id_fkey"
+            columns: ["bairro_id"]
+            isOneToOne: false
+            referencedRelation: "bairros_coordenadas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bairros_coordenadas: {
         Row: {
+          ativo: boolean
           id: string
-          latitude: number
-          longitude: number
+          latitude: number | null
+          longitude: number | null
           nome_bairro: string
         }
         Insert: {
+          ativo?: boolean
           id: string
-          latitude: number
-          longitude: number
+          latitude?: number | null
+          longitude?: number | null
           nome_bairro: string
         }
         Update: {
+          ativo?: boolean
           id?: string
-          latitude?: number
-          longitude?: number
+          latitude?: number | null
+          longitude?: number | null
           nome_bairro?: string
         }
         Relationships: []
@@ -118,11 +177,18 @@ export type Database = {
       cartoes: {
         Row: {
           adjunto: string | null
+          adjunto_exibicao: string | null
+          adjunto_pessoal_id: string | null
+          ano: number | null
           data: string | null
+          delta07_viatura: string | null
           fiscal: string | null
+          fiscal_exibicao: string | null
+          fiscal_pessoal_id: string | null
           id: string
           is_template: boolean
           nome_template: string | null
+          numero: number | null
           oficial_sobreaviso: string | null
           origem_template_id: string | null
           qtd_viaturas_base: number | null
@@ -131,11 +197,18 @@ export type Database = {
         }
         Insert: {
           adjunto?: string | null
+          adjunto_exibicao?: string | null
+          adjunto_pessoal_id?: string | null
+          ano?: number | null
           data?: string | null
+          delta07_viatura?: string | null
           fiscal?: string | null
+          fiscal_exibicao?: string | null
+          fiscal_pessoal_id?: string | null
           id: string
           is_template?: boolean
           nome_template?: string | null
+          numero?: number | null
           oficial_sobreaviso?: string | null
           origem_template_id?: string | null
           qtd_viaturas_base?: number | null
@@ -144,11 +217,18 @@ export type Database = {
         }
         Update: {
           adjunto?: string | null
+          adjunto_exibicao?: string | null
+          adjunto_pessoal_id?: string | null
+          ano?: number | null
           data?: string | null
+          delta07_viatura?: string | null
           fiscal?: string | null
+          fiscal_exibicao?: string | null
+          fiscal_pessoal_id?: string | null
           id?: string
           is_template?: boolean
           nome_template?: string | null
+          numero?: number | null
           oficial_sobreaviso?: string | null
           origem_template_id?: string | null
           qtd_viaturas_base?: number | null
@@ -177,6 +257,21 @@ export type Database = {
         Update: {
           cota_mensal_diarias?: number
           id?: number
+        }
+        Relationships: []
+      }
+      contador_cartoes: {
+        Row: {
+          ano: number
+          ultimo: number
+        }
+        Insert: {
+          ano: number
+          ultimo?: number
+        }
+        Update: {
+          ano?: number
+          ultimo?: number
         }
         Relationships: []
       }
@@ -480,7 +575,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      proximo_numero_cartao: { Args: { p_ano: number }; Returns: number }
     }
     Enums: {
       [_ in never]: never

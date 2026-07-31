@@ -1,13 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { Car, X, Check } from 'lucide-react';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
-import { CATEGORIAS_VIATURA, COMPANHIAS } from '../../../lib/categoriasViatura';
+import type { Tables } from '../../../types/supabase';
+import { CATEGORIAS_VIATURA } from '../../../lib/categoriasViatura';
 import { useToast } from '../../../context/useToast';
+import { SeletorCompanhia } from './SeletorCompanhia';
+import { PainelAvisosViatura } from './PainelAvisosViatura';
 import type { ViaturaPayload } from './useViaturasCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
 
 interface ModalEditarViaturaProps {
   viatura: CartaoViatura;
+  bairros: Tables<'bairros_coordenadas'>[];
+  avisos: Tables<'avisos'>[];
   onFechar: () => void;
   onSalvar: (vtrId: string, payload: ViaturaPayload) => Promise<ResultadoAcao>;
 }
@@ -16,7 +21,7 @@ interface ModalEditarViaturaProps {
 // (index.tsx) só monta este componente quando há uma viatura em edição e o
 // desmonta ao fechar — cada abertura já é uma instância nova, então o estado
 // inicial (lazy) é suficiente; não precisa de useEffect pra resincronizar.
-export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarViaturaProps) {
+export function ModalEditarViatura({ viatura, bairros, avisos, onFechar, onSalvar }: ModalEditarViaturaProps) {
   const { toast } = useToast();
   const [form, setForm] = useState<ViaturaPayload>(() => ({
     prefixo: viatura.prefixo || '',
@@ -25,6 +30,10 @@ export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarV
     categoria: viatura.categoria || 'Ordinária',
     comandante: viatura.comandante || '',
     observacao: viatura.observacao || '',
+    // Viaturas gravadas antes da migration 001 não têm estes campos.
+    bairro_id: viatura.bairro_id || '',
+    comandante_pessoal_id: viatura.comandante_pessoal_id || '',
+    avisos_ids: viatura.avisos_ids || [],
   }));
   const [enviando, setEnviando] = useState(false);
 
@@ -74,10 +83,10 @@ export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarV
           </div>
           <div className="form-row">
             <div className="form-group col-md-6">
-              <label htmlFor="edit-vtr-companhia">Companhia</label>
-              <select id="edit-vtr-companhia" value={form.companhia} onChange={(e) => setForm({ ...form, companhia: e.target.value })}>
-                <option value="">Não informada</option>
-                {COMPANHIAS.map((c) => <option key={c} value={c}>{c}</option>)}
+              <label htmlFor="edit-vtr-bairro">Bairro (Avisos Operacionais)</label>
+              <select id="edit-vtr-bairro" value={form.bairro_id} onChange={(e) => setForm({ ...form, bairro_id: e.target.value })}>
+                <option value="">Não vinculado</option>
+                {bairros.map((b) => <option key={b.id} value={b.id}>{b.nome_bairro}</option>)}
               </select>
             </div>
             <div className="form-group col-md-6">
@@ -86,6 +95,13 @@ export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarV
                 {CATEGORIAS_VIATURA.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+          </div>
+          <div className="form-row">
+            <SeletorCompanhia
+              id="edit-vtr-companhia"
+              valor={form.companhia}
+              onChange={(companhia) => setForm({ ...form, companhia })}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="edit-vtr-comandante">Comandante da Guarnição</label>
@@ -101,6 +117,14 @@ export function ModalEditarViatura({ viatura, onFechar, onSalvar }: ModalEditarV
               value={form.observacao} onChange={(e) => setForm({ ...form, observacao: e.target.value })}
             />
           </div>
+
+          <PainelAvisosViatura
+            avisos={avisos}
+            bairros={bairros}
+            viatura={{ ...form, itens: viatura.itens }}
+            selecionados={form.avisos_ids}
+            onChange={(avisos_ids) => setForm((atual) => ({ ...atual, avisos_ids }))}
+          />
           <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>

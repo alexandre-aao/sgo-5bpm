@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/useAuth';
 import { useBairros } from '../../../hooks/useBairros';
 import { useCartaoDeHoje } from '../../../hooks/useCartaoDeHoje';
 import { normalizarTexto } from '../../../lib/cartaoConflitos';
+import { temCoordenada } from '../../../lib/bairros';
 import { DrawerEvento } from '../eventos/DrawerEvento';
 import { MapaLeaflet, type MapaLeafletHandle } from './MapaLeaflet';
 import { OcorrenciasPanel } from './OcorrenciasPanel';
@@ -42,14 +43,19 @@ export default function MapaPage() {
 
   const eventosSemana = calcularEventosDaSemana(dados.eventos);
 
+  // "Sem coordenada" cobre os dois casos que impedem plotar: bairro não
+  // cadastrado e bairro cadastrado sem lat/lng.
   const semCoordenada = eventosSemana.filter((evt) => {
     const bairroNorm = normalizarTexto(evt.bairro);
-    return !bairroNorm || !bairros.some((b) => normalizarTexto(b.nome_bairro) === bairroNorm);
+    return !bairroNorm || !bairros.some((b) => temCoordenada(b) && normalizarTexto(b.nome_bairro) === bairroNorm);
   });
   const nomesSemCoordenada = [...new Set(semCoordenada.map((e) => e.bairro || 'Sem bairro informado'))];
 
+  // Sem coordenada não há para onde centralizar (bairro cadastrado só para
+  // Avisos Operacionais) — cai no mesmo caminho de "bairro não cadastrado":
+  // abre a gaveta do evento.
   function handleFocarOcorrencia(coordenada: Tables<'bairros_coordenadas'> | null, eventoId: string) {
-    if (coordenada) {
+    if (coordenada && temCoordenada(coordenada)) {
       mapaRef.current?.focar(coordenada.latitude, coordenada.longitude);
     } else {
       setEventoAbertoId(eventoId);

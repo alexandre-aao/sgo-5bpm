@@ -110,11 +110,17 @@ create table if not exists config (
 insert into config (id, cota_mensal_diarias) values (1, 0)
   on conflict (id) do nothing;
 
+-- Cadastro de bairros do batalhão. É o ÚNICO cadastro de bairro do projeto:
+-- alimenta o select de Bairro em Evento, os marcadores do Mapa, o vínculo da
+-- viatura no Cartão Programa e o escopo dos Avisos Operacionais.
+-- Coordenada é opcional (migration 001): um bairro pode existir só para receber
+-- aviso/vincular viatura, sem estar plotado no Mapa.
 create table if not exists bairros_coordenadas (
   id text primary key,
   nome_bairro text not null unique,
-  latitude double precision not null,
-  longitude double precision not null
+  latitude double precision,
+  longitude double precision,
+  ativo boolean not null default true
 );
 
 create table if not exists pessoal (
@@ -146,6 +152,14 @@ create table if not exists viaturas (
 -- existia no db.json) em vez de tabelas filhas — reduz drasticamente a reescrita
 -- das rotas de sub-recurso (adicionar/editar/excluir viatura e item) sem perder
 -- nada da estrutura ou das regras de negócio já implementadas.
+-- Campos de nível DIA. O que é por VIATURA (bairro_id, comandante_pessoal_id,
+-- comandante_exibicao, versao, status_envio, gerado_em, avisos_ids[]) fica no
+-- JSONB `viaturas`, não aqui — um cartão é um DIA com N viaturas, e status de
+-- envio/versão do PDF são por viatura.
+-- "Delta 07" é o rótulo operacional do Fiscal de Operações: os campos são
+-- fiscal_*, e a coluna `fiscal` (nome em texto) segue existindo por
+-- compatibilidade com os cartões antigos. Os `*_exibicao` congelam
+-- "graduação + nome de guerra" no momento em que o PDF é gerado.
 create table if not exists cartoes (
   id text primary key,
   data date, -- null para templates
@@ -157,8 +171,68 @@ create table if not exists cartoes (
   tipo_periodo text check (tipo_periodo is null or tipo_periodo in ('semana', 'fim_de_semana')),
   qtd_viaturas_base int,
   origem_template_id text references cartoes(id) on delete set null,
-  viaturas jsonb not null default '[]'::jsonb
+  viaturas jsonb not null default '[]'::jsonb,
+  ano smallint,
+  numero integer,
+  fiscal_pessoal_id text,
+  adjunto_pessoal_id text,
+  fiscal_exibicao text,
+  adjunto_exibicao text,
+  delta07_viatura text
 );
+
+-- Numeração 000123/2026: única por ano. Templates (sem data) e cartões
+-- históricos ainda não numerados ficam fora do índice.
+create unique index if not exists idx_cartoes_numero_ano
+  on cartoes (ano, numero)
+  where numero is not null;
+
+-- Avisos Operacionais: a P3 cadastra a orientação de um bairro (ou de uma
+-- Companhia) e ela entra automaticamente no Cartão Programa das viaturas
+-- alocadas naquele bairro. O vínculo cartão x aviso é `avisos_ids[]` no JSONB
+-- da viatura — só ids, o texto nunca é duplicado.
+create table if not exists avisos (
+  id text primary key,
+  bairro_id text references bairros_coordenadas(id) on delete set null,
+  companhia text check (companhia is null or companhia in ('1ª Companhia', '2ª Companhia', '3ª Companhia')),
+  categoria text not null default '', -- texto livre
+  prioridade text not null default 'informativa'
+    check (prioridade in ('informativa', 'atencao', 'alta', 'critica')),
+  texto text not null check (char_length(texto) <= 240),
+  data_inicio date not null default current_date,
+  data_fim date, -- vigência padrão de 30 dias, definida pelo app; null + permanente = sem prazo
+  permanente boolean not null default false,
+  ativo boolean not null default true,
+  criado_por text,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz,
+  constraint aviso_tem_escopo check (bairro_id is not null or companhia is not null)
+);
+create index if not exists idx_avisos_bairro on avisos (bairro_id) where ativo;
+
+-- Sequencial de cartão por ano, com a corrida resolvida no próprio banco
+-- (INSERT ... ON CONFLICT DO UPDATE serializa na linha do ano).
+create table if not exists contador_cartoes (
+  ano smallint primary key,
+  ultimo integer not null default 0
+);
+
+create or replace function proximo_numero_cartao(p_ano smallint)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v integer;
+begin
+  insert into contador_cartoes (ano, ultimo) values (p_ano, 1)
+  on conflict (ano) do update set ultimo = contador_cartoes.ultimo + 1
+  returning ultimo into v;
+  return v;
+end; $$;
+
+revoke execute on function proximo_numero_cartao(smallint) from public;
+revoke execute on function proximo_numero_cartao(smallint) from anon, authenticated;
 
 -- Garante no banco a regra "só um Cartão Programa por data" (templates, com data
 -- null, ficam de fora do índice — vários templates podem coexistir sem data).
@@ -202,3 +276,5 @@ alter table if exists pessoal             enable row level security;
 alter table if exists cartoes             enable row level security;
 alter table if exists operacoes           enable row level security;
 alter table if exists viaturas            enable row level security;
+alter table if exists avisos              enable row level security;
+alter table if exists contador_cartoes    enable row level security;

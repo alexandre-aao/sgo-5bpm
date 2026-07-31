@@ -2167,6 +2167,48 @@ body.sgo-sincronizando .topbar::before {
   box-shadow: var(--shadow-sm);
 }
 
+/* Companhia da viatura em botões lado a lado (Cartão Programa) — mesmo padrão
+   visual do .dia-switch, com alvo de toque confortável no celular. */
+.companhia-switch {
+  display: inline-flex;
+  background-color: var(--surface-3);
+  border-radius: 11px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.companhia-opcao {
+  padding: 9px 16px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.79rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.companhia-opcao.ativo {
+  background-color: var(--bg-panel);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Rótulo de grupo que não é <label> (o alvo são vários botões, não um input) —
+   mesmas regras de .form-group label; o espaçamento vem do gap do .form-group. */
+.form-label-estatico {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* O switch é inline-flex: sem isto ele estica na largura toda da coluna do grid. */
+.form-group > .companhia-switch { align-self: flex-start; }
+
 /* Pílula de status (cartão lançado / pendente) */
 .status-pill {
   display: inline-flex;
@@ -4382,6 +4424,231 @@ body.sgo-sincronizando .topbar::before {
 .rel-pdf-rodape { padding: 8px 18px; font-size: 9px; color: #555; border-top: 1px solid #e2e8f0; }
 
 @page relatorioPdfLandscape { size: A4 landscape; margin: 10mm; }
+
+/* -------------------------------------------------------------
+   CARTÃO PROGRAMA EM PDF (por viatura)
+
+   Documento próprio, com design DIFERENTE dos outros relatórios PDF
+   (.rel-pdf-*, estilo SGEPM em A4 paisagem) — pedido explícito do usuário: o
+   cartão não é impresso, é mandado por WhatsApp e lido na tela do celular em
+   serviço. Não propagar mudança daqui para os relatórios de Eventos/Diário/
+   Consolidado, nem o contrário.
+
+   Cores cruas aqui são intencionais, mesma exceção já aberta para .rel-pdf-*:
+   é papel/PDF, preto sobre branco nos dois temas do app, com UMA cor
+   institucional (o marinho #002145) no número do cartão e na barra do aviso.
+   ------------------------------------------------------------- */
+@page cartaoCelular { size: 100mm 180mm; margin: 8mm; }
+@page cartaoA4 { size: A4 portrait; margin: 15mm; }
+
+.cp-pdf {
+  background: #fff;
+  color: #000;
+  /* Família única, dois pesos (600/700). Sem itálico, sem emoji. */
+  font-family: var(--font-body);
+  line-height: 1.25;
+  /* Em pt de propósito: o alvo é a página física de 100mm, não o viewport. */
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+/* Na página estreita o conteúdo ocupa tudo; em A4 fica numa coluna legível em
+   vez de esticar a linha por 180mm. */
+.cp-pdf--celular { page: cartaoCelular; width: 84mm; }
+.cp-pdf--a4 { page: cartaoA4; width: 120mm; }
+
+.cp-topo { padding-bottom: 3mm; }
+.cp-orgao { font-size: 8.5pt; font-weight: 700; letter-spacing: .02em; }
+.cp-numero { font-size: 12pt; font-weight: 700; color: #002145; margin-top: 1mm; }
+
+/* Régua dupla logo abaixo do topo institucional; simples entre os demais blocos. */
+.cp-regua-dupla { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 2px; }
+.cp-regua { border-top: 1px solid #b8bfc9; margin: 3mm 0; }
+
+.cp-bloco { break-inside: avoid; }
+
+/* Rótulo em caixa alta pequena e cinza; valor em negrito. Grid de duas colunas
+   mantém os valores alinhados sem depender de tabela. */
+.cp-linha { display: grid; grid-template-columns: 26mm 1fr; gap: 2mm; margin-bottom: 1.6mm; }
+.cp-rotulo { font-size: 7.5pt; font-weight: 600; letter-spacing: .06em; color: #555; padding-top: .6mm; }
+.cp-valor { font-size: 11pt; font-weight: 700; }
+
+.cp-secao { font-size: 8pt; font-weight: 700; letter-spacing: .08em; color: #555; margin-bottom: 2mm; }
+
+/* Roteiro em três colunas: horário · sigla · local. */
+.cp-roteiro { width: 100%; border-collapse: collapse; }
+.cp-roteiro td { padding: .9mm 0; vertical-align: top; font-size: 10pt; font-weight: 700; }
+.cp-hora { white-space: nowrap; padding-right: 2mm !important; }
+.cp-sigla { width: 12mm; color: #002145; }
+.cp-local { font-weight: 600; }
+
+.cp-avisos-grupo + .cp-avisos-grupo { margin-top: 3mm; }
+/* Barra lateral na cor institucional — o único outro uso de cor no documento. */
+.cp-aviso { border-left: 2px solid #002145; padding-left: 2.5mm; margin-bottom: 2.5mm; break-inside: avoid; }
+.cp-aviso-cabecalho { font-size: 8pt; font-weight: 700; letter-spacing: .04em; }
+.cp-aviso-texto { font-size: 10pt; font-weight: 600; margin-top: .8mm; }
+
+.cp-rodape { font-size: 7pt; font-weight: 600; color: #555; display: flex; flex-direction: column; gap: .8mm; }
+
+/* -------------------------------------------------------------
+   AVISOS OPERACIONAIS
+   Badges de prioridade fogem do slug automático de propósito: "atencao" e
+   "critica" são chaves do banco (sem acento), e a escala de gravidade precisa
+   de cores fixas e previsíveis, não geradas por nome.
+   ------------------------------------------------------------- */
+.badge.prio-critica { background-color: var(--danger-bg); color: var(--danger-fg); }
+.badge.prio-alta { background-color: var(--warning-bg); color: var(--warning-fg); }
+.badge.prio-atencao { background-color: var(--info-bg); color: var(--info-fg); }
+.badge.prio-informativa { background-color: var(--surface-3); color: var(--text-muted); }
+
+/* Checkbox com rótulo ao lado — mesmas regras do .mapa-toggle, com nome
+   genérico porque agora é usado fora do Mapa. */
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-main);
+  cursor: pointer;
+}
+.checkbox-inline input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+/* Status de envio do cartão por viatura. "Alterado" usa o tom de aviso porque é
+   uma pendência de ação (reenviar), não um erro. */
+.badge.envio-pendente { background-color: var(--surface-3); color: var(--text-muted); }
+.badge.envio-gerado { background-color: var(--info-bg); color: var(--info-fg); }
+.badge.envio-enviado { background-color: var(--success-bg); color: var(--success-fg); }
+.badge.envio-alterado { background-color: var(--warning-bg); color: var(--warning-fg); }
+.vtr-versao { margin-left: 6px; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
+
+.aviso-contador { font-size: 0.72rem; color: var(--text-muted); }
+.aviso-contador.no-limite { color: var(--warning-fg); font-weight: 600; }
+.aviso-texto-celula { max-width: 420px; }
+.linha-inativa { opacity: .55; }
+
+.avisos-vencendo { display: flex; flex-direction: column; }
+.aviso-vencendo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+.aviso-vencendo-item > div:first-child { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.aviso-vigencia { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Painel de seleção de avisos dentro do Cartão Programa */
+.avisos-cartao-lista { display: flex; flex-direction: column; gap: 8px; }
+.aviso-selecionavel {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-2);
+}
+.aviso-selecionavel.marcado { border-color: var(--primary); background-color: var(--primary-soft); }
+.aviso-selecionavel input { margin-top: 3px; }
+.aviso-selecionavel-corpo { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.aviso-selecionavel-cabecalho { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aviso-selecionavel-texto { font-size: 0.84rem; }
+.aviso-teto-atingido { font-size: 0.76rem; color: var(--warning-fg); font-weight: 600; }
+
+.cp-pdf-opcoes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.cp-pdf-dica { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 10px; }
+
+/* Painel de opções de geração (Conteúdo · Recorte · Avisos · Layout) */
+.cp-geracao-eixos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.cp-geracao-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.cp-geracao-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-2);
+}
+.cp-geracao-identificacao { display: flex; flex-direction: column; gap: 2px; }
+.cp-geracao-identificacao span { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Uma viatura por página no recorte Companhia/Geral. */
+.cp-pagina-quebra { break-after: page; }
+
+/* O documento só existe para a impressora — na tela o operador vê a lista. */
+.cp-pdf-palco-impressao { display: none; }
+
+/* Prévia em tela: o documento aparece como uma folha sobre o fundo do modal. */
+.cp-pdf-palco {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  background: var(--surface-3);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+}
+.cp-pdf-palco .cp-pdf {
+  padding: 8mm;
+  box-shadow: var(--shadow-md);
+}
+
+@media print {
+  /* Só a folha do cartão vai para a impressora. */
+  body:has(#modal-cartao-pdf) .app-container,
+  body:has(#modal-cartao-pdf) .toast-container { display: none !important; }
+
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf {
+    position: static;
+    display: block;
+    background: none;
+    padding: 0;
+  }
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .modal-box {
+    box-shadow: none;
+    border: none;
+    max-width: none;
+    width: auto;
+    padding: 0;
+    background: #fff;
+  }
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .modal-header,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .form-actions,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pdf-opcoes,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-geracao-eixos,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-geracao-lista,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pdf-dica { display: none !important; }
+
+  body:has(#modal-cartao-pdf) .cp-pdf-palco,
+  body:has(#modal-cartao-pdf) .cp-pdf-palco-impressao {
+    display: block;
+    padding: 0;
+    background: none;
+    overflow: visible;
+  }
+  body:has(#modal-cartao-pdf) .cp-pdf-palco .cp-pdf {
+    padding: 0;
+    box-shadow: none;
+    width: auto;
+  }
+  /* O marinho do número e a barra do aviso precisam sair coloridos. */
+  .cp-pdf, .cp-pdf * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
 
 /* -------------------------------------------------------------
    IMPRESSÃO DO CARTÃO PROGRAMA

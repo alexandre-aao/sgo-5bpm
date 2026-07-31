@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
@@ -7,6 +7,7 @@ import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import type { Tables } from '../../../types/supabase';
 import { normalizarTexto, type CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { esc } from '../../../lib/esc';
+import { bairrosPlotaveis, type BairroComCoordenada } from '../../../lib/bairros';
 import type { MapaPrefs } from './useMapaPrefs';
 import { criarIconeViatura, itemAtivoAgora } from './viaturasNoMapa';
 
@@ -38,9 +39,14 @@ interface MapaLeafletProps {
 // public/app.js, dividido em efeitos por responsabilidade (tile, marcadores de
 // evento, marcadores de viatura) em vez de uma função só que refaz tudo.
 export const MapaLeaflet = forwardRef<MapaLeafletHandle, MapaLeafletProps>(function MapaLeaflet(
-  { bairros, eventosSemana, alocacoes, viaturasCadastro, cartaoHoje, prefs },
+  { bairros: bairrosProp, eventosSemana, alocacoes, viaturasCadastro, cartaoHoje, prefs },
   ref,
 ) {
+  // Desde a migration 001 a coordenada do bairro é opcional (bairro pode existir
+  // só para Avisos Operacionais). Só entra no mapa quem tem lat/lng — o type
+  // guard também estreita o tipo, então os L.marker abaixo recebem number.
+  const bairros = useMemo(() => bairrosPlotaveis(bairrosProp), [bairrosProp]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -114,7 +120,7 @@ export const MapaLeaflet = forwardRef<MapaLeafletHandle, MapaLeafletProps>(funct
     markersEventosRef.current = [];
     if (!prefs.mostrarEventos) return;
 
-    const gruposPorCoordenada = new Map<string, { coordenada: Tables<'bairros_coordenadas'>; eventos: Tables<'eventos'>[] }>();
+    const gruposPorCoordenada = new Map<string, { coordenada: BairroComCoordenada; eventos: Tables<'eventos'>[] }>();
     eventosSemana.forEach((evt) => {
       const bairroNorm = normalizarTexto(evt.bairro);
       const coordenada = bairroNorm ? bairros.find((b) => normalizarTexto(b.nome_bairro) === bairroNorm) : undefined;

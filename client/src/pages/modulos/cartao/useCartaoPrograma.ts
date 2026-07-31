@@ -24,6 +24,11 @@ interface CabecalhoPatch {
   adjunto?: string;
   oficial_sobreaviso?: string;
   tipo_periodo?: string;
+  /** Delta 07 = Fiscal de Operações: o id do cadastro é a fonte de verdade que o
+   *  PDF usa para montar "graduação + nome de guerra". */
+  fiscal_pessoal_id?: string;
+  adjunto_pessoal_id?: string;
+  delta07_viatura?: string;
 }
 
 interface UseCartaoPrograma {

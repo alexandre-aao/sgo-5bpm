@@ -19,7 +19,32 @@ export interface CartaoViatura {
   comandante: string;
   observacao: string;
   itens: CartaoItem[];
+  /** Campos da migration 001 (Cartão Programa em PDF + Avisos Operacionais).
+   *  Opcionais de propósito: viaturas gravadas antes dela não os têm, e não há
+   *  migração de boot preenchendo — todo leitor trata a ausência. */
+  bairro_id?: string;
+  comandante_pessoal_id?: string;
+  /** "3º SGT PM SILVA" congelado na geração do PDF: o cartão já enviado não muda
+   *  se o militar for promovido depois. */
+  comandante_exibicao?: string;
+  /** Só os ids dos avisos selecionados — o texto nunca é duplicado aqui. */
+  avisos_ids?: string[];
+  versao?: number;
+  status_envio?: StatusEnvio;
+  gerado_em?: string | null;
+  /** Retrato do conteúdo impresso no momento da geração — o servidor compara
+   *  para decidir se o cartão já enviado ainda vale. */
+  hash_conteudo?: string | null;
 }
+
+export type StatusEnvio = 'pendente' | 'gerado' | 'enviado' | 'alterado';
+
+export const ROTULO_STATUS_ENVIO: Record<StatusEnvio, string> = {
+  pendente: 'Pendente',
+  gerado: 'Gerado',
+  enviado: 'Enviado',
+  alterado: 'Alterado — reenviar',
+};
 
 export type CartaoDetalhado = Tables<'cartoes'> & { viaturas: CartaoViatura[] };
 

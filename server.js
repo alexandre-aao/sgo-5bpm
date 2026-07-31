@@ -332,6 +332,30 @@ function generateId(prefix = 'id') {
   return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+// Fuso do batalhão. America/Fortaleza é UTC-3 FIXO — o Brasil aboliu o horário
+// de verão em 2019 —, então o offset pode ser literal e não precisa de lib de
+// fuso. Importa porque a Vercel roda a função serverless em UTC: sem isso, o
+// prazo das 07h seria calculado 3 horas adiantado.
+const FUSO_BATALHAO = '-03:00';
+
+function proximoDiaISO(dataISO) {
+  const [ano, mes, dia] = String(dataISO).split('-').map(Number);
+  // Date.UTC normaliza virada de mês/ano sozinho (31 + 1 -> dia 1 do mês seguinte).
+  return new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().slice(0, 10);
+}
+
+function formatarDataBr(dataISO) {
+  return dataISO ? String(dataISO).split('-').reverse().join('/') : '';
+}
+
+/** O Adjunto pode excluir o cartão de um dia até as 07h00 do dia seguinte à
+ *  data do serviço (horário do batalhão). Depois disso, só o P3. */
+function dentroDaJanelaExclusaoAdjunto(dataServico, agora = new Date()) {
+  if (!dataServico) return false;
+  const limite = new Date(`${proximoDiaISO(dataServico)}T07:00:00${FUSO_BATALHAO}`);
+  return agora.getTime() <= limite.getTime();
+}
+
 // Normaliza texto para comparação (minúsculas, sem acentos) — usado para evitar bairros duplicados por grafia
 function normalizarTextoServer(texto) {
   return String(texto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -1072,11 +1096,19 @@ app.post('/api/bairros-coordenadas', exigirP3, asyncRoute(async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
+  // Coordenada é OPCIONAL (migration 001): um bairro pode existir só para
+  // receber Aviso Operacional e vincular viatura, sem entrar no Mapa. Mas se
+  // vier uma das duas, as duas precisam vir — meia coordenada não plota nada.
   const { latitude, longitude } = req.body;
-  const lat = parseFloat(latitude);
-  const lon = parseFloat(longitude);
-  if (isNaN(lat) || isNaN(lon)) {
-    return res.status(400).json({ error: 'Latitude e longitude devem ser números válidos.' });
+  const informouAlguma = latitude !== undefined && latitude !== '' || longitude !== undefined && longitude !== '';
+  let lat = null;
+  let lon = null;
+  if (informouAlguma) {
+    lat = parseFloat(latitude);
+    lon = parseFloat(longitude);
+    if (isNaN(lat) || isNaN(lon)) {
+      return res.status(400).json({ error: 'Informe latitude e longitude juntas, ambas numéricas — ou deixe as duas em branco.' });
+    }
   }
   // Checagem de nome duplicado só na tabela bairros_coordenadas (não no banco inteiro).
   const bairros = await readTabela('bairros_coordenadas');
@@ -1096,15 +1128,25 @@ app.put('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res) =>
   if (!bairro) return res.status(404).json({ error: 'Bairro não encontrado.' });
 
   if (req.body.nome_bairro !== undefined) bairro.nome_bairro = String(req.body.nome_bairro).trim();
+  // String vazia limpa a coordenada (bairro deixa de ser plotado no Mapa e passa
+  // a existir só para avisos/vínculo de viatura).
   if (req.body.latitude !== undefined) {
-    const lat = parseFloat(req.body.latitude);
-    if (isNaN(lat)) return res.status(400).json({ error: 'Latitude inválida.' });
-    bairro.latitude = lat;
+    if (req.body.latitude === '' || req.body.latitude === null) {
+      bairro.latitude = null;
+    } else {
+      const lat = parseFloat(req.body.latitude);
+      if (isNaN(lat)) return res.status(400).json({ error: 'Latitude inválida.' });
+      bairro.latitude = lat;
+    }
   }
   if (req.body.longitude !== undefined) {
-    const lon = parseFloat(req.body.longitude);
-    if (isNaN(lon)) return res.status(400).json({ error: 'Longitude inválida.' });
-    bairro.longitude = lon;
+    if (req.body.longitude === '' || req.body.longitude === null) {
+      bairro.longitude = null;
+    } else {
+      const lon = parseFloat(req.body.longitude);
+      if (isNaN(lon)) return res.status(400).json({ error: 'Longitude inválida.' });
+      bairro.longitude = lon;
+    }
   }
 
   await writeRow('bairros_coordenadas', bairro);
@@ -1119,6 +1161,153 @@ app.delete('/api/bairros-coordenadas/:id', exigirP3, asyncRoute(async (req, res)
   await deleteRow('bairros_coordenadas', req.params.id);
   res.json({ message: 'Bairro excluído.' });
 }));
+
+// -------------------------------------------------------------
+// ROTAS DE AVISOS OPERACIONAIS
+//
+// A P3 observa uma situação num bairro (ex.: aumento de roubo de motos) e
+// cadastra o aviso; quando o Adjunto aloca uma viatura naquele bairro, o aviso
+// aparece e pode entrar no Cartão Programa daquela viatura.
+//
+// Permissão: LEITURA para todos os perfis (o Adjunto precisa ver para
+// selecionar; o Oficial, para saber o que foi orientado); ESCRITA só P3.
+// -------------------------------------------------------------
+const PRIORIDADES_AVISO = ['informativa', 'atencao', 'alta', 'critica'];
+const VIGENCIA_PADRAO_DIAS = 30;
+// Teto por cartão: protege o formato de UMA página por viatura, que é o ponto
+// do documento (lido no celular, em serviço).
+const MAX_AVISOS_POR_CARTAO = 4;
+
+function somarDiasISO(dataISO, dias) {
+  const [ano, mes, dia] = String(dataISO).split('-').map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia + dias)).toISOString().slice(0, 10);
+}
+
+function hojeISO() {
+  // Data no fuso do batalhão, não no do servidor (a Vercel roda em UTC): perto
+  // da meia-noite os dois divergem e a vigência do aviso viraria um dia antes.
+  return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** Aviso vigente: ativo, já começou e ainda não venceu. Permanente ignora data_fim. */
+function avisoVigente(aviso, hoje = hojeISO()) {
+  if (!aviso.ativo) return false;
+  if (aviso.data_inicio && aviso.data_inicio > hoje) return false;
+  if (aviso.permanente) return true;
+  if (aviso.data_fim && aviso.data_fim < hoje) return false;
+  return true;
+}
+
+function validarCorpoAviso(body) {
+  const v = validarCampos(body, {
+    texto: { obrigatorio: true, tipo: 'string', max: 240, label: 'Texto do aviso' },
+    categoria: { obrigatorio: false, tipo: 'string', max: 60, padrao: '', label: 'Categoria' },
+    prioridade: { obrigatorio: false, tipo: 'string', valores: PRIORIDADES_AVISO, padrao: 'informativa', label: 'Prioridade' },
+    bairro_id: { obrigatorio: false, tipo: 'string', max: 60, padrao: '', label: 'Bairro' },
+    companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VALIDAS, padrao: '', label: 'Companhia' },
+    data_inicio: { obrigatorio: false, tipo: 'string', max: 10, padrao: '', label: 'Início da vigência' },
+    data_fim: { obrigatorio: false, tipo: 'string', max: 10, padrao: '', label: 'Fim da vigência' }
+  });
+  if (!v.ok) return v;
+
+  // Espelha a constraint aviso_tem_escopo do banco, com mensagem que o operador entende.
+  if (!v.valores.bairro_id && !v.valores.companhia) {
+    return { ok: false, erro: 'O aviso precisa ter ao menos um escopo: bairro, Companhia, ou os dois.' };
+  }
+  return v;
+}
+
+app.get('/api/avisos', asyncRoute(async (req, res) => {
+  let avisos = await readTabela('avisos');
+
+  // ?vigentes=1 é o que o Cartão Programa usa; a aba Avisos lista tudo e filtra na tela.
+  if (req.query.vigentes === '1') avisos = avisos.filter(a => avisoVigente(a));
+  if (req.query.bairro_id) avisos = avisos.filter(a => a.bairro_id === req.query.bairro_id);
+  if (req.query.companhia) avisos = avisos.filter(a => a.companhia === req.query.companhia);
+
+  // Mais crítico primeiro; entre iguais, o mais recente.
+  avisos.sort((a, b) => {
+    const peso = PRIORIDADES_AVISO.indexOf(b.prioridade) - PRIORIDADES_AVISO.indexOf(a.prioridade);
+    if (peso !== 0) return peso;
+    return String(b.criado_em || '').localeCompare(String(a.criado_em || ''));
+  });
+  res.json(avisos);
+}));
+
+app.post('/api/avisos', exigirP3, asyncRoute(async (req, res) => {
+  const v = validarCorpoAviso(req.body);
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
+  const permanente = !!req.body.permanente;
+  const dataInicio = v.valores.data_inicio || hojeISO();
+
+  const novoAviso = {
+    id: generateId('avs'),
+    bairro_id: v.valores.bairro_id || null,
+    companhia: v.valores.companhia || null,
+    categoria: v.valores.categoria,
+    prioridade: v.valores.prioridade,
+    texto: v.valores.texto,
+    data_inicio: dataInicio,
+    // Vigência padrão de 30 dias: a P3 renova ou encerra. Permanente não vence.
+    data_fim: permanente ? null : (v.valores.data_fim || somarDiasISO(dataInicio, VIGENCIA_PADRAO_DIAS)),
+    permanente,
+    ativo: true,
+    criado_por: req.user ? req.user.usuario : null,
+    criado_em: new Date().toISOString(),
+    atualizado_em: null
+  };
+
+  await writeRow('avisos', novoAviso);
+  res.status(201).json(novoAviso);
+}));
+
+app.put('/api/avisos/:id', exigirP3, asyncRoute(async (req, res) => {
+  const aviso = await buscarRow('avisos', req.params.id);
+  if (!aviso) return res.status(404).json({ error: 'Aviso não encontrado.' });
+
+  const v = validarCorpoAviso({ ...aviso, ...req.body });
+  if (!v.ok) return res.status(400).json({ error: v.erro });
+
+  aviso.texto = v.valores.texto;
+  aviso.categoria = v.valores.categoria;
+  aviso.prioridade = v.valores.prioridade;
+  aviso.bairro_id = v.valores.bairro_id || null;
+  aviso.companhia = v.valores.companhia || null;
+  if (req.body.permanente !== undefined) aviso.permanente = !!req.body.permanente;
+  if (req.body.ativo !== undefined) aviso.ativo = !!req.body.ativo;
+  if (v.valores.data_inicio) aviso.data_inicio = v.valores.data_inicio;
+  // Permanente zera a data de fim; senão, respeita o que veio (ou mantém).
+  aviso.data_fim = aviso.permanente ? null : (v.valores.data_fim || aviso.data_fim || null);
+  aviso.atualizado_em = new Date().toISOString();
+
+  await writeRow('avisos', aviso);
+  res.json(aviso);
+}));
+
+/** Renovar: empurra a vigência por mais 30 dias a partir de hoje (ou dos dias
+ *  informados). É a ação que a P3 mais usa na visão "vencendo em 7 dias". */
+app.post('/api/avisos/:id/renovar', exigirP3, asyncRoute(async (req, res) => {
+  const aviso = await buscarRow('avisos', req.params.id);
+  if (!aviso) return res.status(404).json({ error: 'Aviso não encontrado.' });
+
+  const dias = parseInt(req.body.dias, 10) || VIGENCIA_PADRAO_DIAS;
+  aviso.ativo = true;
+  aviso.permanente = false;
+  aviso.data_fim = somarDiasISO(hojeISO(), dias);
+  aviso.atualizado_em = new Date().toISOString();
+
+  await writeRow('avisos', aviso);
+  res.json(aviso);
+}));
+
+app.delete('/api/avisos/:id', exigirP3, asyncRoute(async (req, res) => {
+  const aviso = await buscarRow('avisos', req.params.id);
+  if (!aviso) return res.status(404).json({ error: 'Aviso não encontrado.' });
+  await deleteRow('avisos', req.params.id);
+  res.json({ message: 'Aviso excluído.' });
+}));
+
 
 // -------------------------------------------------------------
 // ROTAS DE CADASTRO DE VIATURAS (ALIMENTA O AUTOCOMPLETE DE PREFIXO NO CARTÃO PROGRAMA —
@@ -1807,6 +1996,81 @@ app.get('/api/estatisticas-cartao', asyncRoute(async (req, res) => {
 // ROTAS DO CARTÃO PROGRAMA (PATRULHAMENTO DIÁRIO POR VIATURA)
 // -------------------------------------------------------------
 
+// Número sequencial do Cartão Programa (000123/2026), atribuído na CRIAÇÃO do
+// cartão — nunca na geração do PDF, pra o número não mudar entre uma versão e
+// outra do mesmo cartão. A corrida é resolvida no banco pela função
+// proximo_numero_cartao (INSERT ... ON CONFLICT DO UPDATE serializa na linha do
+// ano); ver migrations/001_cartao_avisos.sql.
+// Falha na numeração NÃO impede criar o cartão: o operador precisa do roteiro
+// muito mais do que do número, e um cartão sem número é recuperável (o índice
+// único ignora numero null). Só registra no log.
+async function proximoNumeroCartao(dataCartao) {
+  const ano = parseInt(String(dataCartao).slice(0, 4), 10);
+  if (!Number.isFinite(ano)) return { ano: null, numero: null };
+  try {
+    const { data, error } = await supabase.rpc('proximo_numero_cartao', { p_ano: ano });
+    if (error) throw new Error(error.message);
+    return { ano, numero: data };
+  } catch (erro) {
+    console.error(`Falha ao numerar o Cartão Programa de ${dataCartao}:`, erro.message);
+    return { ano, numero: null };
+  }
+}
+
+// Campos de controle de envio/versão que vivem em CADA viatura do JSONB (não no
+// cartão): o PDF é gerado e mandado por viatura, então status, versão e avisos
+// selecionados são por viatura. Ver migrations/001_cartao_avisos.sql.
+function camposEnvioIniciais() {
+  return {
+    avisos_ids: [],
+    comandante_pessoal_id: '',
+    comandante_exibicao: '',
+    bairro_id: '',
+    versao: 1,
+    status_envio: 'pendente',
+    gerado_em: null,
+    // Retrato do conteúdo no momento em que o PDF foi gerado — é a referência
+    // para saber se o que o comandante recebeu ainda vale.
+    hash_conteudo: null
+  };
+}
+
+// Só o que SAI NO DOCUMENTO entra no hash. Mudar `observacao` ou `setor` (que
+// não são impressos) não invalida um cartão já enviado; mudar horário, local,
+// comandante ou o Delta 07 invalida.
+function hashConteudoCartaoViatura(cartao, viatura) {
+  const partes = [
+    cartao.numero, cartao.ano, cartao.data,
+    cartao.fiscal, cartao.fiscal_pessoal_id, cartao.adjunto, cartao.adjunto_pessoal_id,
+    cartao.delta07_viatura,
+    viatura.prefixo, viatura.companhia, viatura.comandante, viatura.comandante_pessoal_id,
+    viatura.bairro_id,
+    (viatura.avisos_ids || []).join('|'),
+    (viatura.itens || []).map(i => `${i.inicio}~${i.fim}~${i.local}~${i.atividade}`).join('|')
+  ];
+  return crypto.createHash('sha1').update(partes.map(p => String(p ?? '')).join('§')).digest('hex');
+}
+
+/**
+ * Reavalia o status de envio das viaturas depois de QUALQUER escrita no cartão.
+ * Uma viatura que já foi gerada ou enviada e cujo conteúdo impresso mudou volta
+ * para "alterado" e sobe de versão — é o gatilho do "_v2" e do reenvio.
+ *
+ * A versão sobe só na TRANSIÇÃO (gerado|enviado -> alterado): sem isso, cada
+ * ajuste seguinte viraria v3, v4, v5 antes mesmo de o cartão ser reenviado.
+ * Muta o objeto `cartao` recebido; quem chama grava com writeRow.
+ */
+function reavaliarStatusEnvio(cartao) {
+  (cartao.viaturas || []).forEach(viatura => {
+    if (viatura.status_envio !== 'gerado' && viatura.status_envio !== 'enviado') return;
+    if (!viatura.hash_conteudo) return;
+    if (hashConteudoCartaoViatura(cartao, viatura) === viatura.hash_conteudo) return;
+
+    viatura.status_envio = 'alterado';
+    viatura.versao = (viatura.versao || 1) + 1;
+  });
+}
+
 // Lista resumida (filtrável por data exata, ou por mês/ano para o histórico) — nunca inclui templates
 app.get('/api/cartoes', asyncRoute(async (req, res) => {
   const cartoes = await buscarCartoesFiltrados({ data: req.query.data, ano: req.query.ano, mes: req.query.mes });
@@ -1906,6 +2170,8 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
     return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
   }
 
+  const { ano, numero } = await proximoNumeroCartao(dataCartao);
+
   const novoCartao = {
     id: generateId('cp'),
     data: dataCartao,
@@ -1917,7 +2183,14 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
     tipo_periodo: ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo) ? req.body.tipo_periodo : null,
     qtd_viaturas_base: null,
     origem_template_id: null,
-    viaturas: []
+    viaturas: [],
+    ano,
+    numero,
+    fiscal_pessoal_id: req.body.fiscal_pessoal_id || '',
+    adjunto_pessoal_id: req.body.adjunto_pessoal_id || '',
+    fiscal_exibicao: '',
+    adjunto_exibicao: '',
+    delta07_viatura: req.body.delta07_viatura || ''
   };
 
   // Copia a estrutura de um cartão de origem: 'ultimo' = mais recente anterior; ou um id específico
@@ -1936,6 +2209,10 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
       novoCartao.fiscal = novoCartao.fiscal || base.fiscal;
       novoCartao.adjunto = novoCartao.adjunto || base.adjunto;
       if (!novoCartao.tipo_periodo) novoCartao.tipo_periodo = base.tipo_periodo || null;
+      // Copia a estrutura (inclusive comandante e bairro), mas o controle de envio
+      // nasce zerado: é um cartão novo, ainda não gerado nem mandado. Os avisos
+      // selecionados também não vêm junto — a vigência pode ter mudado desde a
+      // data de origem, então são recalculados para a data nova.
       novoCartao.viaturas = (base.viaturas || []).map(v => ({
         id: generateId('cpv'),
         prefixo: v.prefixo,
@@ -1944,6 +2221,9 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
         categoria: v.categoria || 'Ordinária',
         comandante: v.comandante,
         observacao: v.observacao || '',
+        ...camposEnvioIniciais(),
+        bairro_id: v.bairro_id || '',
+        comandante_pessoal_id: v.comandante_pessoal_id || '',
         itens: (v.itens || []).map(i => ({
           id: generateId('cpi'),
           inicio: i.inicio,
@@ -1976,6 +2256,8 @@ app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
     return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
   }
 
+  const { ano, numero } = await proximoNumeroCartao(dataCartao);
+
   const novoCartao = {
     id: generateId('cp'),
     data: dataCartao,
@@ -1987,6 +2269,13 @@ app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
     tipo_periodo: template.tipo_periodo,
     qtd_viaturas_base: template.qtd_viaturas_base,
     origem_template_id: template.id,
+    ano,
+    numero,
+    fiscal_pessoal_id: '',
+    adjunto_pessoal_id: '',
+    fiscal_exibicao: '',
+    adjunto_exibicao: '',
+    delta07_viatura: '',
     viaturas: (template.viaturas || []).map(v => ({
       id: generateId('cpv'),
       prefixo: v.prefixo,
@@ -1995,6 +2284,10 @@ app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
       categoria: v.categoria || 'Ordinária',
       comandante: '', // em branco: preenchido pelo Adjunto no dia
       observacao: v.observacao || '',
+      // Bairro é estrutural do template e vem junto; comandante e controle de
+      // envio nascem zerados (camposEnvioIniciais já zera comandante_pessoal_id).
+      ...camposEnvioIniciais(),
+      bairro_id: v.bairro_id || '',
       itens: (v.itens || []).map(i => ({
         id: generateId('cpi'),
         inicio: i.inicio,
@@ -2021,13 +2314,26 @@ app.put('/api/cartoes/:id', asyncRoute(async (req, res) => {
   const v = validarCampos(req.body, {
     fiscal: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Fiscal de Operações' },
     adjunto: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Adjunto' },
-    oficial_sobreaviso: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Oficial de Sobreaviso' }
+    oficial_sobreaviso: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Oficial de Sobreaviso' },
+    // "Delta 07" é o rótulo operacional do Fiscal de Operações — por isso o id
+    // é fiscal_pessoal_id, não delta07_pessoal_id. `delta07_viatura` é a
+    // guarnição (prefixo de VTR) em que o Delta 07 está no dia.
+    fiscal_pessoal_id: { obrigatorio: false, tipo: 'string', max: 60, padrao: '', label: 'Delta 07 (cadastro)' },
+    adjunto_pessoal_id: { obrigatorio: false, tipo: 'string', max: 60, padrao: '', label: 'Adjunto (cadastro)' },
+    delta07_viatura: { obrigatorio: false, tipo: 'string', max: 30, padrao: '', label: 'Guarnição do Delta 07' }
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
   if (req.body.fiscal !== undefined) cartao.fiscal = v.valores.fiscal;
   if (req.body.adjunto !== undefined) cartao.adjunto = v.valores.adjunto;
   if (req.body.oficial_sobreaviso !== undefined) cartao.oficial_sobreaviso = v.valores.oficial_sobreaviso;
+  if (req.body.fiscal_pessoal_id !== undefined) cartao.fiscal_pessoal_id = v.valores.fiscal_pessoal_id;
+  if (req.body.adjunto_pessoal_id !== undefined) cartao.adjunto_pessoal_id = v.valores.adjunto_pessoal_id;
+  if (req.body.delta07_viatura !== undefined) cartao.delta07_viatura = v.valores.delta07_viatura;
+
+  // O cabeçalho sai no documento de TODAS as viaturas: trocar o Delta 07
+  // invalida todos os cartões já enviados daquele dia.
+  reavaliarStatusEnvio(cartao);
 
   // tipo_periodo escolhido manualmente (Dia Útil / Fim de Semana). String vazia limpa (null).
   if (req.body.tipo_periodo !== undefined) {
@@ -2038,9 +2344,31 @@ app.put('/api/cartoes/:id', asyncRoute(async (req, res) => {
   res.json(cartao);
 }));
 
-// Excluir cartão — só o P3 pode excluir, seja template ou o roteiro operacional de um dia
-app.delete('/api/cartoes/:id', exigirP3, asyncRoute(async (req, res) => {
+// Excluir cartão. P3 exclui qualquer um, sem prazo. O Adjunto pode excluir o
+// cartão de UM DIA até as 07h00 do dia seguinte à data do serviço — depois
+// disso o roteiro já foi cumprido e vira registro histórico. Template continua
+// sendo exclusividade do P3 em qualquer horário: não é roteiro de um dia, é
+// estrutura reaproveitada por todos os cartões futuros.
+// Oficial não exclui nada (só tem leitura no Cartão Programa).
+app.delete('/api/cartoes/:id', asyncRoute(async (req, res) => {
   const { data: cartaoAlvo } = await supabase.from('cartoes').select('data, is_template, nome_template').eq('id', req.params.id).maybeSingle();
+  if (!cartaoAlvo) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const ehP3 = req.user && req.user.role === 'P3';
+  if (!ehP3) {
+    if (req.user?.role !== 'Adjunto') {
+      return res.status(403).json({ error: 'Você não tem permissão para excluir o Cartão Programa.' });
+    }
+    if (cartaoAlvo.is_template) {
+      return res.status(403).json({ error: 'Apenas o perfil P3 pode excluir um cartão padrão.' });
+    }
+    if (!dentroDaJanelaExclusaoAdjunto(cartaoAlvo.data)) {
+      return res.status(403).json({
+        error: `O prazo para excluir o Cartão Programa de ${formatarDataBr(cartaoAlvo.data)} terminou às 07h00 de ${formatarDataBr(proximoDiaISO(cartaoAlvo.data))}. Peça ao P3.`
+      });
+    }
+  }
+
   await deleteRow('cartoes', req.params.id);
   const descricaoAlvo = cartaoAlvo && cartaoAlvo.is_template
     ? `Template "${cartaoAlvo.nome_template}" excluído.`
@@ -2060,7 +2388,12 @@ app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
     companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VALIDAS, padrao: '', label: 'Companhia' },
     categoria: { obrigatorio: false, tipo: 'string', valores: CATEGORIAS_VIATURA, padrao: 'Ordinária', label: 'Categoria' },
     comandante: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Comandante' },
-    observacao: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Observação' }
+    observacao: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Observação' },
+    // bairro_id liga a viatura ao cadastro de bairros (é o que traz os Avisos
+    // Operacionais do bairro). `setor` continua existindo em paralelo: é texto
+    // livre, usado pelo Mapa e pelo Quadro Resumo, e nem todo setor é um bairro.
+    bairro_id: { obrigatorio: false, tipo: 'string', max: 60, padrao: '', label: 'Bairro' },
+    comandante_pessoal_id: { obrigatorio: false, tipo: 'string', max: 60, padrao: '', label: 'Comandante (cadastro)' }
   });
   if (!v.ok) return res.status(400).json({ error: v.erro });
 
@@ -2072,6 +2405,14 @@ app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
     categoria: v.valores.categoria,
     comandante: v.valores.comandante,
     observacao: v.valores.observacao,
+    ...camposEnvioIniciais(),
+    bairro_id: v.valores.bairro_id,
+    comandante_pessoal_id: v.valores.comandante_pessoal_id,
+    // O Adjunto já escolhe os avisos no mesmo formulário em que aloca a viatura
+    // no bairro, então eles podem chegar já no POST.
+    avisos_ids: Array.isArray(req.body.avisos_ids)
+      ? req.body.avisos_ids.filter(id => typeof id === 'string' && id).slice(0, MAX_AVISOS_POR_CARTAO)
+      : [],
     itens: []
   };
 
@@ -2096,9 +2437,27 @@ app.put('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
     return res.status(400).json({ error: 'Categoria de viatura inválida.' });
   }
 
-  ['prefixo', 'setor', 'companhia', 'categoria', 'comandante', 'observacao'].forEach(campo => {
+  // Viaturas gravadas antes da migration 001 não têm os campos de bairro/envio.
+  // Não há migração de boot pra preenchê-los: reescrever todos os cartões
+  // custaria banco à toa, e todo leitor (frontend e gerador de PDF) trata a
+  // ausência com `|| ''`. Aqui eles entram naturalmente na primeira edição.
+  ['prefixo', 'setor', 'companhia', 'categoria', 'comandante', 'observacao', 'bairro_id', 'comandante_pessoal_id'].forEach(campo => {
     if (req.body[campo] !== undefined) viatura[campo] = req.body[campo];
   });
+
+  // Avisos selecionados para o cartão desta viatura: só os ids, nunca o texto.
+  // Teto de 4 aplicado também aqui (o cliente já limita, mas a regra protege o
+  // formato de uma página independentemente de quem chamou a API).
+  if (req.body.avisos_ids !== undefined) {
+    if (!Array.isArray(req.body.avisos_ids)) {
+      return res.status(400).json({ error: 'avisos_ids deve ser uma lista de ids de aviso.' });
+    }
+    viatura.avisos_ids = req.body.avisos_ids
+      .filter(id => typeof id === 'string' && id)
+      .slice(0, MAX_AVISOS_POR_CARTAO);
+  }
+
+  reavaliarStatusEnvio(cartao);
 
   await writeRow('cartoes', cartao);
   res.json(viatura);
@@ -2114,6 +2473,30 @@ app.delete('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
   cartao.viaturas = cartao.viaturas.filter(v => v.id !== req.params.vid);
   await writeRow('cartoes', cartao);
   res.json({ message: 'Viatura removida do cartão' });
+}));
+
+// Marcar o cartão de uma viatura como gerado ou enviado. É aqui que o retrato
+// do conteúdo (hash) é tirado: a partir deste ponto, qualquer mudança no que
+// sai no documento devolve a viatura para "alterado" com a versão seguinte.
+// Adjunto pode: é ele quem gera e manda o cartão ao comandante.
+app.put('/api/cartoes/:id/viaturas/:vid/status', asyncRoute(async (req, res) => {
+  const cartao = await buscarCartaoPorId(req.params.id);
+  if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  const viatura = (cartao.viaturas || []).find(v => v.id === req.params.vid);
+  if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
+
+  const status = req.body.status_envio;
+  if (!['gerado', 'enviado'].includes(status)) {
+    return res.status(400).json({ error: "status_envio deve ser 'gerado' ou 'enviado'." });
+  }
+
+  viatura.status_envio = status;
+  viatura.gerado_em = new Date().toISOString();
+  viatura.hash_conteudo = hashConteudoCartaoViatura(cartao, viatura);
+
+  await writeRow('cartoes', cartao);
+  res.json(viatura);
 }));
 
 // Adicionar item de roteiro à viatura
@@ -2143,6 +2526,7 @@ app.post('/api/cartoes/:id/viaturas/:vid/itens', asyncRoute(async (req, res) => 
 
   viatura.itens.push(novoItem);
   viatura.itens = ordenarPorTurno(viatura.itens);
+  reavaliarStatusEnvio(cartao);
   await writeRow('cartoes', cartao);
   res.status(201).json(novoItem);
 }));
@@ -2164,6 +2548,7 @@ app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res)
   });
 
   viatura.itens = ordenarPorTurno(viatura.itens);
+  reavaliarStatusEnvio(cartao);
   await writeRow('cartoes', cartao);
   res.json(item);
 }));
@@ -2178,6 +2563,7 @@ app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, r
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
 
   viatura.itens = viatura.itens.filter(i => i.id !== req.params.iid);
+  reavaliarStatusEnvio(cartao);
   await writeRow('cartoes', cartao);
   res.json({ message: 'Item de roteiro removido' });
 }));
@@ -2194,6 +2580,10 @@ app.get('/api/backup', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
   const { sessoes, ...backup } = db;
   backup.usuarios = (db.usuarios || []).map(usuarioPublico);
+  // `avisos` fica FORA de TABELAS de propósito (senão toda rota agregadora
+  // baixaria a tabela sem usar), então readDB não a traz — aqui é somada
+  // explicitamente, porque é dado de negócio e precisa estar no backup.
+  backup.avisos = await readTabela('avisos');
   res.json(backup);
 }));
 

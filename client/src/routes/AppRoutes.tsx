@@ -19,6 +19,7 @@ const paginas = {
   usuarios: lazy(() => import('../pages/modulos/usuarios')),
   pessoal: lazy(() => import('../pages/modulos/pessoal')),
   viaturas: lazy(() => import('../pages/modulos/viaturas')),
+  avisos: lazy(() => import('../pages/modulos/avisos')),
 } as const;
 
 export function AppRoutes() {

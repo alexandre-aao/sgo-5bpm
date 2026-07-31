@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Tables } from '../../../types/supabase';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { useToast } from '../../../context/useToast';
@@ -6,11 +7,15 @@ import type { ResultadoAcao } from './useCartaoPrograma';
 interface CartaoHeaderProps {
   cartao: CartaoDetalhado;
   pessoal: Tables<'pessoal'>[];
+  viaturasCadastradas: Tables<'viaturas'>[];
   onAtualizar: (patch: {
     fiscal?: string;
     adjunto?: string;
     oficial_sobreaviso?: string;
     tipo_periodo?: string;
+    fiscal_pessoal_id?: string;
+    adjunto_pessoal_id?: string;
+    delta07_viatura?: string;
   }) => Promise<ResultadoAcao>;
 }
 
@@ -27,7 +32,9 @@ function SelectPessoal({
   categoria: string;
   valorAtual: string;
   pessoal: Tables<'pessoal'>[];
-  onChange: (valor: string) => void;
+  /** Devolve o nome (fonte compatível com os cartões antigos) e o id do cadastro,
+   *  que passa a ser a fonte de verdade para o PDF resolver posto + nome de guerra. */
+  onChange: (valor: string, pessoalId: string) => void;
 }) {
   // Espelha popularSelectPessoal(): filtra pessoal pela categoria; se o valor
   // salvo não estiver na lista (texto livre antigo, ou pessoa desativada),
@@ -38,7 +45,15 @@ function SelectPessoal({
   return (
     <div className="form-group">
       <label htmlFor={id}>{label}</label>
-      <select id={id} value={valorAtual} onChange={(e) => onChange(e.target.value)}>
+      <select
+        id={id}
+        value={valorAtual}
+        onChange={(e) => {
+          const nome = e.target.value;
+          const pessoa = pessoasDaCategoria.find((p) => p.nome === nome);
+          onChange(nome, pessoa?.id || '');
+        }}
+      >
         <option value="">Selecione...</option>
         {pessoasDaCategoria.map((p) => (
           <option key={p.id} value={p.nome}>{p.nome} ({p.posto_graduacao})</option>
@@ -52,8 +67,11 @@ function SelectPessoal({
 // Cabeçalho oficial do cartão: Tipo de Cartão + Fiscal/Adjunto/Oficial de
 // Sobreaviso (selects do Cadastro de Pessoal) — espelha exibirCartaoNoEditor() +
 // handleSalvarCabecalhoCartao() em public/app.js.
-export function CartaoHeader({ cartao, pessoal, onAtualizar }: CartaoHeaderProps) {
+export function CartaoHeader({ cartao, pessoal, viaturasCadastradas, onAtualizar }: CartaoHeaderProps) {
   const { toast } = useToast();
+  // Texto livre com sugestão: a guarnição do Delta 07 nem sempre é uma das
+  // viaturas do cartão do dia. Salva no blur, não a cada tecla.
+  const [delta07Viatura, setDelta07Viatura] = useState(cartao.delta07_viatura || '');
 
   async function salvar(patch: Parameters<CartaoHeaderProps['onAtualizar']>[0]) {
     const resultado = await onAtualizar(patch);
@@ -92,7 +110,10 @@ export function CartaoHeader({ cartao, pessoal, onAtualizar }: CartaoHeaderProps
   return (
     <div className="panel cartao-header-panel">
       <div className="cartao-print-title">
-        <h2>CARTÃO PROGRAMA {dataBr} - 5º BPM</h2>
+        <h2>
+          CARTÃO PROGRAMA {cartao.numero ? `Nº ${String(cartao.numero).padStart(6, '0')}/${cartao.ano} ` : ''}
+          {dataBr} - 5º BPM
+        </h2>
         <span>Policiamento Ostensivo Diário</span>
       </div>
       <div className="cartao-header-fields">
@@ -108,21 +129,42 @@ export function CartaoHeader({ cartao, pessoal, onAtualizar }: CartaoHeaderProps
             <option value="fim_de_semana">Fim de Semana</option>
           </select>
         </div>
+        {/* "Delta 07" é o indicativo operacional do Fiscal de Operações — mesmo
+            campo, rótulo que o comandante de viatura reconhece no PDF. O seletor
+            não filtra por posto: o Delta 07 pode ser oficial ou praça. */}
         <SelectPessoal
           id="cartao-fiscal"
-          label="Fiscal de Operações"
+          label="Delta 07 (Fiscal de Operações)"
           categoria="Fiscal de Operações"
           valorAtual={cartao.fiscal || ''}
           pessoal={pessoal}
-          onChange={(valor) => salvar({ fiscal: valor })}
+          onChange={(valor, pessoalId) => salvar({ fiscal: valor, fiscal_pessoal_id: pessoalId })}
         />
+        <div className="form-group">
+          <label htmlFor="cartao-delta07-viatura">Guarnição do Delta 07</label>
+          <input
+            type="text"
+            id="cartao-delta07-viatura"
+            placeholder="Ex: VTR 0987"
+            list="lista-prefixos-delta07"
+            value={delta07Viatura}
+            onChange={(e) => setDelta07Viatura(e.target.value)}
+            onBlur={() => {
+              const valor = delta07Viatura.trim();
+              if (valor !== (cartao.delta07_viatura || '')) void salvar({ delta07_viatura: valor });
+            }}
+          />
+          <datalist id="lista-prefixos-delta07">
+            {viaturasCadastradas.map((v) => <option key={v.id} value={v.prefixo} />)}
+          </datalist>
+        </div>
         <SelectPessoal
           id="cartao-adjunto"
           label="Adjunto"
           categoria="Adjunto"
           valorAtual={cartao.adjunto || ''}
           pessoal={pessoal}
-          onChange={(valor) => salvar({ adjunto: valor })}
+          onChange={(valor, pessoalId) => salvar({ adjunto: valor, adjunto_pessoal_id: pessoalId })}
         />
         <div id="cartao-sobreaviso-grupo">
           <SelectPessoal

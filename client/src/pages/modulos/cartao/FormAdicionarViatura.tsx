@@ -1,20 +1,27 @@
 import { useState, type FormEvent } from 'react';
 import { Car, Plus } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
-import { CATEGORIAS_VIATURA, COMPANHIAS } from '../../../lib/categoriasViatura';
+import { CATEGORIAS_VIATURA } from '../../../lib/categoriasViatura';
 import { useToast } from '../../../context/useToast';
+import { SeletorCompanhia } from './SeletorCompanhia';
+import { PainelAvisosViatura } from './PainelAvisosViatura';
 import type { ViaturaPayload } from './useViaturasCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
 
-const VAZIO: ViaturaPayload = { prefixo: '', setor: '', companhia: '', categoria: 'Ordinária', comandante: '', observacao: '' };
+const VAZIO: ViaturaPayload = {
+  prefixo: '', setor: '', companhia: '', categoria: 'Ordinária', comandante: '',
+  observacao: '', bairro_id: '', comandante_pessoal_id: '', avisos_ids: [],
+};
 
 interface FormAdicionarViaturaProps {
   viaturasCadastradas: Tables<'viaturas'>[];
+  bairros: Tables<'bairros_coordenadas'>[];
+  avisos: Tables<'avisos'>[];
   onAdicionar: (payload: ViaturaPayload) => Promise<ResultadoAcao>;
 }
 
 // Espelha o form #form-cartao-vtr de public/index.html + handleAddCartaoVtr().
-export function FormAdicionarViatura({ viaturasCadastradas, onAdicionar }: FormAdicionarViaturaProps) {
+export function FormAdicionarViatura({ viaturasCadastradas, bairros, avisos, onAdicionar }: FormAdicionarViaturaProps) {
   const { toast } = useToast();
   const [form, setForm] = useState<ViaturaPayload>(VAZIO);
   const [enviando, setEnviando] = useState(false);
@@ -73,10 +80,10 @@ export function FormAdicionarViatura({ viaturasCadastradas, onAdicionar }: FormA
         </div>
         <div className="form-row">
           <div className="form-group col-md-4">
-            <label htmlFor="vtr_companhia">Companhia</label>
-            <select id="vtr_companhia" value={form.companhia} onChange={(e) => setForm({ ...form, companhia: e.target.value })}>
-              <option value="">Não informada</option>
-              {COMPANHIAS.map((c) => <option key={c} value={c}>{c}</option>)}
+            <label htmlFor="vtr_bairro">Bairro (Avisos Operacionais)</label>
+            <select id="vtr_bairro" value={form.bairro_id} onChange={(e) => setForm({ ...form, bairro_id: e.target.value })}>
+              <option value="">Não vinculado</option>
+              {bairros.map((b) => <option key={b.id} value={b.id}>{b.nome_bairro}</option>)}
             </select>
           </div>
           <div className="form-group col-md-4">
@@ -93,6 +100,21 @@ export function FormAdicionarViatura({ viaturasCadastradas, onAdicionar }: FormA
             />
           </div>
         </div>
+        <div className="form-row">
+          <SeletorCompanhia
+            id="vtr_companhia"
+            valor={form.companhia}
+            onChange={(companhia) => setForm({ ...form, companhia })}
+          />
+        </div>
+
+        <PainelAvisosViatura
+          avisos={avisos}
+          bairros={bairros}
+          viatura={form}
+          selecionados={form.avisos_ids}
+          onChange={(avisos_ids) => setForm((atual) => ({ ...atual, avisos_ids }))}
+        />
         <div className="form-row" style={{ justifyContent: 'flex-end' }}>
           <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
             <Plus /> Adicionar Viatura
