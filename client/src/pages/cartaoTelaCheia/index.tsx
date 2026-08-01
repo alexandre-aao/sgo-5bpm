@@ -1,54 +1,53 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import type { CartaoDetalhado } from '../../lib/cartaoConflitos';
 import { janela24h } from '../../lib/janelaCartao';
 import { Carregando } from '../../components/estado/Carregando';
+import { useAuth } from '../../context/useAuth';
 import { useModoCartao } from './useModoCartao';
+import { GradeEdicao } from './GradeEdicao';
+import { BlocosOperacao } from './BlocosOperacao';
 
 /**
  * Cartão Programa em tela cheia — sem sidebar/topbar/bottom-tabs (rota fora de
  * NAV_SECTIONS, ver routes/RotaCartaoTelaCheia.tsx). Resolve o "espremido no
  * layout" trocando o container geral pela largura total da janela.
- *
- * A grade de roteiro (modo Edição/Operação) entra no Lote 8; esta casca só
- * carrega o cartão e monta a barra superior mínima.
  */
 export default function CartaoTelaCheiaPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const { modo, setModo } = useModoCartao();
 
   const [cartao, setCartao] = useState<CartaoDetalhado | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
 
-  useEffect(() => {
+  // Cartão Programa é a única tela que Adjunto edita — Oficial só lê (mesma
+  // regra do editor compacto em pages/modulos/cartao/index.tsx).
+  const podeEditar = usuario?.role === 'P3' || usuario?.role === 'Adjunto';
+
+  const carregar = useCallback(async () => {
     if (!id) return;
-    let cancelado = false;
     setCarregando(true);
     setErro(false);
-
-    apiFetch(`/api/cartoes/${id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Cartão não encontrado');
-        return res.json() as Promise<CartaoDetalhado>;
-      })
-      .then((dados) => {
-        if (!cancelado) setCartao(dados);
-      })
-      .catch(() => {
-        if (!cancelado) setErro(true);
-      })
-      .finally(() => {
-        if (!cancelado) setCarregando(false);
-      });
-
-    return () => {
-      cancelado = true;
-    };
+    try {
+      const res = await apiFetch(`/api/cartoes/${id}`);
+      if (!res.ok) throw new Error('Cartão não encontrado');
+      const dados = (await res.json()) as CartaoDetalhado;
+      setCartao(dados);
+    } catch {
+      setErro(true);
+    } finally {
+      setCarregando(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
 
   return (
     <div className="ctc-shell">
@@ -102,12 +101,10 @@ export default function CartaoTelaCheiaPage() {
               Voltar
             </button>
           </div>
+        ) : modo === 'edicao' ? (
+          <GradeEdicao cartao={cartao} podeEditar={podeEditar} recarregar={carregar} />
         ) : (
-          <div className="ctc-placeholder">
-            <p>
-              Modo <strong>{modo === 'edicao' ? 'Edição' : 'Operação'}</strong> — grade de roteiro entra no próximo lote.
-            </p>
-          </div>
+          <BlocosOperacao cartao={cartao} />
         )}
       </div>
     </div>

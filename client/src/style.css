@@ -4457,8 +4457,7 @@ body.sgo-sincronizando .topbar::before {
   padding: 20px;
 }
 
-.ctc-vazio,
-.ctc-placeholder {
+.ctc-vazio {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4471,6 +4470,149 @@ body.sgo-sincronizando .topbar::before {
 @media (max-width: 768px) {
   .ctc-barra { flex-wrap: wrap; }
   .ctc-barra-fracao { display: none; }
+}
+
+/* Modo Edição: uma seção por viatura, colunas fixas com rolagem horizontal —
+   nunca comprimidas (regra C.4 da especificação). */
+.ctc-grade-secao {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.ctc-grade-titulo {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ctc-grade-scroll {
+  overflow-x: auto;
+}
+
+.ctc-grade {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ctc-grade thead th {
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-panel);
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  z-index: 1;
+}
+
+.ctc-grade td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--divider);
+  vertical-align: top;
+  font-size: 0.82rem;
+}
+
+.ctc-col-horario { min-width: 130px; width: 130px; white-space: nowrap; font-weight: 600; }
+.ctc-col-local { min-width: 280px; }
+.ctc-col-missao { min-width: 200px; }
+.ctc-col-efetivo { min-width: 200px; color: var(--text-muted); }
+.ctc-col-acoes { min-width: 90px; width: 90px; white-space: nowrap; }
+
+.ctc-virada td {
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background-color: var(--surface-2);
+}
+
+.ctc-vazio-linha {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 20px;
+}
+
+.ctc-grade-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* Modo Operação: leitura, tipografia ampliada e alto contraste — sem controle
+   de edição nenhum. */
+.ctc-blocos-secao {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.ctc-blocos-titulo {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.ctc-blocos-comandante {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ctc-blocos-vazio {
+  color: var(--text-muted);
+}
+
+.ctc-blocos-virada {
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background-color: var(--surface-2);
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  margin: 12px 0;
+}
+
+.ctc-bloco-missao {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.ctc-bloco-missao:last-child {
+  border-bottom: none;
+}
+
+.ctc-bloco-horario {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.ctc-bloco-missao-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.ctc-bloco-local {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 /* -------------------------------------------------------------
