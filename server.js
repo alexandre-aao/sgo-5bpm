@@ -2152,11 +2152,9 @@ app.get('/api/cartoes/:id', asyncRoute(async (req, res) => {
   res.json(cartaoOrdenado);
 }));
 
-// Criar cartão de um dia (com opção de copiar as viaturas/roteiros do cartão mais recente),
+// Criar o cartão do dia (sempre a partir do padrão ativo — ver ativar_cartao_padrao),
 // ou criar um TEMPLATE nomeado (is_template=true, exclusivo do P3, sem data)
 app.post('/api/cartoes', asyncRoute(async (req, res) => {
-  const db = await readDB();
-
   if (req.body.is_template) {
     if (!req.user || req.user.role !== 'P3') {
       return res.status(403).json({ error: 'Apenas o perfil P3 tem permissão para criar templates.' });
@@ -2183,9 +2181,9 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
       tipo_periodo,
       qtd_viaturas_base: parseInt(qtd_viaturas_base, 10),
       origem_template_id: null,
-      viaturas: []
+      viaturas: [],
+      padrao_ativo: false
     };
-    db.cartoes.push(novoTemplate);
     await writeRow('cartoes', novoTemplate);
     return res.status(201).json(novoTemplate);
   }
@@ -2194,8 +2192,18 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
   if (!dataCartao) {
     return res.status(400).json({ error: 'A data do Cartão Programa é obrigatória.' });
   }
-  if (db.cartoes.some(c => !c.is_template && c.data === dataCartao)) {
+
+  // SELECT pontual (não readDB) só para checar duplicata da data.
+  const existentes = await buscarCartoesFiltrados({ data: dataCartao });
+  if (existentes.length > 0) {
     return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
+  }
+
+  const padrao = await buscarPadraoAtivo();
+  if (!padrao) {
+    return res.status(409).json({
+      error: 'Nenhum cartão padrão ativo. Peça ao P3 para definir o padrão antes de criar o cartão do dia.'
+    });
   }
 
   const { ano, numero } = await proximoNumeroCartao(dataCartao);
@@ -2208,64 +2216,58 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
     oficial_sobreaviso: req.body.oficial_sobreaviso || '',
     is_template: false,
     nome_template: null,
-    tipo_periodo: ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo) ? req.body.tipo_periodo : null,
-    qtd_viaturas_base: null,
-    origem_template_id: null,
-    viaturas: [],
+    tipo_periodo: ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo)
+      ? req.body.tipo_periodo
+      : (padrao.tipo_periodo || null),
+    qtd_viaturas_base: padrao.qtd_viaturas_base,
+    origem_template_id: padrao.id,
     ano,
     numero,
     fiscal_pessoal_id: req.body.fiscal_pessoal_id || '',
     adjunto_pessoal_id: req.body.adjunto_pessoal_id || '',
     fiscal_exibicao: '',
     adjunto_exibicao: '',
-    delta07_viatura: req.body.delta07_viatura || ''
+    delta07_viatura: req.body.delta07_viatura || '',
+    padrao_ativo: false,
+    // Clone do padrão ativo: comandante e controle de envio nascem zerados (é um
+    // cartão novo, ainda não gerado nem mandado); bairro é estrutural e vem junto.
+    // Os avisos selecionados não vêm — a vigência pode ter mudado desde o padrão
+    // e são recalculados na data nova (camposEnvioIniciais já zera avisos_ids).
+    viaturas: (padrao.viaturas || []).map(v => ({
+      id: generateId('cpv'),
+      prefixo: v.prefixo,
+      setor: v.setor,
+      companhia: v.companhia || '',
+      categoria: v.categoria || 'Ordinária',
+      comandante: '',
+      observacao: v.observacao || '',
+      ...camposEnvioIniciais(),
+      bairro_id: v.bairro_id || '',
+      itens: ordenarPorTurno((v.itens || []).map(i => ({
+        id: generateId('cpi'),
+        inicio: i.inicio,
+        fim: i.fim,
+        local: i.local,
+        atividade: i.atividade
+      })))
+    }))
   };
 
-  // Copia a estrutura de um cartão de origem: 'ultimo' = mais recente anterior; ou um id específico
-  // (o operador escolhe qualquer cartão no modal "Copiar").
-  if (req.body.copiar_de) {
-    let base = null;
-    if (req.body.copiar_de === 'ultimo') {
-      const anteriores = db.cartoes
-        .filter(c => !c.is_template && c.data < dataCartao)
-        .sort((a, b) => b.data.localeCompare(a.data));
-      base = anteriores[0] || null;
-    } else {
-      base = (db.cartoes || []).find(c => c.id === req.body.copiar_de && !c.is_template) || null;
-    }
-    if (base) {
-      novoCartao.fiscal = novoCartao.fiscal || base.fiscal;
-      novoCartao.adjunto = novoCartao.adjunto || base.adjunto;
-      if (!novoCartao.tipo_periodo) novoCartao.tipo_periodo = base.tipo_periodo || null;
-      // Copia a estrutura (inclusive comandante e bairro), mas o controle de envio
-      // nasce zerado: é um cartão novo, ainda não gerado nem mandado. Os avisos
-      // selecionados também não vêm junto — a vigência pode ter mudado desde a
-      // data de origem, então são recalculados para a data nova.
-      novoCartao.viaturas = (base.viaturas || []).map(v => ({
-        id: generateId('cpv'),
-        prefixo: v.prefixo,
-        setor: v.setor,
-        companhia: v.companhia || '',
-        categoria: v.categoria || 'Ordinária',
-        comandante: v.comandante,
-        observacao: v.observacao || '',
-        ...camposEnvioIniciais(),
-        bairro_id: v.bairro_id || '',
-        comandante_pessoal_id: v.comandante_pessoal_id || '',
-        itens: (v.itens || []).map(i => ({
-          id: generateId('cpi'),
-          inicio: i.inicio,
-          fim: i.fim,
-          local: i.local,
-          atividade: i.atividade
-        }))
-      }));
-    }
-  }
-
-  db.cartoes.push(novoCartao);
   await writeRow('cartoes', novoCartao);
   res.status(201).json(novoCartao);
+}));
+
+// Define qual template é o padrão único ativo (fonte de todo cartão do dia novo).
+// A troca é atômica no banco (ativar_cartao_padrao) para nunca haver um instante sem padrão.
+app.put('/api/cartoes/:id/padrao-ativo', exigirP3, asyncRoute(async (req, res) => {
+  const template = await buscarCartaoPorId(req.params.id);
+  if (!template) return res.status(404).json({ error: 'Cartão padrão não encontrado.' });
+  if (!template.is_template) return res.status(400).json({ error: 'Este cartão não é um template.' });
+
+  const { error } = await supabase.rpc('ativar_cartao_padrao', { p_id: req.params.id });
+  if (error) return res.status(500).json({ error: 'Falha ao definir o padrão ativo.' });
+
+  res.json({ ok: true });
 }));
 
 // "Importar e Clonar" um template: gera o cartão do dia a partir do template, com viaturas/roteiros
