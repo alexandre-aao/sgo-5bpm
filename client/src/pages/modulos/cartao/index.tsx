@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, FileDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, FileDown, Maximize2 } from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
@@ -226,6 +227,11 @@ export default function CartaoProgramaPage() {
             <button type="button" className="btn btn-primary btn-sm" onClick={handleCriarCartao}>
               <Plus /> Criar Cartão
             </button>
+            {cartaoEditando && !cartaoEditando.is_template && (
+              <Link to={`/cartao/${cartaoEditando.id}`} className="btn btn-secondary btn-sm">
+                <Maximize2 /> Tela Cheia
+              </Link>
+            )}
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleImprimir}>
               <Printer /> Imprimir
             </button>

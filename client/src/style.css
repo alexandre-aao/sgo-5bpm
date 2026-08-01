@@ -4404,6 +4404,76 @@ body.sgo-sincronizando .topbar::before {
 }
 
 /* -------------------------------------------------------------
+   CARTÃO PROGRAMA — TELA CHEIA (/cartao/:id)
+   Sem sidebar/topbar/bottom-tabs — resolve o layout espremido trocando o
+   container geral pela largura total. Não confundir com #drawer-op (gaveta
+   de detalhe de operação): esta é a rota própria do Cartão Programa.
+   ------------------------------------------------------------- */
+.ctc-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-app);
+}
+
+.ctc-barra {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.ctc-barra-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.ctc-barra-janela {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ctc-barra-fracao {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.ctc-barra-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ctc-conteudo {
+  flex: 1;
+  padding: 20px;
+}
+
+.ctc-vazio,
+.ctc-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .ctc-barra { flex-wrap: wrap; }
+  .ctc-barra-fracao { display: none; }
+}
+
+/* -------------------------------------------------------------
    RELATÓRIOS PDF (estilo SGEPM) — área impressa via window.print()
    ------------------------------------------------------------- */
 .relatorio-pdf-area {
