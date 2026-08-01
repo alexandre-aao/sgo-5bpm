@@ -4,6 +4,7 @@ import type { Tables } from '../../../../types/supabase';
 import type { CartaoDetalhado, CartaoViatura } from '../../../../lib/cartaoConflitos';
 import { CartaoPdf, type LayoutCartaoPdf, type AvisoDoCartao } from './CartaoPdf';
 import { montarDadosCartaoPdf, nomeArquivoCartao } from './cartaoPdfDados';
+import { PortalImpressao } from '../../../../components/PortalImpressao';
 
 interface ModalCartaoPdfProps {
   cartao: CartaoDetalhado;
@@ -34,51 +35,53 @@ export function ModalCartaoPdf({ cartao, viatura, pessoal, bairros, avisos = [],
   }
 
   return (
-    <div id="modal-cartao-pdf" className="modal-overlay">
-      <div className="modal-box modal-box-lg">
-        <div className="modal-header">
-          <h3><FileText /> Cartão da VTR {viatura.prefixo}</h3>
-          <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
-        </div>
+    <PortalImpressao>
+      <div id="modal-cartao-pdf" className="modal-overlay">
+        <div className="modal-box modal-box-lg">
+          <div className="modal-header">
+            <h3><FileText /> Cartão da VTR {viatura.prefixo}</h3>
+            <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
+          </div>
 
-        <div className="cp-pdf-opcoes">
-          <span className="form-label-estatico">Layout</span>
-          <div className="companhia-switch" role="group" aria-label="Layout da página">
-            <button
-              type="button"
-              className={`companhia-opcao${layout === 'celular' ? ' ativo' : ''}`}
-              aria-pressed={layout === 'celular'}
-              onClick={() => setLayout('celular')}
-            >
-              Celular
-            </button>
-            <button
-              type="button"
-              className={`companhia-opcao${layout === 'a4' ? ' ativo' : ''}`}
-              aria-pressed={layout === 'a4'}
-              onClick={() => setLayout('a4')}
-            >
-              A4
+          <div className="cp-pdf-opcoes">
+            <span className="form-label-estatico">Layout</span>
+            <div className="companhia-switch" role="group" aria-label="Layout da página">
+              <button
+                type="button"
+                className={`companhia-opcao${layout === 'celular' ? ' ativo' : ''}`}
+                aria-pressed={layout === 'celular'}
+                onClick={() => setLayout('celular')}
+              >
+                Celular
+              </button>
+              <button
+                type="button"
+                className={`companhia-opcao${layout === 'a4' ? ' ativo' : ''}`}
+                aria-pressed={layout === 'a4'}
+                onClick={() => setLayout('a4')}
+              >
+                A4
+              </button>
+            </div>
+          </div>
+
+          <p className="cp-pdf-dica">
+            Clique em &quot;Imprimir / Salvar PDF&quot; e escolha &quot;Salvar como PDF&quot;. No celular, confira
+            se o destino está em {layout === 'celular' ? '100 × 180 mm' : 'A4'}.
+          </p>
+
+          <div className="cp-pdf-palco">
+            <CartaoPdf dados={dados} layout={layout} avisos={avisos} />
+          </div>
+
+          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+            <button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button>
+            <button type="button" className="btn btn-primary" onClick={handleImprimir}>
+              <Printer /> Imprimir / Salvar PDF
             </button>
           </div>
         </div>
-
-        <p className="cp-pdf-dica">
-          Clique em &quot;Imprimir / Salvar PDF&quot; e escolha &quot;Salvar como PDF&quot;. No celular, confira
-          se o destino está em {layout === 'celular' ? '100 × 180 mm' : 'A4'}.
-        </p>
-
-        <div className="cp-pdf-palco">
-          <CartaoPdf dados={dados} layout={layout} avisos={avisos} />
-        </div>
-
-        <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
-          <button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button>
-          <button type="button" className="btn btn-primary" onClick={handleImprimir}>
-            <Printer /> Imprimir / Salvar PDF
-          </button>
-        </div>
       </div>
-    </div>
+    </PortalImpressao>
   );
 }

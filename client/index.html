@@ -12,6 +12,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Raiz dos modais que vão para a impressora (Cartão em PDF, Relatórios
+         SGEPM). Precisa ser IRMÃ de #root: o gate de impressão desses modais
+         esconde .app-container, e um modal renderizado dentro dele sumiria
+         junto — folha em branco. Ver PortalImpressao.tsx e print.css. -->
+    <div id="sgo-modal-root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

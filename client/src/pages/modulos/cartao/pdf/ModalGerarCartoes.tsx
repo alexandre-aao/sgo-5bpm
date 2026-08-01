@@ -21,6 +21,7 @@ import {
   type RecorteCartao,
 } from './geracaoCartao';
 import type { LayoutCartaoPdf } from './CartaoPdf';
+import { PortalImpressao } from '../../../../components/PortalImpressao';
 
 interface ModalGerarCartoesProps {
   cartao: CartaoDetalhado;
@@ -124,98 +125,100 @@ export function ModalGerarCartoes({
   }
 
   return (
-    <div id="modal-cartao-pdf" className="modal-overlay">
-      <div className="modal-box modal-box-lg">
-        <div className="modal-header">
-          <h3><FileDown /> Gerar Cartões</h3>
-          <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
-        </div>
+    <PortalImpressao>
+      <div id="modal-cartao-pdf" className="modal-overlay">
+        <div className="modal-box modal-box-lg">
+          <div className="modal-header">
+            <h3><FileDown /> Gerar Cartões</h3>
+            <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
+          </div>
 
-        <div className="cp-geracao-eixos">
-          <Eixo<ConteudoCartao>
-            rotulo="Conteúdo"
-            valor={preset.conteudo}
-            opcoes={(['ordinario', 'reforco', 'completo'] as ConteudoCartao[]).map((v) => ({ valor: v, texto: ROTULO_CONTEUDO[v] }))}
-            onChange={(conteudo) => setPreset((atual) => ({ ...atual, conteudo }))}
-          />
-          <Eixo<RecorteCartao>
-            rotulo="Recorte"
-            valor={preset.recorte}
-            opcoes={(['viatura', 'companhia', 'geral'] as RecorteCartao[]).map((v) => ({ valor: v, texto: ROTULO_RECORTE[v] }))}
-            onChange={(recorte) => setPreset((atual) => ({ ...atual, recorte }))}
-          />
-          <Eixo<'com' | 'sem'>
-            rotulo="Alertas"
-            valor={preset.comAvisos ? 'com' : 'sem'}
-            opcoes={[{ valor: 'com', texto: 'Com' }, { valor: 'sem', texto: 'Sem' }]}
-            onChange={(v) => setPreset((atual) => ({ ...atual, comAvisos: v === 'com' }))}
-          />
-          <Eixo<LayoutCartaoPdf>
-            rotulo="Layout"
-            valor={preset.layout}
-            opcoes={[{ valor: 'celular', texto: 'Celular' }, { valor: 'a4', texto: 'A4' }]}
-            onChange={(layout) => setPreset((atual) => ({ ...atual, layout }))}
-          />
-        </div>
-
-        {!preset.comAvisos && (
-          <p className="cp-pdf-dica">
-            Versão sem alertas — é a que serve para arquivo e processo, já que a orientação da P3
-            costuma ser informação sensível.
-          </p>
-        )}
-
-        <div className="cp-geracao-lista">
-          {grupos.length === 0 ? (
-            <p className="cp-pdf-dica">
-              Nenhuma viatura no conteúdo &quot;{ROTULO_CONTEUDO[preset.conteudo]}&quot;.
-              Troque para &quot;Completo&quot; para ver todas as viaturas do dia.
-            </p>
-          ) : (
-            grupos.map((grupo) => (
-              <div key={grupo.id} className="cp-geracao-item">
-                <div className="cp-geracao-identificacao">
-                  <strong>{grupo.titulo}</strong>
-                  <span>{grupo.subtitulo}</span>
-                </div>
-                <div className="acoes-linha">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setGrupoAtivo(grupo)}>
-                    <Printer /> Gerar
-                  </button>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleCompartilhar(grupo)}>
-                    <Share2 /> Compartilhar
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <p className="cp-pdf-dica">
-          <Send style={{ width: 12, height: 12, verticalAlign: '-1px' }} /> &quot;Gerar&quot; abre
-          o diálogo de impressão (escolha &quot;Salvar como PDF&quot;). &quot;Compartilhar&quot; manda
-          o cartão em texto direto pelo celular, ou copia para a área de transferência no computador.
-        </p>
-
-        <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
-          <button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button>
-        </div>
-
-        {/* Área que vai para a impressora: só existe enquanto um grupo está sendo gerado. */}
-        {grupoAtivo && (
-          <div className="cp-pdf-palco cp-pdf-palco-impressao">
-            <DocumentoCartoes
-              cartao={cartao}
-              viaturas={grupoAtivo.viaturas}
-              pessoal={pessoal}
-              bairros={bairros}
-              avisos={avisos}
-              layout={preset.layout}
-              comAvisos={preset.comAvisos}
+          <div className="cp-geracao-eixos">
+            <Eixo<ConteudoCartao>
+              rotulo="Conteúdo"
+              valor={preset.conteudo}
+              opcoes={(['ordinario', 'reforco', 'completo'] as ConteudoCartao[]).map((v) => ({ valor: v, texto: ROTULO_CONTEUDO[v] }))}
+              onChange={(conteudo) => setPreset((atual) => ({ ...atual, conteudo }))}
+            />
+            <Eixo<RecorteCartao>
+              rotulo="Recorte"
+              valor={preset.recorte}
+              opcoes={(['viatura', 'companhia', 'geral'] as RecorteCartao[]).map((v) => ({ valor: v, texto: ROTULO_RECORTE[v] }))}
+              onChange={(recorte) => setPreset((atual) => ({ ...atual, recorte }))}
+            />
+            <Eixo<'com' | 'sem'>
+              rotulo="Alertas"
+              valor={preset.comAvisos ? 'com' : 'sem'}
+              opcoes={[{ valor: 'com', texto: 'Com' }, { valor: 'sem', texto: 'Sem' }]}
+              onChange={(v) => setPreset((atual) => ({ ...atual, comAvisos: v === 'com' }))}
+            />
+            <Eixo<LayoutCartaoPdf>
+              rotulo="Layout"
+              valor={preset.layout}
+              opcoes={[{ valor: 'celular', texto: 'Celular' }, { valor: 'a4', texto: 'A4' }]}
+              onChange={(layout) => setPreset((atual) => ({ ...atual, layout }))}
             />
           </div>
-        )}
+
+          {!preset.comAvisos && (
+            <p className="cp-pdf-dica">
+              Versão sem alertas — é a que serve para arquivo e processo, já que a orientação da P3
+              costuma ser informação sensível.
+            </p>
+          )}
+
+          <div className="cp-geracao-lista">
+            {grupos.length === 0 ? (
+              <p className="cp-pdf-dica">
+                Nenhuma viatura no conteúdo &quot;{ROTULO_CONTEUDO[preset.conteudo]}&quot;.
+                Troque para &quot;Completo&quot; para ver todas as viaturas do dia.
+              </p>
+            ) : (
+              grupos.map((grupo) => (
+                <div key={grupo.id} className="cp-geracao-item">
+                  <div className="cp-geracao-identificacao">
+                    <strong>{grupo.titulo}</strong>
+                    <span>{grupo.subtitulo}</span>
+                  </div>
+                  <div className="acoes-linha">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setGrupoAtivo(grupo)}>
+                      <Printer /> Gerar
+                    </button>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleCompartilhar(grupo)}>
+                      <Share2 /> Compartilhar
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <p className="cp-pdf-dica">
+            <Send style={{ width: 12, height: 12, verticalAlign: '-1px' }} /> &quot;Gerar&quot; abre
+            o diálogo de impressão (escolha &quot;Salvar como PDF&quot;). &quot;Compartilhar&quot; manda
+            o cartão em texto direto pelo celular, ou copia para a área de transferência no computador.
+          </p>
+
+          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+            <button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button>
+          </div>
+
+          {/* Área que vai para a impressora: só existe enquanto um grupo está sendo gerado. */}
+          {grupoAtivo && (
+            <div className="cp-pdf-palco cp-pdf-palco-impressao">
+              <DocumentoCartoes
+                cartao={cartao}
+                viaturas={grupoAtivo.viaturas}
+                pessoal={pessoal}
+                bairros={bairros}
+                avisos={avisos}
+                layout={preset.layout}
+                comAvisos={preset.comAvisos}
+              />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </PortalImpressao>
   );
 }
