@@ -178,7 +178,8 @@ create table if not exists cartoes (
   adjunto_pessoal_id text,
   fiscal_exibicao text,
   adjunto_exibicao text,
-  delta07_viatura text
+  delta07_viatura text,
+  padrao_ativo boolean not null default false
 );
 
 -- Numeração 000123/2026: única por ano. Templates (sem data) e cartões
@@ -186,6 +187,36 @@ create table if not exists cartoes (
 create unique index if not exists idx_cartoes_numero_ano
   on cartoes (ano, numero)
   where numero is not null;
+
+-- Padrão único de Cartão Programa: só um template pode estar com
+-- padrao_ativo=true por vez (ver migrations/002_cartao_padrao_unico.sql).
+-- O CHECK impede que um cartão do dia carregue a flag fora do índice.
+alter table cartoes
+  add constraint cartoes_padrao_so_template check (not padrao_ativo or is_template);
+
+create unique index if not exists ux_cartoes_padrao_unico
+  on cartoes (padrao_ativo)
+  where is_template = true and padrao_ativo = true;
+
+-- Troca o padrão ativo numa transação só, para nunca haver um instante
+-- sem padrão nenhum (índice único não é deferível).
+create or replace function ativar_cartao_padrao(p_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from cartoes where id = p_id and is_template) then
+    raise exception 'Cartão padrão % não encontrado', p_id;
+  end if;
+  update cartoes set padrao_ativo = false
+   where is_template and padrao_ativo and id <> p_id;
+  update cartoes set padrao_ativo = true
+   where id = p_id;
+end; $$;
+revoke execute on function ativar_cartao_padrao(text) from public;
+revoke execute on function ativar_cartao_padrao(text) from anon, authenticated;
 
 -- Avisos Operacionais: a P3 cadastra a orientação de um bairro (ou de uma
 -- Companhia) e ela entra automaticamente no Cartão Programa das viaturas

@@ -290,6 +290,19 @@ async function buscarCartaoPorId(id) {
   return data;
 }
 
+// O padrão ativo é a fonte de todo cartão do dia novo (POST /api/cartoes) — busca pontual
+// em vez de filtrar em JS depois de trazer todos os templates.
+async function buscarPadraoAtivo() {
+  const { data, error } = await supabase
+    .from('cartoes')
+    .select('*')
+    .eq('is_template', true)
+    .eq('padrao_ativo', true)
+    .maybeSingle();
+  if (error) throw new Error(`Falha ao buscar cartão padrão: ${error.message}`);
+  return data;
+}
+
 async function buscarCartoesFiltrados({ data: dataFiltro, ano, mes }) {
   // `data` é coluna `date` no Postgres — LIKE não se aplica (operador de texto), usa faixa
   // (gte/lt) em vez de prefixo. Exceção: filtro só por mês (sem ano, todo histórico) não dá
@@ -2106,8 +2119,23 @@ app.get('/api/cartoes/templates', asyncRoute(async (req, res) => {
     nome_template: c.nome_template,
     tipo_periodo: c.tipo_periodo,
     qtd_viaturas_base: c.qtd_viaturas_base,
-    qtd_viaturas: (c.viaturas || []).length
+    qtd_viaturas: (c.viaturas || []).length,
+    padrao_ativo: !!c.padrao_ativo
   })));
+}));
+
+// Padrão único ativo (fonte de todo cartão do dia novo) — precisa vir antes de
+// /api/cartoes/:id pelo mesmo motivo de /api/cartoes/templates acima.
+app.get('/api/cartoes/padrao-ativo', asyncRoute(async (req, res) => {
+  const padrao = await buscarPadraoAtivo();
+  if (!padrao) return res.json({ padrao: null });
+
+  res.json({
+    padrao: {
+      ...padrao,
+      viaturas: (padrao.viaturas || []).map(v => ({ ...v, itens: ordenarPorTurno(v.itens || []) }))
+    }
+  });
 }));
 
 // Detalhe completo de um cartão (ou template)
