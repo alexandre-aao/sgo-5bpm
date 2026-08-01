@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import type { CartaoDetalhado } from '../../lib/cartaoConflitos';
@@ -84,10 +84,9 @@ export default function CartaoTelaCheiaPage() {
               Operação
             </button>
           </div>
-          {/* Lote 9: troca para link a /impressao?cartao={id}, quando a Central existir. */}
-          <button type="button" className="btn-icon" aria-label="Imprimir" title="Imprimir" onClick={() => window.print()}>
+          <Link to={`/impressao?cartao=${id}`} className="btn-icon" aria-label="Imprimir" title="Imprimir">
             <Printer />
-          </button>
+          </Link>
         </div>
       </header>
 

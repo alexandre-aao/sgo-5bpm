@@ -14,6 +14,7 @@ import {
   Calendar,
   ClipboardList,
   Megaphone,
+  Printer,
   Menu,
   type LucideIcon,
 } from 'lucide-react';
@@ -32,7 +33,8 @@ export type SectionId =
   | 'usuarios'
   | 'pessoal'
   | 'viaturas'
-  | 'avisos';
+  | 'avisos'
+  | 'impressao';
 
 export interface NavItem {
   id: SectionId;
@@ -75,6 +77,9 @@ export const NAV_SECTIONS: NavSection[] = [
       // cartão, e o Oficial para saber o que foi orientado ao turno. Fica só no
       // menu (a barra inferior do celular já tem seus 4 destinos + Mais).
       { id: 'avisos', label: 'Alertas', icon: Megaphone, roles: ['P3', 'Adjunto', 'Oficial'] },
+      // Fora das bottom-tabs de propósito (já tem 4 destinos + Mais) — fica só no
+      // menu/drawer, mesma decisão tomada para Alertas.
+      { id: 'impressao', label: 'Impressão', icon: Printer, roles: ['P3', 'Adjunto', 'Oficial'] },
     ],
   },
   {
@@ -117,6 +122,7 @@ export const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string
   pessoal: { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' },
   viaturas: { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' },
   avisos: { title: 'Alertas', subtitle: 'Orientações da P3 por bairro e Companhia, que entram no Cartão Programa das viaturas.' },
+  impressao: { title: 'Central de Impressão', subtitle: 'Saídas oficiais do Cartão Programa, num lugar só.' },
 };
 
 /** Tela inicial por perfil — regra 7 do MIGRACAO.md. */

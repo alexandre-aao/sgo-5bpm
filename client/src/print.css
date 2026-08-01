@@ -1,0 +1,181 @@
+/* ============================================================
+   SGO — print.css
+   Regras @page e @media print extraídas de style.css (Lote 9) — move puro,
+   sem reescrever nenhum seletor. Importado depois de style.css em main.tsx:
+   a ordem de import é o que define a cascata do bundle final, e como todo
+   seletor aqui usa `body:has(#id)` e/ou `!important` (especificidade alta o
+   bastante para não depender de vir depois na fonte), mover de arquivo não
+   muda o resultado. As regras base .cp- e .rel-pdf- (usadas também na prévia
+   em tela, não só na impressão) continuam em style.css de propósito.
+   ============================================================ */
+
+@page relatorioPdfLandscape { size: A4 landscape; margin: 10mm; }
+
+@page cartaoCelular { size: 100mm 180mm; margin: 8mm; }
+@page cartaoA4 { size: A4 portrait; margin: 15mm; }
+
+@media print {
+  /* Só a folha do cartão vai para a impressora. */
+  body:has(#modal-cartao-pdf) .app-container,
+  body:has(#modal-cartao-pdf) .toast-container { display: none !important; }
+
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf {
+    position: static;
+    display: block;
+    background: none;
+    padding: 0;
+  }
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .modal-box {
+    box-shadow: none;
+    border: none;
+    max-width: none;
+    width: auto;
+    padding: 0;
+    background: #fff;
+  }
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .modal-header,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .form-actions,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pdf-opcoes,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-geracao-eixos,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-geracao-lista,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pdf-dica { display: none !important; }
+
+  body:has(#modal-cartao-pdf) .cp-pdf-palco,
+  body:has(#modal-cartao-pdf) .cp-pdf-palco-impressao {
+    display: block;
+    padding: 0;
+    background: none;
+    overflow: visible;
+  }
+  body:has(#modal-cartao-pdf) .cp-pdf-palco .cp-pdf {
+    padding: 0;
+    box-shadow: none;
+    width: auto;
+  }
+  /* O marinho do número e a barra do aviso precisam sair coloridos. */
+  .cp-pdf, .cp-pdf * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+
+/* -------------------------------------------------------------
+   IMPRESSÃO DO CARTÃO PROGRAMA
+   ------------------------------------------------------------- */
+@media print {
+  body { overflow: visible; background: #fff; color: #000; }
+  .sidebar, .topbar, .toast-container, .drawer,
+  .cartao-toolbar-panel, .cartao-add-vtr-panel,
+  .cartao-historico-panel,
+  .cartao-item-form, .btn, .btn-icon,
+  #cartao-vazio { display: none !important; }
+
+  .app-container { display: block; height: auto; width: auto; }
+  .main-content { overflow: visible; display: block; }
+  .tab-content { display: none; padding: 0; overflow: visible; }
+  .tab-content.active { display: block; }
+
+  .cartao-header-panel,
+  .cartao-vtr-card,
+  .cartao-resumo-panel {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #333 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    margin-bottom: 14px;
+  }
+
+  .cartao-header-panel { border-left: 4px solid #000 !important; }
+
+  /* Quadro Resumo sai em página própria, separado das rotas por viatura */
+  .cartao-resumo-panel { break-after: page; }
+
+  .cartao-print-title h2, .cartao-print-title span,
+  .cartao-vtr-header h3, .cartao-vtr-header .vtr-meta,
+  .cartao-itens-table th, .cartao-itens-table td,
+  .cartao-item-hora,
+  .cartao-resumo-panel .panel-title h2,
+  .cartao-resumo-panel .panel-title i,
+  .cartao-resumo-panel .styled-table th,
+  .cartao-resumo-panel .styled-table td {
+    color: #000 !important;
+  }
+
+  .cartao-resumo-panel .panel-header { border-bottom: 1px solid #333 !important; }
+  .cartao-resumo-panel .styled-table th { background: #eee !important; }
+  .cartao-resumo-panel .styled-table td { border-bottom: 1px solid #ccc !important; }
+
+  .cartao-vtr-header {
+    background: #eee !important;
+    border-bottom: 1px solid #333;
+  }
+
+  .cartao-itens-table td { border-bottom: 1px solid #ccc; }
+
+  .cartao-header-fields input,
+  .cartao-header-fields select {
+    border: none;
+    background: transparent !important;
+    color: #000 !important;
+    font-weight: 600;
+    padding: 0;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .cartao-header-fields label { color: #444 !important; }
+
+  #cartao-sobreaviso-grupo { display: none !important; }
+  .cartao-sobreaviso-print-only { display: flex !important; }
+  .cartao-sobreaviso-print-only span { font-weight: 600; }
+
+  .badge { border: 1px solid #333; background: #fff !important; color: #000 !important; }
+
+  .cartao-evento-alerta {
+    background: #fff !important;
+    border: 2px solid #000 !important;
+    color: #000 !important;
+  }
+
+  .cartao-evento-alerta i { color: #000 !important; }
+  .cartao-evento-alerta > div > strong { color: #000 !important; }
+
+  .cartao-alertas-panel {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #333 !important;
+    border-left: 4px solid #000 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    margin-bottom: 14px;
+  }
+
+  .cartao-alerta-item {
+    background: #fff !important;
+    border: 2px solid #000 !important;
+    color: #000 !important;
+  }
+
+  .cartao-alerta-item i { color: #000 !important; }
+
+  .cartao-vtr-grid { display: block; }
+
+  /* Relatório PDF: some com o resto, mostra só a área do relatório, em paisagem */
+  body:has(#modal-relatorio-pdf:not(.hidden)) .app-container,
+  body:has(#modal-relatorio-pdf:not(.hidden)) .toast-container { display: none !important; }
+  body:has(#modal-relatorio-pdf:not(.hidden)) #modal-relatorio-pdf {
+    position: static; background: none; backdrop-filter: none; display: block; animation: none;
+  }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .modal-box {
+    box-shadow: none; border: none; width: auto; max-width: none; max-height: none; overflow: visible; background: #fff; padding: 0;
+  }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .modal-header,
+  body:has(#modal-relatorio-pdf:not(.hidden)) #modal-relatorio-pdf > .modal-box > p,
+  body:has(#modal-relatorio-pdf:not(.hidden)) .form-actions { display: none !important; }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area {
+    max-height: none; overflow: visible; border-radius: 0;
+  }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area,
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area * {
+    -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+  }
+  body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area { page: relatorioPdfLandscape; }
+}
