@@ -507,6 +507,17 @@ function exigirP3(req, res, next) {
   next();
 }
 
+// Cartão Programa é a única tela que Adjunto edita (Oficial só lê) — diferente de
+// exigirP3, que bloquearia o Adjunto também e quebraria a edição diária dele.
+// Cartões com is_template=true exigem uma checagem adicional, feita dentro de
+// cada handler depois de carregar o cartão (aqui ainda não se sabe qual é).
+function exigirEdicaoCartao(req, res, next) {
+  if (!req.user || req.user.role === 'Oficial') {
+    return res.status(403).json({ error: 'Seu perfil não tem permissão para editar o Cartão Programa.' });
+  }
+  next();
+}
+
 // -------------------------------------------------------------
 // ROTA DE AUTENTICAÇÃO (LOGIN)
 // -------------------------------------------------------------
@@ -2270,74 +2281,14 @@ app.put('/api/cartoes/:id/padrao-ativo', exigirP3, asyncRoute(async (req, res) =
   res.json({ ok: true });
 }));
 
-// "Importar e Clonar" um template: gera o cartão do dia a partir do template, com viaturas/roteiros
-// prontos e o campo Comandante em branco para o Adjunto preencher
-app.post('/api/cartoes/:id/clonar', asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const template = (db.cartoes || []).find(c => c.id === req.params.id);
-  if (!template) return res.status(404).json({ error: 'Template não encontrado' });
-  if (!template.is_template) return res.status(400).json({ error: 'Este cartão não é um template.' });
-
-  const dataCartao = req.body.data;
-  if (!dataCartao) {
-    return res.status(400).json({ error: 'A data do Cartão Programa é obrigatória.' });
-  }
-  if (db.cartoes.some(c => !c.is_template && c.data === dataCartao)) {
-    return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
-  }
-
-  const { ano, numero } = await proximoNumeroCartao(dataCartao);
-
-  const novoCartao = {
-    id: generateId('cp'),
-    data: dataCartao,
-    fiscal: '',
-    adjunto: '',
-    oficial_sobreaviso: '',
-    is_template: false,
-    nome_template: null,
-    tipo_periodo: template.tipo_periodo,
-    qtd_viaturas_base: template.qtd_viaturas_base,
-    origem_template_id: template.id,
-    ano,
-    numero,
-    fiscal_pessoal_id: '',
-    adjunto_pessoal_id: '',
-    fiscal_exibicao: '',
-    adjunto_exibicao: '',
-    delta07_viatura: '',
-    viaturas: (template.viaturas || []).map(v => ({
-      id: generateId('cpv'),
-      prefixo: v.prefixo,
-      setor: v.setor,
-      companhia: v.companhia || '',
-      categoria: v.categoria || 'Ordinária',
-      comandante: '', // em branco: preenchido pelo Adjunto no dia
-      observacao: v.observacao || '',
-      // Bairro é estrutural do template e vem junto; comandante e controle de
-      // envio nascem zerados (camposEnvioIniciais já zera comandante_pessoal_id).
-      ...camposEnvioIniciais(),
-      bairro_id: v.bairro_id || '',
-      itens: (v.itens || []).map(i => ({
-        id: generateId('cpi'),
-        inicio: i.inicio,
-        fim: i.fim,
-        local: i.local,
-        atividade: i.atividade
-      }))
-    }))
-  };
-
-  db.cartoes.push(novoCartao);
-  await writeRow('cartoes', novoCartao);
-  res.status(201).json(novoCartao);
-}));
-
 // Atualizar cabeçalho do cartão (fiscal / adjunto / oficial de sobreaviso)
-app.put('/api/cartoes/:id', asyncRoute(async (req, res) => {
+app.put('/api/cartoes/:id', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const db = await readDB();
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
 
   // padrao:'' de propósito nos três — o frontend manda string vazia para "limpar" a seleção
   // (voltar para "Selecione..."), e isso precisa continuar entrando em valores explicitamente.
@@ -2407,10 +2358,13 @@ app.delete('/api/cartoes/:id', asyncRoute(async (req, res) => {
 }));
 
 // Adicionar viatura ao cartão
-app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
+app.post('/api/cartoes/:id/viaturas', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const db = await readDB();
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
 
   const v = validarCampos(req.body, {
     prefixo: { obrigatorio: true, tipo: 'string', max: 30, label: 'Prefixo da VTR' },
@@ -2452,10 +2406,13 @@ app.post('/api/cartoes/:id/viaturas', asyncRoute(async (req, res) => {
 }));
 
 // Atualizar viatura
-app.put('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
+app.put('/api/cartoes/:id/viaturas/:vid', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const db = await readDB();
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
@@ -2494,10 +2451,13 @@ app.put('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
 }));
 
 // Remover viatura do cartão
-app.delete('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
+app.delete('/api/cartoes/:id/viaturas/:vid', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const db = await readDB();
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   cartao.viaturas = cartao.viaturas.filter(v => v.id !== req.params.vid);
@@ -2509,9 +2469,12 @@ app.delete('/api/cartoes/:id/viaturas/:vid', asyncRoute(async (req, res) => {
 // do conteúdo (hash) é tirado: a partir deste ponto, qualquer mudança no que
 // sai no documento devolve a viatura para "alterado" com a versão seguinte.
 // Adjunto pode: é ele quem gera e manda o cartão ao comandante.
-app.put('/api/cartoes/:id/viaturas/:vid/status', asyncRoute(async (req, res) => {
+app.put('/api/cartoes/:id/viaturas/:vid/status', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
 
   const viatura = (cartao.viaturas || []).find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
@@ -2530,10 +2493,13 @@ app.put('/api/cartoes/:id/viaturas/:vid/status', asyncRoute(async (req, res) => 
 }));
 
 // Adicionar item de roteiro à viatura
-app.post('/api/cartoes/:id/viaturas/:vid/itens', asyncRoute(async (req, res) => {
+app.post('/api/cartoes/:id/viaturas/:vid/itens', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const db = await readDB();
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
@@ -2562,10 +2528,13 @@ app.post('/api/cartoes/:id/viaturas/:vid/itens', asyncRoute(async (req, res) => 
 }));
 
 // Atualizar item de roteiro
-app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res) => {
+app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const db = await readDB();
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
@@ -2584,10 +2553,13 @@ app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res)
 }));
 
 // Remover item de roteiro
-app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', asyncRoute(async (req, res) => {
+app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const db = await readDB();
   const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
 
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
