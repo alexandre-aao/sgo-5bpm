@@ -47,6 +47,7 @@
   body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pdf-opcoes,
   body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-geracao-eixos,
   body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-geracao-lista,
+  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pendencias,
   body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pdf-dica { display: none !important; }
 
   body:has(#modal-cartao-pdf) .cp-pdf-palco,

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { FileText, X, Printer } from 'lucide-react';
+import { FileText, X, Printer, TriangleAlert } from 'lucide-react';
 import type { Tables } from '../../../../types/supabase';
 import type { CartaoDetalhado, CartaoViatura } from '../../../../lib/cartaoConflitos';
 import { CartaoPdf, type LayoutCartaoPdf, type AvisoDoCartao } from './CartaoPdf';
 import { montarDadosCartaoPdf, nomeArquivoCartao } from './cartaoPdfDados';
 import { PortalImpressao } from '../../../../components/PortalImpressao';
+import { validarEmissao } from './validarEmissao';
 
 interface ModalCartaoPdfProps {
   cartao: CartaoDetalhado;
@@ -24,6 +25,11 @@ export function ModalCartaoPdf({ cartao, viatura, pessoal, bairros, avisos = [],
   // Congelado no primeiro render: o "gerado em" não pode mudar enquanto o
   // operador olha a prévia (mesmo cuidado do CabecalhoRelatorioPdf).
   const [dados] = useState(() => montarDadosCartaoPdf(cartao, viatura, pessoal, bairros));
+
+  // A prévia sempre mostra o documento (é para conferir, inclusive o que falta),
+  // mas imprimir fica bloqueado enquanto houver campo obrigatório em branco —
+  // mesma regra do "Gerar Cartões", que é a outra porta de saída.
+  const pendencias = validarEmissao(cartao, [viatura]);
 
   function handleImprimir() {
     // O nome do arquivo sugerido no "Salvar como PDF" vem do document.title —
@@ -70,13 +76,32 @@ export function ModalCartaoPdf({ cartao, viatura, pessoal, bairros, avisos = [],
             se o destino está em {layout === 'celular' ? '100 × 180 mm' : 'A4'}.
           </p>
 
+          {pendencias.length > 0 && (
+            <div className="cp-pendencias" role="alert">
+              <p className="cp-pendencias-titulo">
+                <TriangleAlert /> Cartão incompleto — corrija antes de imprimir
+              </p>
+              <ul>
+                {pendencias.map((pendencia) => (
+                  <li key={pendencia.mensagem}>{pendencia.mensagem}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="cp-pdf-palco">
             <CartaoPdf dados={dados} layout={layout} avisos={avisos} />
           </div>
 
           <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button>
-            <button type="button" className="btn btn-primary" onClick={handleImprimir}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleImprimir}
+              disabled={pendencias.length > 0}
+              title={pendencias.length > 0 ? 'Há campos obrigatórios em branco neste cartão.' : undefined}
+            >
               <Printer /> Imprimir / Salvar PDF
             </button>
           </div>

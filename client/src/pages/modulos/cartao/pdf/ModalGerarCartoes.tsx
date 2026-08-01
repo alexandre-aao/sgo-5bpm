@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FileDown, X, Printer, Share2, Send } from 'lucide-react';
+import { FileDown, X, Printer, Share2, Send, TriangleAlert } from 'lucide-react';
 import type { Tables } from '../../../../types/supabase';
 import type { CartaoDetalhado } from '../../../../lib/cartaoConflitos';
 import { useToast } from '../../../../context/useToast';
@@ -22,6 +22,7 @@ import {
 } from './geracaoCartao';
 import type { LayoutCartaoPdf } from './CartaoPdf';
 import { PortalImpressao } from '../../../../components/PortalImpressao';
+import { validarEmissao, type PendenciaEmissao } from './validarEmissao';
 
 interface ModalGerarCartoesProps {
   cartao: CartaoDetalhado;
@@ -68,6 +69,9 @@ export function ModalGerarCartoes({
   const { toast } = useToast();
   const [preset, setPreset] = useState<PresetGeracao>(carregarPreset);
   const [grupoAtivo, setGrupoAtivo] = useState<GrupoGeracao | null>(null);
+  // Pendências do último "Gerar" recusado. Ficam na tela até o operador tentar
+  // de novo — ele precisa sair daqui, corrigir o cabeçalho e voltar.
+  const [pendencias, setPendencias] = useState<PendenciaEmissao[]>([]);
 
   // O preset é lembrado entre sessões — o Adjunto quase sempre repete a mesma
   // combinação todo dia.
@@ -103,7 +107,27 @@ export function ModalGerarCartoes({
     setGrupoAtivo(null);
   }, [grupoAtivo, cartao, pessoal, bairros, preset.conteudo]);
 
+  /** Porta única de saída: nada é emitido com campo obrigatório em branco.
+   *  Vale para "Gerar" e para "Compartilhar" — os dois produzem o documento
+   *  que o comandante recebe e os dois mexem no status de envio da viatura. */
+  function bloqueadoPorPendencia(grupo: GrupoGeracao): boolean {
+    const erros = validarEmissao(cartao, grupo.viaturas);
+    setPendencias(erros);
+    if (erros.length) {
+      toast('Cartão incompleto — corrija as pendências antes de emitir.', 'warning');
+      return true;
+    }
+    return false;
+  }
+
+  function handleGerar(grupo: GrupoGeracao) {
+    if (bloqueadoPorPendencia(grupo)) return;
+    setGrupoAtivo(grupo);
+  }
+
   async function handleCompartilhar(grupo: GrupoGeracao) {
+    if (bloqueadoPorPendencia(grupo)) return;
+
     const partes = grupo.viaturas.map((viatura) => {
       const dados = montarDadosCartaoPdf(cartao, viatura, pessoal, bairros);
       const avisosDaVtr = preset.comAvisos ? avisosSelecionadosParaPdf(viatura, avisos, bairros) : [];
@@ -167,6 +191,22 @@ export function ModalGerarCartoes({
             </p>
           )}
 
+          {pendencias.length > 0 && (
+            <div className="cp-pendencias" role="alert">
+              <p className="cp-pendencias-titulo">
+                <TriangleAlert /> Cartão incompleto — corrija antes de emitir
+              </p>
+              <ul>
+                {pendencias.map((pendencia) => (
+                  <li key={pendencia.mensagem}>{pendencia.mensagem}</li>
+                ))}
+              </ul>
+              <p className="cp-pendencias-rodape">
+                Feche esta janela para preencher o cabeçalho do cartão e o roteiro das viaturas.
+              </p>
+            </div>
+          )}
+
           <div className="cp-geracao-lista">
             {grupos.length === 0 ? (
               <p className="cp-pdf-dica">
@@ -181,7 +221,7 @@ export function ModalGerarCartoes({
                     <span>{grupo.subtitulo}</span>
                   </div>
                   <div className="acoes-linha">
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setGrupoAtivo(grupo)}>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleGerar(grupo)}>
                       <Printer /> Gerar
                     </button>
                     <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleCompartilhar(grupo)}>
