@@ -108,7 +108,7 @@ export function CartaoPdf({ dados, layout, avisos }: CartaoPdfProps) {
           <div className="cp-bloco">
             {[...avisosPorBairro.entries()].map(([bairro, lista]) => (
               <div key={bairro} className="cp-avisos-grupo">
-                <div className="cp-secao">AVISOS{bairro ? ` — ${bairro}` : ''}</div>
+                <div className="cp-secao">ALERTAS{bairro ? ` — ${bairro}` : ''}</div>
                 {lista.map((aviso) => (
                   <div key={aviso.id} className="cp-aviso">
                     {/* A prioridade vem ESCRITA, não só colorida: o cartão é

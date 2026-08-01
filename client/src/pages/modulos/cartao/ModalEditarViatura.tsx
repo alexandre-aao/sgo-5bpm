@@ -83,7 +83,7 @@ export function ModalEditarViatura({ viatura, bairros, avisos, onFechar, onSalva
           </div>
           <div className="form-row">
             <div className="form-group col-md-6">
-              <label htmlFor="edit-vtr-bairro">Bairro (Avisos Operacionais)</label>
+              <label htmlFor="edit-vtr-bairro">Bairro (Alertas)</label>
               <select id="edit-vtr-bairro" value={form.bairro_id} onChange={(e) => setForm({ ...form, bairro_id: e.target.value })}>
                 <option value="">Não vinculado</option>
                 {bairros.map((b) => <option key={b.id} value={b.id}>{b.nome_bairro}</option>)}

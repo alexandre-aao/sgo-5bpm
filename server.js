@@ -1224,7 +1224,7 @@ function avisoVigente(aviso, hoje = hojeISO()) {
 
 function validarCorpoAviso(body) {
   const v = validarCampos(body, {
-    texto: { obrigatorio: true, tipo: 'string', max: 240, label: 'Texto do aviso' },
+    texto: { obrigatorio: true, tipo: 'string', max: 240, label: 'Texto do alerta' },
     categoria: { obrigatorio: false, tipo: 'string', max: 60, padrao: '', label: 'Categoria' },
     prioridade: { obrigatorio: false, tipo: 'string', valores: PRIORIDADES_AVISO, padrao: 'informativa', label: 'Prioridade' },
     bairro_id: { obrigatorio: false, tipo: 'string', max: 60, padrao: '', label: 'Bairro' },
@@ -1236,7 +1236,7 @@ function validarCorpoAviso(body) {
 
   // Espelha a constraint aviso_tem_escopo do banco, com mensagem que o operador entende.
   if (!v.valores.bairro_id && !v.valores.companhia) {
-    return { ok: false, erro: 'O aviso precisa ter ao menos um escopo: bairro, Companhia, ou os dois.' };
+    return { ok: false, erro: 'O alerta precisa ter ao menos um escopo: bairro, Companhia, ou os dois.' };
   }
   return v;
 }
@@ -1288,7 +1288,7 @@ app.post('/api/avisos', exigirP3, asyncRoute(async (req, res) => {
 
 app.put('/api/avisos/:id', exigirP3, asyncRoute(async (req, res) => {
   const aviso = await buscarRow('avisos', req.params.id);
-  if (!aviso) return res.status(404).json({ error: 'Aviso não encontrado.' });
+  if (!aviso) return res.status(404).json({ error: 'Alerta não encontrado.' });
 
   const v = validarCorpoAviso({ ...aviso, ...req.body });
   if (!v.ok) return res.status(400).json({ error: v.erro });
@@ -1313,7 +1313,7 @@ app.put('/api/avisos/:id', exigirP3, asyncRoute(async (req, res) => {
  *  informados). É a ação que a P3 mais usa na visão "vencendo em 7 dias". */
 app.post('/api/avisos/:id/renovar', exigirP3, asyncRoute(async (req, res) => {
   const aviso = await buscarRow('avisos', req.params.id);
-  if (!aviso) return res.status(404).json({ error: 'Aviso não encontrado.' });
+  if (!aviso) return res.status(404).json({ error: 'Alerta não encontrado.' });
 
   const dias = parseInt(req.body.dias, 10) || VIGENCIA_PADRAO_DIAS;
   aviso.ativo = true;
@@ -1327,9 +1327,9 @@ app.post('/api/avisos/:id/renovar', exigirP3, asyncRoute(async (req, res) => {
 
 app.delete('/api/avisos/:id', exigirP3, asyncRoute(async (req, res) => {
   const aviso = await buscarRow('avisos', req.params.id);
-  if (!aviso) return res.status(404).json({ error: 'Aviso não encontrado.' });
+  if (!aviso) return res.status(404).json({ error: 'Alerta não encontrado.' });
   await deleteRow('avisos', req.params.id);
-  res.json({ message: 'Aviso excluído.' });
+  res.json({ message: 'Alerta excluído.' });
 }));
 
 

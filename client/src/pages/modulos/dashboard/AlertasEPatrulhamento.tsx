@@ -37,14 +37,14 @@ export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, p
         <div className="panel-header">
           <div className="panel-title">
             <AlertTriangle />
-            <h2>Alertas Operacionais</h2>
+            <h2>Pendências</h2>
           </div>
         </div>
         <div className="dash-alertas-lista">
           {todosAlertas.length === 0 ? (
             <div className="dash-alertas-vazio">
               <CheckCircle />
-              <span>Nenhum alerta operacional no momento.</span>
+              <span>Nenhuma pendência no momento.</span>
             </div>
           ) : (
             todosAlertas.map((a, i) => {

@@ -57,7 +57,7 @@ export function useAvisos() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao cadastrar o aviso.') };
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao cadastrar o alerta.') };
       await recarregar();
       return { ok: true };
     } catch (e) {
@@ -73,7 +73,7 @@ export function useAvisos() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao salvar o aviso.') };
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao salvar o alerta.') };
       await recarregar();
       return { ok: true };
     } catch (e) {
@@ -89,7 +89,7 @@ export function useAvisos() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dias }),
       });
-      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao renovar o aviso.') };
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao renovar o alerta.') };
       await recarregar();
       return { ok: true };
     } catch (e) {
@@ -101,7 +101,7 @@ export function useAvisos() {
   const excluirAviso = useCallback(async (id: string): Promise<ResultadoAcao> => {
     try {
       const res = await apiFetch(`/api/avisos/${id}`, { method: 'DELETE' });
-      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao excluir o aviso.') };
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao excluir o alerta.') };
       await recarregar();
       return { ok: true };
     } catch (e) {

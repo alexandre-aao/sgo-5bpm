@@ -145,7 +145,7 @@ export function ModalGerarCartoes({
             onChange={(recorte) => setPreset((atual) => ({ ...atual, recorte }))}
           />
           <Eixo<'com' | 'sem'>
-            rotulo="Avisos"
+            rotulo="Alertas"
             valor={preset.comAvisos ? 'com' : 'sem'}
             opcoes={[{ valor: 'com', texto: 'Com' }, { valor: 'sem', texto: 'Sem' }]}
             onChange={(v) => setPreset((atual) => ({ ...atual, comAvisos: v === 'com' }))}
@@ -160,7 +160,7 @@ export function ModalGerarCartoes({
 
         {!preset.comAvisos && (
           <p className="cp-pdf-dica">
-            Versão sem avisos — é a que serve para arquivo e processo, já que a orientação da P3
+            Versão sem alertas — é a que serve para arquivo e processo, já que a orientação da P3
             costuma ser informação sensível.
           </p>
         )}

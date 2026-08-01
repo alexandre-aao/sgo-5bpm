@@ -22,7 +22,7 @@ export function ConflitoBanner({ alertas }: ConflitoBannerProps) {
     <div className="cartao-conflito-banner">
       <AlertTriangle />
       <div className="cartao-conflito-texto">
-        <strong>{alertas.length} {alertas.length === 1 ? 'alerta de conflito' : 'alertas de conflito'} neste cartão.</strong>
+        <strong>{alertas.length} {alertas.length === 1 ? 'conflito' : 'conflitos'} neste cartão.</strong>
         <span>{tipos.join(' · ')}</span>
       </div>
     </div>

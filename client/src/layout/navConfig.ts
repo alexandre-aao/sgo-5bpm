@@ -70,11 +70,11 @@ export const NAV_SECTIONS: NavSection[] = [
       { id: 'eventos', label: 'Eventos', icon: CalendarRange, roles: ['P3', 'Adjunto', 'Oficial'] },
       { id: 'operacoes', label: 'Operações', icon: ShieldAlert, roles: ['P3'] },
       { id: 'cartao', label: 'Cartão Programa', icon: Route, roles: ['P3', 'Adjunto', 'Oficial'] },
-      // Avisos: só a P3 cria e edita, mas todos veem — o Adjunto precisa
-      // consultar para selecionar no cartão, e o Oficial para saber o que foi
-      // orientado ao turno. Fica só no menu (a barra inferior do celular já tem
-      // seus 4 destinos + Mais).
-      { id: 'avisos', label: 'Avisos', icon: Megaphone, roles: ['P3', 'Adjunto', 'Oficial'] },
+      // Alertas (id/tabela seguem "avisos" — só o rótulo mudou): só a P3 cria e
+      // edita, mas todos veem — o Adjunto precisa consultar para selecionar no
+      // cartão, e o Oficial para saber o que foi orientado ao turno. Fica só no
+      // menu (a barra inferior do celular já tem seus 4 destinos + Mais).
+      { id: 'avisos', label: 'Alertas', icon: Megaphone, roles: ['P3', 'Adjunto', 'Oficial'] },
     ],
   },
   {
@@ -116,7 +116,7 @@ export const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string
   usuarios: { title: 'Usuários do Sistema', subtitle: 'Gestão de perfis de acesso e redefinição de senhas.' },
   pessoal: { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' },
   viaturas: { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' },
-  avisos: { title: 'Avisos Operacionais', subtitle: 'Orientações da P3 por bairro e Companhia, que entram no Cartão Programa das viaturas.' },
+  avisos: { title: 'Alertas', subtitle: 'Orientações da P3 por bairro e Companhia, que entram no Cartão Programa das viaturas.' },
 };
 
 /** Tela inicial por perfil — regra 7 do MIGRACAO.md. */

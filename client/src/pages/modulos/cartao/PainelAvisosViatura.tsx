@@ -61,11 +61,11 @@ export function PainelAvisosViatura({ avisos, bairros, viatura, selecionados, on
   if (aplicaveis.length === 0) {
     return (
       <div className="form-group">
-        <span className="form-label-estatico">Avisos Operacionais</span>
+        <span className="form-label-estatico">Alertas</span>
         <span className="aviso-contador">
           {bairrosIds.length === 0
-            ? 'Vincule um bairro à viatura para trazer os avisos da P3.'
-            : 'Nenhum aviso vigente para esta área.'}
+            ? 'Vincule um bairro à viatura para trazer os alertas da P3.'
+            : 'Nenhum alerta vigente para esta área.'}
         </span>
       </div>
     );
@@ -87,7 +87,7 @@ export function PainelAvisosViatura({ avisos, bairros, viatura, selecionados, on
     <div className="form-group">
       <span className="form-label-estatico">
         <Megaphone style={{ width: 13, height: 13, verticalAlign: '-2px' }} />{' '}
-        {aplicaveis.length} aviso(s) para {nomesCobertura.toUpperCase()}
+        {aplicaveis.length} alerta(s) para {nomesCobertura.toUpperCase()}
       </span>
       {soPorNome && (
         <span className="aviso-contador">
@@ -120,7 +120,7 @@ export function PainelAvisosViatura({ avisos, bairros, viatura, selecionados, on
       </div>
       {noTeto && (
         <span className="aviso-teto-atingido">
-          Limite de {MAX_AVISOS_POR_CARTAO} avisos por cartão atingido — desmarque um para trocar.
+          Limite de {MAX_AVISOS_POR_CARTAO} alertas por cartão atingido — desmarque um para trocar.
         </span>
       )}
     </div>

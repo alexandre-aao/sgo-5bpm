@@ -81,15 +81,15 @@ export default function AvisosPage() {
   }
 
   async function handleEncerrar(aviso: Tables<'avisos'>) {
-    if (!window.confirm('Encerrar este aviso? Ele deixa de aparecer nos cartões, mas continua no histórico.')) return;
+    if (!window.confirm('Encerrar este alerta? Ele deixa de aparecer nos cartões, mas continua no histórico.')) return;
     const resultado = await atualizarAviso(aviso.id, { ativo: false });
-    toast(resultado.ok ? 'Aviso encerrado.' : resultado.mensagem, resultado.ok ? 'info' : 'danger');
+    toast(resultado.ok ? 'Alerta encerrado.' : resultado.mensagem, resultado.ok ? 'info' : 'danger');
   }
 
   async function handleExcluir(aviso: Tables<'avisos'>) {
-    if (!window.confirm('Excluir permanentemente este aviso? Os cartões já gerados não são alterados.')) return;
+    if (!window.confirm('Excluir permanentemente este alerta? Os cartões já gerados não são alterados.')) return;
     const resultado = await excluirAviso(aviso.id);
-    toast(resultado.ok ? 'Aviso excluído.' : resultado.mensagem, resultado.ok ? 'info' : 'danger');
+    toast(resultado.ok ? 'Alerta excluído.' : resultado.mensagem, resultado.ok ? 'info' : 'danger');
   }
 
   if (carregando) return <Carregando />;
@@ -101,7 +101,7 @@ export default function AvisosPage() {
         <div className="panel-header flex-column-mobile">
           <div className="panel-title">
             <Megaphone />
-            <h2>Avisos Operacionais</h2>
+            <h2>Alertas</h2>
           </div>
           <div className="report-filters">
             <select value={filtroBairro} onChange={(e) => setFiltroBairro(e.target.value)} aria-label="Filtrar por bairro">
@@ -128,7 +128,7 @@ export default function AvisosPage() {
                 type="button" className="btn btn-primary btn-sm"
                 onClick={() => { setAvisoEmEdicao(null); setModalAberto(true); }}
               >
-                <Plus /> Novo Aviso
+                <Plus /> Novo Alerta
               </button>
             )}
           </div>
@@ -158,7 +158,7 @@ export default function AvisosPage() {
                   <button className="btn btn-secondary btn-sm" onClick={() => void handleRenovar(aviso)}>
                     <RefreshCw /> Renovar 30 dias
                   </button>
-                  <button className="btn-icon" title="Encerrar aviso" aria-label="Encerrar aviso" onClick={() => void handleEncerrar(aviso)}>
+                  <button className="btn-icon" title="Encerrar alerta" aria-label="Encerrar alerta" onClick={() => void handleEncerrar(aviso)}>
                     <Ban />
                   </button>
                 </div>
@@ -187,13 +187,13 @@ export default function AvisosPage() {
                   <td colSpan={ehP3 ? 6 : 5}>
                     <SemDados
                       icone={Megaphone}
-                      titulo="Nenhum aviso operacional"
+                      titulo="Nenhum alerta"
                       orientacao={
                         soVigentes
-                          ? 'Não há avisos vigentes com esses filtros. Desmarque "Só vigentes" para ver os encerrados e vencidos.'
+                          ? 'Não há alertas vigentes com esses filtros. Desmarque "Só vigentes" para ver os encerrados e vencidos.'
                           : ehP3
-                            ? 'Cadastre um aviso para orientar as viaturas alocadas num bairro.'
-                            : 'A P3 ainda não cadastrou avisos para esses filtros.'
+                            ? 'Cadastre um alerta para orientar as viaturas alocadas num bairro.'
+                            : 'A P3 ainda não cadastrou alertas para esses filtros.'
                       }
                     />
                   </td>
@@ -214,18 +214,18 @@ export default function AvisosPage() {
                       <td className="text-right" data-label="Ações">
                         <div className="acoes-linha">
                           <button
-                            className="btn-icon" title="Editar aviso" aria-label="Editar aviso"
+                            className="btn-icon" title="Editar alerta" aria-label="Editar alerta"
                             onClick={() => { setAvisoEmEdicao(aviso); setModalAberto(true); }}
                           >
                             <Pencil />
                           </button>
                           {avisoVigente(aviso) && (
-                            <button className="btn-icon" title="Encerrar aviso" aria-label="Encerrar aviso" onClick={() => void handleEncerrar(aviso)}>
+                            <button className="btn-icon" title="Encerrar alerta" aria-label="Encerrar alerta" onClick={() => void handleEncerrar(aviso)}>
                               <Ban />
                             </button>
                           )}
                           <button
-                            className="btn-icon btn-icon-danger" title="Excluir aviso" aria-label="Excluir aviso"
+                            className="btn-icon btn-icon-danger" title="Excluir alerta" aria-label="Excluir alerta"
                             onClick={() => void handleExcluir(aviso)}
                           >
                             <Trash2 />

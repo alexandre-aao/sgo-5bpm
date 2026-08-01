@@ -21,7 +21,7 @@ interface TrilhoCartaoProps {
 }
 
 // Trilho lateral do Cartão Programa: Resumo do Turno (4 mini-cards), Distribuição
-// por Categoria e Alertas de Conflito detalhados — espelha renderResumoLateralCartao()
+// por Categoria e Conflitos detalhados — espelha renderResumoLateralCartao()
 // e a parte de lista de renderAlertasCartao() em public/app.js.
 export function TrilhoCartao({ viaturas, alertas }: TrilhoCartaoProps) {
   const setores = new Set(viaturas.map((v) => v.setor).filter(Boolean));
@@ -94,7 +94,7 @@ export function TrilhoCartao({ viaturas, alertas }: TrilhoCartaoProps) {
 
       <div className="panel" id="cartao-alertas-panel">
         <div className="panel-header">
-          <div className="panel-title"><AlertTriangle /><h2>Alertas de Conflito</h2></div>
+          <div className="panel-title"><AlertTriangle /><h2>Conflitos</h2></div>
           <span className={`contador-pill${alertas.length === 0 ? ' contador-pill-zero' : ''}`}>{alertas.length}</span>
         </div>
         <div className="dash-alertas-lista">

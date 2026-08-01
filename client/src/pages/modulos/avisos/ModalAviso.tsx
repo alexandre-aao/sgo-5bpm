@@ -39,7 +39,7 @@ export function ModalAviso({ aviso, bairros, onFechar, onSalvar }: ModalAvisoPro
     const resultado = await onSalvar({ ...form, texto: form.texto.trim(), categoria: form.categoria.trim() });
     setEnviando(false);
     if (resultado.ok) {
-      toast(aviso ? 'Aviso atualizado.' : 'Aviso cadastrado.', 'success');
+      toast(aviso ? 'Alerta atualizado.' : 'Alerta cadastrado.', 'success');
       onFechar();
     } else {
       toast(resultado.mensagem, 'danger');
@@ -50,7 +50,7 @@ export function ModalAviso({ aviso, bairros, onFechar, onSalvar }: ModalAvisoPro
     <div className="modal-overlay">
       <div className="modal-box">
         <div className="modal-header">
-          <h3><Megaphone /> {aviso ? 'Editar Aviso' : 'Novo Aviso Operacional'}</h3>
+          <h3><Megaphone /> {aviso ? 'Editar Alerta' : 'Novo Alerta'}</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -128,7 +128,7 @@ export function ModalAviso({ aviso, bairros, onFechar, onSalvar }: ModalAvisoPro
                 onChange={(e) => setForm({ ...form, data_fim: e.target.value })}
               />
               <span className="aviso-contador">
-                {form.permanente ? 'Aviso permanente: não vence.' : 'Em branco = 30 dias a partir do início.'}
+                {form.permanente ? 'Alerta permanente: não vence.' : 'Em branco = 30 dias a partir do início.'}
               </span>
             </div>
           </div>
@@ -139,14 +139,14 @@ export function ModalAviso({ aviso, bairros, onFechar, onSalvar }: ModalAvisoPro
                 type="checkbox" id="aviso-permanente" checked={form.permanente}
                 onChange={(e) => setForm({ ...form, permanente: e.target.checked })}
               />
-              Aviso permanente (sem prazo de validade)
+              Alerta permanente (sem prazo de validade)
             </label>
           </div>
 
           <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
-              <Check /> {aviso ? 'Salvar Aviso' : 'Cadastrar Aviso'}
+              <Check /> {aviso ? 'Salvar Alerta' : 'Cadastrar Alerta'}
             </button>
           </div>
         </form>

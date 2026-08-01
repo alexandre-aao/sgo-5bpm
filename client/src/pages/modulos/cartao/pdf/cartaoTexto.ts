@@ -63,7 +63,7 @@ export function cartaoEmTexto(dados: DadosCartaoPdf, avisos: AvisoDoCartao[]): s
       porBairro.get(chave)!.push(a);
     });
     porBairro.forEach((lista, bairro) => {
-      linhas.push(`*AVISOS${bairro ? ` — ${bairro}` : ''}*`);
+      linhas.push(`*ALERTAS${bairro ? ` — ${bairro}` : ''}*`);
       lista.forEach((aviso) => {
         const cabecalho = [ROTULO_PRIORIDADE[aviso.prioridade], aviso.categoria].filter(Boolean).join(' · ');
         linhas.push(`- ${cabecalho}`);

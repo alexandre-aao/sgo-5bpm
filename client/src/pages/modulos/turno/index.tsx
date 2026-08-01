@@ -119,7 +119,7 @@ export default function TurnoPage() {
           </span>
           <div>
             <div className="kpi-valor">{avisos.length}</div>
-            <div className="kpi-label-sob">Avisos do turno</div>
+            <div className="kpi-label-sob">Pendências do turno</div>
           </div>
         </div>
       </div>
