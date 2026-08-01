@@ -134,14 +134,6 @@ export default function CartaoProgramaPage() {
     if (templateAberto?.id === id) setTemplateAberto(null);
   }
 
-  function handleImprimir() {
-    if (!cartaoEditando) {
-      toast('Não há Cartão Programa nesta data para imprimir.', 'warning');
-      return;
-    }
-    window.print();
-  }
-
   // Só o Adjunto e a P3 registram o envio: o Oficial pode ver e gerar o cartão,
   // mas não é ele quem manda ao comandante, então não move o status do turno.
   async function registrarEnvio(viaturaIds: string[], status: 'gerado' | 'enviado') {
@@ -228,13 +220,19 @@ export default function CartaoProgramaPage() {
               <Plus /> Criar Cartão
             </button>
             {cartaoEditando && !cartaoEditando.is_template && (
-              <Link to={`/cartao/${cartaoEditando.id}`} className="btn btn-secondary btn-sm">
-                <Maximize2 /> Tela Cheia
-              </Link>
+              <>
+                <Link to={`/cartao/${cartaoEditando.id}`} className="btn btn-secondary btn-sm">
+                  <Maximize2 /> Tela Cheia
+                </Link>
+                {/* Antes era um window.print() solto, que mandava a TELA inteira
+                    (menu, filtros, cards) para a impressora. As saídas oficiais
+                    vivem na Central de Impressão — mesmo destino do botão da
+                    tela cheia. */}
+                <Link to={`/impressao?cartao=${cartaoEditando.id}`} className="btn btn-secondary btn-sm">
+                  <Printer /> Imprimir
+                </Link>
+              </>
             )}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={handleImprimir}>
-              <Printer /> Imprimir
-            </button>
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleAbrirGerar}>
               <FileDown /> Gerar Cartões
             </button>
