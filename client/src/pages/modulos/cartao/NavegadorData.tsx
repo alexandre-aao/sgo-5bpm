@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { janela24h } from '../../../lib/janelaCartao';
 
 const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
@@ -18,7 +19,7 @@ export function NavegadorData({ dataSelecionada, onMudarData, onDeslocarDia, tem
 
   return (
     <>
-      <div className="cartao-data-nav">
+      <div className="cartao-data-nav" title={dataSelecionada ? `Janela do cartão: ${janela24h(dataSelecionada)}` : undefined}>
         <button type="button" className="btn-icon" aria-label="Dia anterior" title="Dia anterior" onClick={() => onDeslocarDia(-1)}>
           <ChevronLeft />
         </button>

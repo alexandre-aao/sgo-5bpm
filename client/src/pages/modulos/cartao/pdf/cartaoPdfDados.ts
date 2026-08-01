@@ -1,6 +1,7 @@
 import type { Tables } from '../../../../types/supabase';
 import type { CartaoDetalhado, CartaoViatura, CartaoItem } from '../../../../lib/cartaoConflitos';
 import { abreviarPosto } from '../../../../lib/abrevPosto';
+import { janela24h } from '../../../../lib/janelaCartao';
 
 /** Nome como sai no documento: graduação + nome de guerra, em caixa alta.
  *  Ex.: "3º SGT PM SILVA". O nome de guerra é o que o comandante reconhece no
@@ -68,7 +69,12 @@ export function horaCurta(hora: string | null | undefined): string {
 
 export interface DadosCartaoPdf {
   numero: string;
+  /** dd/mm/aaaa — usada só para reconstruir a data ISO no nome do arquivo
+   *  (nomeArquivoCartao). Exibição na tela/documento usa `janela`, nunca isto. */
   data: string;
+  /** Janela de 24h no formato completo, ancorada às 07h — é o que sai no
+   *  documento e no texto de WhatsApp (nunca a data isolada). */
+  janela: string;
   delta07: string;
   delta07Viatura: string;
   adjunto: string;
@@ -97,6 +103,7 @@ export function montarDadosCartaoPdf(
   return {
     numero: cartao.numero ? `${String(cartao.numero).padStart(6, '0')}/${cartao.ano}` : '',
     data: cartao.data ? cartao.data.split('-').reverse().join('/') : '',
+    janela: janela24h(cartao.data),
     delta07: resolverNome(cartao.fiscal_pessoal_id, cartao.fiscal, pessoal),
     delta07Viatura: (cartao.delta07_viatura || '').toUpperCase(),
     adjunto: resolverNome(cartao.adjunto_pessoal_id, cartao.adjunto, pessoal),

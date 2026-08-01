@@ -1,4 +1,5 @@
 import type { Role } from '../types/auth';
+import { horaParaMinutos } from './cartaoConflitos';
 
 // Fuso do batalhão. America/Fortaleza é UTC-3 FIXO (o Brasil aboliu o horário de
 // verão em 2019), então o offset pode ser literal — o cliente pode estar em
@@ -36,4 +37,34 @@ export function podeExcluirCartao(
   if (role === 'P3') return true;
   if (role !== 'Adjunto' || cartao.is_template) return false;
   return dentroDaJanelaExclusaoAdjunto(cartao.data, agora);
+}
+
+/** Janela de 24h do cartão, no formato completo exigido em cabeçalho de tela e de
+ *  impressão: "05/08/2026 07h00 às 06/08/2026 07h00". Nunca exibir a data isolada
+ *  — a ordenação do roteiro (server.js, ordenarPorTurno) já usa essa mesma âncora
+ *  das 07h, então o rótulo precisa deixar a janela real explícita. */
+export function janela24h(dataISO: string | null | undefined): string {
+  if (!dataISO) return '';
+  return `${dataBr(dataISO)} 07h00 às ${dataBr(proximoDiaISO(dataISO))} 07h00`;
+}
+
+/** Intercala os itens já ordenados por turno (ordenarPorTurno, ancorado nas 07h)
+ *  com um marcador textual na virada de dia — entre o último item de hoje
+ *  (>=07h00) e o primeiro de amanhã (<07h00). Não agrupa nem reordena: só marca
+ *  a fronteira. Cartão sem itens de madrugada não tem marcador nenhum. */
+export function marcarViradaDeDia<T extends { inicio: string }>(
+  itens: T[],
+  dataISO: string,
+): Array<{ tipo: 'item'; item: T } | { tipo: 'virada'; rotulo: string }> {
+  const rotulo = `— ${dataBr(proximoDiaISO(dataISO)).slice(0, 5)} —`;
+
+  return itens.reduce<Array<{ tipo: 'item'; item: T } | { tipo: 'virada'; rotulo: string }>>((acc, item, i) => {
+    if (i > 0) {
+      const anterior = horaParaMinutos(itens[i - 1].inicio);
+      const atual = horaParaMinutos(item.inicio);
+      if (anterior >= 420 && atual < 420) acc.push({ tipo: 'virada', rotulo });
+    }
+    acc.push({ tipo: 'item', item });
+    return acc;
+  }, []);
 }

@@ -3,6 +3,7 @@ import { Pencil, Trash2, Check, X, Plus, CalendarCheck } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
 import { formatHoraCartao, itensSobrepostos } from '../../../lib/cartaoConflitos';
+import { marcarViradaDeDia } from '../../../lib/janelaCartao';
 import { useToast } from '../../../context/useToast';
 import { ATIVIDADES_CARTAO, atividadeBadgeClass, categoriaBadgeClass } from './constantes';
 import { eventosNoSetorDaVtr } from './eventosNoSetor';
@@ -163,7 +164,15 @@ export function ViaturaRoteiroCard({
             {vtr.itens.length === 0 ? (
               <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 16 }}>Sem itens de roteiro.</td></tr>
             ) : (
-              vtr.itens.map((item) => {
+              marcarViradaDeDia(vtr.itens, dataCartao).map((entrada) => {
+                if (entrada.tipo === 'virada') {
+                  return (
+                    <tr className="cartao-item-virada" key={`virada-${entrada.rotulo}`}>
+                      <td colSpan={4}>{entrada.rotulo}</td>
+                    </tr>
+                  );
+                }
+                const item = entrada.item;
                 const emEdicao = editandoAtividade?.vtrId === vtr.id && editandoAtividade?.itemId === item.id;
                 return (
                   <tr key={item.id}>

@@ -65,7 +65,7 @@ export function CartaoPdf({ dados, layout, avisos }: CartaoPdfProps) {
       <div className="cp-regua-dupla" />
 
       <div className="cp-bloco">
-        <Linha rotulo="DATA" valor={dados.data} />
+        <Linha rotulo="PERÍODO" valor={dados.janela} />
         <Linha rotulo="DELTA 07" valor={dados.delta07} />
         <Linha rotulo="ADJUNTO" valor={dados.adjunto} />
         <Linha rotulo="GUARNIÇÃO" valor={dados.delta07Viatura} />

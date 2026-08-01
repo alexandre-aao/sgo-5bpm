@@ -33,7 +33,7 @@ export function cartaoEmTexto(dados: DadosCartaoPdf, avisos: AvisoDoCartao[]): s
     if (valor) linhas.push(`${rotulo}: ${valor}`);
   };
 
-  par('DATA', dados.data);
+  par('PERÍODO', dados.janela);
   par('DELTA 07', dados.delta07);
   par('ADJUNTO', dados.adjunto);
   par('GUARNIÇÃO', dados.delta07Viatura);

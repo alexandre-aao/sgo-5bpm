@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Tables } from '../../../types/supabase';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { useToast } from '../../../context/useToast';
+import { janela24h } from '../../../lib/janelaCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
 
 interface CartaoHeaderProps {
@@ -82,7 +83,9 @@ export function CartaoHeader({ cartao, pessoal, viaturasCadastradas, onAtualizar
     }
   }
 
-  const dataBr = cartao.data ? cartao.data.split('-').reverse().join('/') : '';
+  // Formato completo (05/08/2026 07h00 às 06/08/2026 07h00), nunca a data isolada
+  // — a janela do cartão é de 24h, ancorada às 07h (ver ordenarPorTurno em server.js).
+  const periodo = janela24h(cartao.data);
 
   // Na impressão, o campo Sobreaviso vira um rótulo dinâmico: se o Fiscal já é
   // Oficial, o sobreaviso é redundante e mostra "Oficial de Serviço" com o
@@ -112,9 +115,9 @@ export function CartaoHeader({ cartao, pessoal, viaturasCadastradas, onAtualizar
       <div className="cartao-print-title">
         <h2>
           CARTÃO PROGRAMA {cartao.numero ? `Nº ${String(cartao.numero).padStart(6, '0')}/${cartao.ano} ` : ''}
-          {dataBr} - 5º BPM
+          - 5º BPM
         </h2>
-        <span>Policiamento Ostensivo Diário</span>
+        <span>Policiamento Ostensivo Diário · {periodo}</span>
       </div>
       <div className="cartao-header-fields">
         <div className="form-group">

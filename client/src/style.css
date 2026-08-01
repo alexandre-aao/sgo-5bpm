@@ -4194,6 +4194,18 @@ body.sgo-sincronizando .topbar::before {
   color: var(--nav-active-fg);
 }
 
+/* Marcador de virada de dia entre o último item de hoje (>=07h) e o primeiro de
+   amanhã (<07h) — não agrupa nem separa fisicamente a tabela, só sinaliza. */
+.cartao-item-virada td {
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  padding: 4px 8px;
+}
+
 .cartao-edit-atividade-select {
   max-width: 170px;
   font-size: 0.78rem;
