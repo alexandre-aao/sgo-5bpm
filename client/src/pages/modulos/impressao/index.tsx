@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { Printer, FileText, FileStack } from 'lucide-react';
 import { apiFetch } from '../../../lib/api';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
-import { janela24h } from '../../../lib/janelaCartao';
 import { Carregando } from '../../../components/estado/Carregando';
+import { useAppData } from '../../../context/useAppData';
+import { useBairros } from '../../../hooks/useBairros';
+import { useAvisos } from '../../../hooks/useAvisos';
 import {
   filtrarPorConteudo,
   agruparPorRecorte,
@@ -13,6 +15,8 @@ import {
   type ConteudoCartao,
   type RecorteCartao,
 } from '../cartao/pdf/geracaoCartao';
+import { SaidaCartaoIndividual } from './SaidaCartaoIndividual';
+import { SaidaConsolidadoDia } from './SaidaConsolidadoDia';
 
 type TipoSaida = 'individual' | 'consolidado';
 
@@ -25,15 +29,17 @@ const OPCOES_RECORTE: RecorteCartao[] = ['viatura', 'companhia', 'geral'];
  * (Consolidado do dia) existem por ora: o SGO não tem os dados de efetivo
  * previsto/disponível/indisponível nem guarnição completa por viatura que as
  * saídas 3-5 exigiriam.
- *
- * Esta entrega é o "shell" navegável — filtros, seleção de data e seleção
- * múltipla já funcionam de ponta a ponta. A pré-visualização com a folha real
- * de impressão (CabecalhoImpressao + Saída 1/2) entra no próximo lote, mesmo
- * padrão faseado usado na tela cheia do Cartão (Lote 7 → Lote 8).
  */
 export default function ImpressaoPage() {
   const [searchParams] = useSearchParams();
   const cartaoIdInicial = searchParams.get('cartao');
+  const { dados } = useAppData();
+  const { bairros } = useBairros();
+  const { avisos } = useAvisos();
+
+  // Congela o instante de emissão no mount — mesmo cuidado de
+  // CabecalhoRelatorioPdf/ModalCartaoPdf: não muda se o pai re-renderizar.
+  const [agora] = useState(() => new Date());
 
   const [data, setData] = useState('');
   const [cartao, setCartao] = useState<CartaoDetalhado | null>(null);
@@ -121,6 +127,9 @@ export default function ImpressaoPage() {
     });
   }
 
+  const viaturasSelecionadas = grupos.filter((g) => selecionados.has(g.id)).flatMap((g) => g.viaturas);
+  const podeImprimir = !!cartao && (tipoSaida === 'consolidado' || viaturasSelecionadas.length > 0);
+
   return (
     <>
       <div className="panel">
@@ -162,48 +171,24 @@ export default function ImpressaoPage() {
         </div>
 
         {tipoSaida === 'individual' && (
-          <div className="report-filters" style={{ padding: '0 20px 20px' }}>
-            <div className="filter-group">
-              <label htmlFor="impressao-conteudo">Conteúdo</label>
-              <select id="impressao-conteudo" value={conteudo} onChange={(e) => setConteudo(e.target.value as ConteudoCartao)}>
-                {OPCOES_CONTEUDO.map((c) => <option key={c} value={c}>{ROTULO_CONTEUDO[c]}</option>)}
-              </select>
+          <>
+            <div className="report-filters" style={{ padding: '0 20px 20px' }}>
+              <div className="filter-group">
+                <label htmlFor="impressao-conteudo">Conteúdo</label>
+                <select id="impressao-conteudo" value={conteudo} onChange={(e) => setConteudo(e.target.value as ConteudoCartao)}>
+                  {OPCOES_CONTEUDO.map((c) => <option key={c} value={c}>{ROTULO_CONTEUDO[c]}</option>)}
+                </select>
+              </div>
+              <div className="filter-group">
+                <label htmlFor="impressao-recorte">Recorte</label>
+                <select id="impressao-recorte" value={recorte} onChange={(e) => setRecorte(e.target.value as RecorteCartao)}>
+                  {OPCOES_RECORTE.map((r) => <option key={r} value={r}>{ROTULO_RECORTE[r]}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="filter-group">
-              <label htmlFor="impressao-recorte">Recorte</label>
-              <select id="impressao-recorte" value={recorte} onChange={(e) => setRecorte(e.target.value as RecorteCartao)}>
-                {OPCOES_RECORTE.map((r) => <option key={r} value={r}>{ROTULO_RECORTE[r]}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
 
-      <div className="panel">
-        <div className="panel-header">
-          <div className="panel-title"><FileStack /><h2>Pré-visualização</h2></div>
-        </div>
-
-        {carregando ? (
-          <Carregando mensagem="Carregando Cartão Programa..." />
-        ) : naoEncontrado ? (
-          <p style={{ padding: '0 20px 20px', color: 'var(--text-muted)' }}>
-            Nenhum Cartão Programa lançado para esta data.
-          </p>
-        ) : !cartao ? (
-          <p style={{ padding: '0 20px 20px', color: 'var(--text-muted)' }}>
-            Selecione uma data com Cartão Programa lançado.
-          </p>
-        ) : (
-          <div style={{ padding: '0 20px 20px' }}>
-            <p style={{ color: 'var(--text-muted)', marginBottom: 12 }}>
-              {janela24h(cartao.data)} — Nº {cartao.numero ? `${String(cartao.numero).padStart(6, '0')}/${cartao.ano}` : 'sem numeração'}
-            </p>
-
-            {tipoSaida === 'consolidado' ? (
-              <p>Documento único com todas as {cartao.viaturas.length} viatura(s) do dia.</p>
-            ) : (
-              <ul className="cp-geracao-lista" style={{ listStyle: 'none', padding: 0 }}>
+            {cartao && (
+              <ul className="cp-geracao-lista" style={{ listStyle: 'none', padding: '0 20px 20px', margin: 0 }}>
                 {grupos.map((g) => (
                   <li key={g.id} className="cp-geracao-item">
                     <label className="checkbox-inline">
@@ -221,10 +206,42 @@ export default function ImpressaoPage() {
                 {grupos.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Nenhuma viatura para este conteúdo.</p>}
               </ul>
             )}
+          </>
+        )}
+      </div>
 
-            <p style={{ marginTop: 16, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              A folha de impressão com o padrão institucional (saídas 1 e 2) chega no próximo lote.
-            </p>
+      <div className="panel">
+        <div className="panel-header flex-column-mobile">
+          <div className="panel-title"><FileStack /><h2>Pré-visualização</h2></div>
+          <button type="button" className="btn btn-primary btn-sm" disabled={!podeImprimir} onClick={() => window.print()}>
+            <Printer /> Imprimir / Salvar PDF
+          </button>
+        </div>
+
+        {carregando ? (
+          <Carregando mensagem="Carregando Cartão Programa..." />
+        ) : naoEncontrado ? (
+          <p style={{ padding: '0 20px 20px', color: 'var(--text-muted)' }}>
+            Nenhum Cartão Programa lançado para esta data.
+          </p>
+        ) : !cartao ? (
+          <p style={{ padding: '0 20px 20px', color: 'var(--text-muted)' }}>
+            Selecione uma data com Cartão Programa lançado.
+          </p>
+        ) : (
+          <div id="impressao-preview-area" className="impressao-preview-area">
+            {tipoSaida === 'individual' ? (
+              viaturasSelecionadas.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>Selecione ao menos uma viatura para gerar o documento.</p>
+              ) : (
+                <SaidaCartaoIndividual
+                  cartao={cartao} viaturas={viaturasSelecionadas}
+                  pessoal={dados.pessoal} bairros={bairros} avisos={avisos} agora={agora}
+                />
+              )
+            ) : (
+              <SaidaConsolidadoDia cartao={cartao} pessoal={dados.pessoal} agora={agora} />
+            )}
           </div>
         )}
       </div>

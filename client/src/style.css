@@ -4844,6 +4844,85 @@ body.sgo-sincronizando .topbar::before {
 }
 
 /* -------------------------------------------------------------
+   CENTRAL DE IMPRESSÃO (/impressao) — Saídas 1 e 2
+   Design institucional próprio (.impressao-*), distinto tanto do .rel-pdf-
+   (relatórios estilo SGEPM, paisagem) quanto do .cp- (Cartão Programa em PDF
+   por viatura, retrato 100x180mm/A4 — exceção documentada no CLAUDE.md).
+   Cores cruas são intencionais aqui, mesma exceção já aberta para os outros
+   dois: é papel/PDF, preto sobre branco nos dois temas do app.
+   ------------------------------------------------------------- */
+.impressao-preview-area {
+  background: #fff;
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 75vh;
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.folha {
+  background: #fff;
+  color: #000;
+  font-family: Helvetica, Arial, sans-serif;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 20mm 15mm 20mm 30mm;
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
+  page: impressaoRetrato;
+}
+
+.impressao-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8mm;
+  border-bottom: 1pt solid #000;
+  padding-bottom: 3mm;
+  margin-bottom: 5mm;
+}
+.impressao-cabecalho img { height: 18mm; width: auto; }
+.impressao-cabecalho .orgao {
+  font-weight: 700;
+  font-size: 11pt;
+  text-transform: uppercase;
+  letter-spacing: .3pt;
+}
+.impressao-cabecalho .unidade { font-size: 10pt; }
+
+.impressao-titulo {
+  text-align: center;
+  font-size: 12pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin: 0 0 4mm;
+}
+.impressao-periodo {
+  text-align: center;
+  font-size: 10pt;
+  font-weight: 600;
+  margin: 0 0 3mm;
+}
+.impressao-emissao {
+  text-align: center;
+  font-size: 8pt;
+  color: #555;
+  margin: 0 0 6mm;
+}
+
+.assinatura {
+  margin-top: 15mm;
+  text-align: center;
+  font-size: 10pt;
+  break-inside: avoid;
+}
+.assinatura .linha {
+  width: 80mm;
+  margin: 0 auto 1.5mm;
+  border-top: 0.5pt solid #000;
+}
+
+/* -------------------------------------------------------------
    POLIMENTOS GERAIS
    ------------------------------------------------------------- */
 ::-webkit-scrollbar {

@@ -14,6 +14,9 @@
 @page cartaoCelular { size: 100mm 180mm; margin: 8mm; }
 @page cartaoA4 { size: A4 portrait; margin: 15mm; }
 
+/* Central de Impressão (Lote 10) — margens do Manual de Redação Oficial. */
+@page impressaoRetrato { size: A4 portrait; margin: 20mm 15mm 20mm 30mm; }
+
 @media print {
   /* Só a folha do cartão vai para a impressora. */
   body:has(#modal-cartao-pdf) .app-container,
@@ -178,4 +181,53 @@
     -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
   }
   body:has(#modal-relatorio-pdf:not(.hidden)) .relatorio-pdf-area { page: relatorioPdfLandscape; }
+}
+
+/* -------------------------------------------------------------
+   CENTRAL DE IMPRESSÃO (/impressao) — Saídas 1 e 2 (Lote 10)
+   A rota vive dentro do AppLayout normal (sidebar/topbar), diferente dos
+   modais #modal-cartao-pdf/#modal-relatorio-pdf acima — por isso o gate não
+   usa body:has(#id) + display:none no ancestral (a folha é descendente do
+   .app-container, então escondê-lo esconderia a folha também). A técnica
+   "visibility" abaixo é robusta à profundidade do DOM: some tudo, revela só
+   a folha, e a reposiciona na origem da página impressa.
+   ------------------------------------------------------------- */
+@media print {
+  body:has(#impressao-preview-area) * {
+    visibility: hidden;
+  }
+  body:has(#impressao-preview-area) #impressao-preview-area,
+  body:has(#impressao-preview-area) #impressao-preview-area * {
+    visibility: visible;
+  }
+  body:has(#impressao-preview-area) #impressao-preview-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    display: block;
+  }
+  body:has(#impressao-preview-area) .folha {
+    width: auto;
+    min-height: 0;
+    box-shadow: none;
+    margin: 0;
+  }
+
+  /* Tabela repete cabeçalho a cada página; linha nunca quebra no meio. */
+  #impressao-preview-area table thead { display: table-header-group; }
+  #impressao-preview-area tr, #impressao-preview-area td, #impressao-preview-area th {
+    break-inside: avoid;
+  }
+  #impressao-preview-area .folha, #impressao-preview-area .folha * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sem URL impressa ao lado de link, órfãs/viúvas controladas. */
+  #impressao-preview-area a[href]::after { content: '' !important; }
+  #impressao-preview-area p, #impressao-preview-area li { orphans: 3; widows: 3; }
 }
