@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Route, ClipboardX, Plus, Copy, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, FileDown } from 'lucide-react';
+import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, FileDown } from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
@@ -21,8 +21,7 @@ import { ConflitoBanner } from './ConflitoBanner';
 import { TrilhoCartao } from './TrilhoCartao';
 import { TemplatesPanel } from './TemplatesPanel';
 import { ModalNovoTemplate } from './ModalNovoTemplate';
-import { SugestaoTemplate } from './SugestaoTemplate';
-import { ModalCopiarCartao } from './ModalCopiarCartao';
+import { CriarDoPadrao } from './CriarDoPadrao';
 import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarExclusaoForte';
 import { podeExcluirCartao, proximoDiaISO, dataBr } from '../../../lib/janelaCartao';
 import { useBairros } from '../../../hooks/useBairros';
@@ -89,7 +88,6 @@ export default function CartaoProgramaPage() {
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarTemplatesPanel, setMostrarTemplatesPanel] = useState(false);
   const [modalNovoTemplateAberto, setModalNovoTemplateAberto] = useState(false);
-  const [modalCopiarAberto, setModalCopiarAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -117,14 +115,6 @@ export default function CartaoProgramaPage() {
     } else {
       toast(resultado.mensagem, 'warning');
     }
-  }
-
-  function handleAbrirCopiar() {
-    if (!dataSelecionada) {
-      toast('Selecione a data do Cartão Programa (destino da cópia).', 'warning');
-      return;
-    }
-    setModalCopiarAberto(true);
   }
 
   async function handleAbrirTemplate(id: string) {
@@ -236,9 +226,6 @@ export default function CartaoProgramaPage() {
             <button type="button" className="btn btn-primary btn-sm" onClick={handleCriarCartao}>
               <Plus /> Criar Cartão
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={handleAbrirCopiar}>
-              <Copy /> Copiar
-            </button>
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleImprimir}>
               <Printer /> Imprimir
             </button>
@@ -288,8 +275,10 @@ export default function CartaoProgramaPage() {
         <div className="cartao-empty-state">
           <ClipboardX />
           <h3>Nenhum Cartão Programa para esta data</h3>
-          <p>Crie um cartão em branco, copie a estrutura do dia anterior, ou importe um cartão padrão pronto.</p>
-          <SugestaoTemplate dataSelecionada={dataSelecionada} onClonado={() => void recarregar()} />
+          <p>O cartão do dia nasce a partir do cartão padrão ativo — as viaturas e o roteiro base já vêm preenchidos.</p>
+          {/* key força um novo fetch ao fechar "Cartões Padrão" — o P3 pode ter trocado o
+              padrão ativo ali, e este bloco só busca no mount. */}
+          <CriarDoPadrao key={String(mostrarTemplatesPanel)} onCriar={() => void handleCriarCartao()} />
         </div>
       )}
 
@@ -403,14 +392,6 @@ export default function CartaoProgramaPage() {
         <ModalNovoTemplate
           onFechar={() => setModalNovoTemplateAberto(false)}
           onCriado={(t) => { setModalNovoTemplateAberto(false); setTemplateAberto(t); }}
-        />
-      )}
-
-      {modalCopiarAberto && (
-        <ModalCopiarCartao
-          dataAlvo={dataSelecionada}
-          onFechar={() => setModalCopiarAberto(false)}
-          onCopiado={() => { setModalCopiarAberto(false); setTemplateAberto(null); void recarregar(); }}
         />
       )}
 

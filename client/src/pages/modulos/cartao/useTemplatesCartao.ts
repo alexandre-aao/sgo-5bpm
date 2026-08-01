@@ -9,6 +9,7 @@ export interface TemplateResumo {
   tipo_periodo: string;
   qtd_viaturas_base: number;
   qtd_viaturas: number;
+  padrao_ativo: boolean;
 }
 
 export interface NovoTemplatePayload {
@@ -76,5 +77,18 @@ export function useTemplatesCartao() {
     }
   }, [recarregar]);
 
-  return { templates, carregando, recarregar, criarTemplate, excluirTemplate };
+  // Único padrão ativo no sistema: a troca é atômica no servidor (ativar_cartao_padrao).
+  const definirPadraoAtivo = useCallback(async (id: string): Promise<ResultadoAcao> => {
+    try {
+      const res = await apiFetch(`/api/cartoes/${id}/padrao-ativo`, { method: 'PUT' });
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao definir o cartão padrão.') };
+      await recarregar();
+      return { ok: true };
+    } catch (erro) {
+      console.error('Erro ao definir cartão padrão ativo:', erro);
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [recarregar]);
+
+  return { templates, carregando, recarregar, criarTemplate, excluirTemplate, definirPadraoAtivo };
 }

@@ -1,4 +1,4 @@
-import { LayoutTemplate, FolderOpen, Trash2 } from 'lucide-react';
+import { LayoutTemplate, FolderOpen, Trash2, CheckCircle2 } from 'lucide-react';
 import { useToast } from '../../../context/useToast';
 import { useTemplatesCartao } from './useTemplatesCartao';
 
@@ -10,10 +10,11 @@ interface TemplatesPanelProps {
 }
 
 // Painel "Cartões Padrão" (P3-only) — espelha #cartao-templates-panel +
-// renderTemplatesTab()/handleExcluirTemplate() em public/app.js.
+// renderTemplatesTab()/handleExcluirTemplate() em public/app.js. Um só template
+// pode estar ativo por vez: é o que POST /api/cartoes clona para o cartão do dia.
 export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
   const { toast } = useToast();
-  const { templates, carregando, excluirTemplate } = useTemplatesCartao();
+  const { templates, carregando, excluirTemplate, definirPadraoAtivo } = useTemplatesCartao();
 
   async function handleExcluir(id: string) {
     if (!window.confirm('Excluir permanentemente este cartão padrão?')) return;
@@ -21,6 +22,15 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
     if (resultado.ok) {
       toast('Cartão padrão excluído.', 'info');
       onExcluido(id);
+    } else {
+      toast(resultado.mensagem, 'danger');
+    }
+  }
+
+  async function handleDefinirPadrao(id: string) {
+    const resultado = await definirPadraoAtivo(id);
+    if (resultado.ok) {
+      toast('Cartão padrão ativo definido.', 'success');
     } else {
       toast(resultado.mensagem, 'danger');
     }
@@ -45,13 +55,14 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
               <th>Período</th>
               <th className="text-center">Qtd. VTRs Base</th>
               <th className="text-center">Viaturas Cadastradas</th>
+              <th className="text-center">Padrão</th>
               <th className="text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando ? null : templates.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
                   Nenhum cartão padrão cadastrado ainda.
                 </td>
               </tr>
@@ -62,6 +73,17 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
                   <td>{t.tipo_periodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'}</td>
                   <td className="text-center">{t.qtd_viaturas_base}</td>
                   <td className="text-center">{t.qtd_viaturas}</td>
+                  <td className="text-center">
+                    {t.padrao_ativo ? (
+                      <span className="badge status-ativa">
+                        <CheckCircle2 style={{ width: 12, height: 12 }} /> Ativo
+                      </span>
+                    ) : (
+                      <button className="btn btn-secondary btn-sm" onClick={() => void handleDefinirPadrao(t.id)}>
+                        Definir como padrão
+                      </button>
+                    )}
+                  </td>
                   <td className="text-right">
                     <button className="btn btn-secondary btn-sm" onClick={() => onAbrir(t.id)}>
                       <FolderOpen style={{ width: 12, height: 12 }} /> Abrir
