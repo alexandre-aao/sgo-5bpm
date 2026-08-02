@@ -5,23 +5,26 @@ import { CATEGORIAS_VIATURA } from '../../../lib/categoriasViatura';
 import { useToast } from '../../../context/useToast';
 import { SeletorCompanhia } from './SeletorCompanhia';
 import { PainelAvisosViatura } from './PainelAvisosViatura';
+import { AutocompleteComandante } from './AutocompleteComandante';
+import { SeletorBairrosViatura } from './SeletorBairrosViatura';
 import type { ViaturaPayload } from './useViaturasCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
 
 const VAZIO: ViaturaPayload = {
-  prefixo: '', setor: '', companhia: '', categoria: 'Ordinária', comandante: '',
-  observacao: '', bairro_id: '', comandante_pessoal_id: '', avisos_ids: [],
+  prefixo: '', setor: '', companhia: '', categoria: 'Ordinária', comandante: '', composicao: '',
+  observacao: '', bairro_id: '', bairros_ids: [], comandante_pessoal_id: '', avisos_ids: [],
 };
 
 interface FormAdicionarViaturaProps {
   viaturasCadastradas: Tables<'viaturas'>[];
+  pessoal: Tables<'pessoal'>[];
   bairros: Tables<'bairros_coordenadas'>[];
   avisos: Tables<'avisos'>[];
   onAdicionar: (payload: ViaturaPayload) => Promise<ResultadoAcao>;
 }
 
 // Espelha o form #form-cartao-vtr de public/index.html + handleAddCartaoVtr().
-export function FormAdicionarViatura({ viaturasCadastradas, bairros, avisos, onAdicionar }: FormAdicionarViaturaProps) {
+export function FormAdicionarViatura({ viaturasCadastradas, pessoal, bairros, avisos, onAdicionar }: FormAdicionarViaturaProps) {
   const { toast } = useToast();
   const [form, setForm] = useState<ViaturaPayload>(VAZIO);
   const [enviando, setEnviando] = useState(false);
@@ -72,20 +75,11 @@ export function FormAdicionarViatura({ viaturasCadastradas, bairros, avisos, onA
           </div>
           <div className="form-group col-md-5">
             <label htmlFor="vtr_comandante">Comandante da Guarnição</label>
-            <input
-              type="text" id="vtr_comandante" placeholder="Ex: 2º SGT PM DÊNIS"
-              value={form.comandante} onChange={(e) => setForm({ ...form, comandante: e.target.value })}
-            />
+            <AutocompleteComandante id="vtr_comandante" pessoal={pessoal} valor={form.comandante}
+              onChange={(comandante, comandante_pessoal_id) => setForm({ ...form, comandante, comandante_pessoal_id })} />
           </div>
         </div>
         <div className="form-row">
-          <div className="form-group col-md-4">
-            <label htmlFor="vtr_bairro">Bairro (Alertas)</label>
-            <select id="vtr_bairro" value={form.bairro_id} onChange={(e) => setForm({ ...form, bairro_id: e.target.value })}>
-              <option value="">Não vinculado</option>
-              {bairros.map((b) => <option key={b.id} value={b.id}>{b.nome_bairro}</option>)}
-            </select>
-          </div>
           <div className="form-group col-md-4">
             <label htmlFor="vtr_categoria">Categoria da Viatura</label>
             <select id="vtr_categoria" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
@@ -100,6 +94,15 @@ export function FormAdicionarViatura({ viaturasCadastradas, bairros, avisos, onA
             />
           </div>
         </div>
+        <div className="form-row">
+          <div className="form-group col-md-6">
+            <label htmlFor="vtr_composicao">Composição da guarnição</label>
+            <input id="vtr_composicao" type="text" placeholder="Ex: 3º SGT SILVA · CB SOUZA · SD LIMA"
+              value={form.composicao} onChange={(e) => setForm({ ...form, composicao: e.target.value })} />
+          </div>
+        </div>
+        <SeletorBairrosViatura bairros={bairros} selecionados={form.bairros_ids}
+          onChange={(bairros_ids) => setForm({ ...form, bairros_ids, bairro_id: bairros_ids[0] || '' })} />
         <div className="form-row">
           <SeletorCompanhia
             id="vtr_companhia"

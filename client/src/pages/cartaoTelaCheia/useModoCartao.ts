@@ -17,7 +17,7 @@ function lerPreferenciaSalva(): ModoCartao | null {
 /** Modo de renderização do Cartão em tela cheia: automático pelo viewport (mesmo
  *  breakpoint do shell mobile, max-width:768px), com override manual que sempre
  *  vence e persiste em localStorage — mesmo padrão de tolerância a falha (modo
- *  privado etc.) de pdf/geracaoCartao.ts. */
+ *  privado etc.) usados pela Central de Emissão. */
 export function useModoCartao() {
   const [modo, setModoState] = useState<ModoCartao>(() => {
     const salvo = lerPreferenciaSalva();

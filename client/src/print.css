@@ -1,69 +1,30 @@
 /* ============================================================
    SGO — print.css
-   Regras @page e @media print extraídas de style.css (Lote 9) — move puro,
-   sem reescrever nenhum seletor. Importado depois de style.css em main.tsx:
-   a ordem de import é o que define a cascata do bundle final, e como todo
-   seletor aqui usa `body:has(#id)` e/ou `!important` (especificidade alta o
-   bastante para não depender de vir depois na fonte), mover de arquivo não
-   muda o resultado. As regras base .cp- e .rel-pdf- (usadas também na prévia
-   em tela, não só na impressão) continuam em style.css de propósito.
+   Regras físicas de página e gates que isolam cada documento na impressão.
+   Importado depois de style.css em main.tsx para manter a cascata previsível.
    ============================================================ */
 
 @page relatorioPdfLandscape { size: A4 landscape; margin: 10mm; }
 
-@page cartaoCelular { size: 100mm 180mm; margin: 8mm; }
-@page cartaoA4 { size: A4 portrait; margin: 15mm; }
+@page centralCartaoA4 { size: A4 portrait; margin: 0; }
+@page centralCartaoCelular { size: 100mm 180mm; margin: 0; }
 
-/* Central de Impressão (Lote 10) — margens do Manual de Redação Oficial. */
-@page impressaoRetrato { size: A4 portrait; margin: 20mm 15mm 20mm 30mm; }
-
-/* Os dois gates abaixo (#modal-cartao-pdf e #modal-relatorio-pdf) escondem
-   .app-container inteiro e deixam só a folha. Isso EXIGE que o modal seja irmão
-   de .app-container, não descendente — um ancestral com `display: none` não é
-   anulado por regra no filho, e o documento sairia em branco. Quem garante isso
-   é o <PortalImpressao>, que monta esses modais em #sgo-modal-root (filho direto
-   de <body>). Ao criar um modal de impressão novo, envolva-o no portal também. */
 @media print {
-  /* Só a folha do cartão vai para a impressora. */
-  body:has(#modal-cartao-pdf) .app-container,
-  body:has(#modal-cartao-pdf) .toast-container { display: none !important; }
-
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf {
-    position: static;
-    display: block;
-    background: none;
-    padding: 0;
+  body:has(#central-emissao-impressao) * { visibility: hidden !important; }
+  body:has(#central-emissao-impressao) #central-emissao-impressao,
+  body:has(#central-emissao-impressao) #central-emissao-impressao * { visibility: visible !important; }
+  body:has(#central-emissao-impressao) #central-emissao-impressao {
+    display: block !important; position: absolute; inset: 0; width: 100%;
   }
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf .modal-box {
-    box-shadow: none;
-    border: none;
-    max-width: none;
-    width: auto;
-    padding: 0;
-    background: #fff;
+  body:has(#central-emissao-impressao) .documento-cartao { box-shadow: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  body:has(#central-emissao-impressao) .doc-cartao-rodape {
+    position: fixed; bottom: 5mm; left: 15mm; right: 15mm; margin: 0;
   }
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf .modal-header,
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf .form-actions,
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pdf-opcoes,
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-geracao-eixos,
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-geracao-lista,
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pendencias,
-  body:has(#modal-cartao-pdf) #modal-cartao-pdf .cp-pdf-dica { display: none !important; }
-
-  body:has(#modal-cartao-pdf) .cp-pdf-palco,
-  body:has(#modal-cartao-pdf) .cp-pdf-palco-impressao {
-    display: block;
-    padding: 0;
-    background: none;
-    overflow: visible;
-  }
-  body:has(#modal-cartao-pdf) .cp-pdf-palco .cp-pdf {
-    padding: 0;
-    box-shadow: none;
-    width: auto;
-  }
-  /* O marinho do número e a barra do aviso precisam sair coloridos. */
-  .cp-pdf, .cp-pdf * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  body:has(#central-emissao-impressao) .documento-cartao--celular .doc-cartao-rodape { left: 7mm; right: 7mm; bottom: 4mm; }
+  body:has(#central-emissao-impressao) .doc-cartao-roteiro thead { display: table-header-group; }
+  body:has(#central-emissao-impressao) .doc-cartao-roteiro tr,
+  body:has(#central-emissao-impressao) .doc-cartao-evento,
+  body:has(#central-emissao-impressao) .doc-cartao-alerta { break-inside: avoid; }
 }
 
 /* -------------------------------------------------------------
@@ -73,9 +34,7 @@
    (.cartao-header-panel, .cartao-vtr-card, .cartao-itens-table...) para sair no
    papel. Elas serviam a um botão "Imprimir" solto no toolbar, que mandava a
    tela inteira — com menu e filtros — para a impressora. Esse botão foi
-   removido: as saídas oficiais do cartão são o "Gerar Cartões" (documento
-   .cp-*) e a Central de Impressão (documento .impressao-*), cada um com o seu
-   próprio design. As regras foram junto; nenhum documento atual as usa.
+   removido: toda emissão do Cartão agora passa pela Central de Emissão.
 
    Sobrou o que vale para QUALQUER impressão do app.
    ------------------------------------------------------------- */
@@ -111,53 +70,4 @@
     -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
   }
   body:has(#modal-relatorio-pdf) .relatorio-pdf-area { page: relatorioPdfLandscape; }
-}
-
-/* -------------------------------------------------------------
-   CENTRAL DE IMPRESSÃO (/impressao) — Saídas 1 e 2 (Lote 10)
-   A rota vive dentro do AppLayout normal (sidebar/topbar), diferente dos
-   modais #modal-cartao-pdf/#modal-relatorio-pdf acima — por isso o gate não
-   usa body:has(#id) + display:none no ancestral (a folha é descendente do
-   .app-container, então escondê-lo esconderia a folha também). A técnica
-   "visibility" abaixo é robusta à profundidade do DOM: some tudo, revela só
-   a folha, e a reposiciona na origem da página impressa.
-   ------------------------------------------------------------- */
-@media print {
-  body:has(#impressao-preview-area) * {
-    visibility: hidden;
-  }
-  body:has(#impressao-preview-area) #impressao-preview-area,
-  body:has(#impressao-preview-area) #impressao-preview-area * {
-    visibility: visible;
-  }
-  body:has(#impressao-preview-area) #impressao-preview-area {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    max-height: none;
-    overflow: visible;
-    padding: 0;
-    display: block;
-  }
-  body:has(#impressao-preview-area) .folha {
-    width: auto;
-    min-height: 0;
-    box-shadow: none;
-    margin: 0;
-  }
-
-  /* Tabela repete cabeçalho a cada página; linha nunca quebra no meio. */
-  #impressao-preview-area table thead { display: table-header-group; }
-  #impressao-preview-area tr, #impressao-preview-area td, #impressao-preview-area th {
-    break-inside: avoid;
-  }
-  #impressao-preview-area .folha, #impressao-preview-area .folha * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  /* Sem URL impressa ao lado de link, órfãs/viúvas controladas. */
-  #impressao-preview-area a[href]::after { content: '' !important; }
-  #impressao-preview-area p, #impressao-preview-area li { orphans: 3; widows: 3; }
 }

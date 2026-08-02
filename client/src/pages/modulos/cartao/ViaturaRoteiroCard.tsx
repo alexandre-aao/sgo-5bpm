@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Pencil, Trash2, Check, X, Plus, CalendarCheck } from 'lucide-react';
+import { CalendarCheck, Check, Copy, CopyPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
-import type { CartaoViatura } from '../../../lib/cartaoConflitos';
+import type { CartaoItem, CartaoViatura } from '../../../lib/cartaoConflitos';
 import { formatHoraCartao, itensSobrepostos } from '../../../lib/cartaoConflitos';
 import { marcarViradaDeDia } from '../../../lib/janelaCartao';
 import { useToast } from '../../../context/useToast';
@@ -10,246 +10,139 @@ import { eventosNoSetorDaVtr } from './eventosNoSetor';
 import type { ItemPayload } from './useItensRoteiro';
 import type { ResultadoAcao } from './useCartaoPrograma';
 
-interface EdicaoAtividade {
-  vtrId: string;
-  itemId: string;
-}
-
 interface ViaturaRoteiroCardProps {
   vtr: CartaoViatura;
+  todasViaturas: CartaoViatura[];
   dataCartao: string;
   eventos: Tables<'eventos'>[];
   podeEditar: boolean;
-  editandoAtividade: EdicaoAtividade | null;
-  onIniciarEdicaoAtividade: (vtrId: string, itemId: string) => void;
-  onCancelarEdicaoAtividade: () => void;
-  onSalvarAtividade: (vtrId: string, itemId: string, atividade: string) => Promise<ResultadoAcao>;
   onExcluirItem: (vtrId: string, itemId: string) => Promise<ResultadoAcao>;
   onAdicionarItem: (vtrId: string, payload: ItemPayload) => Promise<ResultadoAcao>;
+  onAtualizarItem: (vtrId: string, itemId: string, payload: ItemPayload) => Promise<ResultadoAcao>;
+  onDuplicarItem: (vtrId: string, payload: ItemPayload) => Promise<ResultadoAcao>;
+  onCopiarRoteiro: (vtrAlvoId: string, origemViaturaId: string, substituir: boolean) => Promise<ResultadoAcao>;
   onEditarViatura: (vtr: CartaoViatura) => void;
   onExcluirViatura: (vtr: CartaoViatura) => void;
 }
 
 const ITEM_VAZIO: ItemPayload = { inicio: '', fim: '', local: '', atividade: ATIVIDADES_CARTAO[0] };
 
-// Um card por viatura, com a tabela de itens de roteiro + form de inclusão —
-// espelha o trecho de renderCartaoVtrGrid() em public/app.js.
+function payloadDoItem(item: CartaoItem): ItemPayload {
+  return { inicio: item.inicio, fim: item.fim || '', local: item.local, atividade: item.atividade };
+}
+
 export function ViaturaRoteiroCard({
-  vtr,
-  dataCartao,
-  eventos,
-  podeEditar,
-  editandoAtividade,
-  onIniciarEdicaoAtividade,
-  onCancelarEdicaoAtividade,
-  onSalvarAtividade,
-  onExcluirItem,
-  onAdicionarItem,
-  onEditarViatura,
-  onExcluirViatura,
+  vtr, todasViaturas, dataCartao, eventos, podeEditar, onExcluirItem, onAdicionarItem,
+  onAtualizarItem, onDuplicarItem, onCopiarRoteiro, onEditarViatura, onExcluirViatura,
 }: ViaturaRoteiroCardProps) {
   const { toast } = useToast();
   const [novoItem, setNovoItem] = useState<ItemPayload>(ITEM_VAZIO);
-  const [atividadeEmEdicao, setAtividadeEmEdicao] = useState('');
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [itemEmEdicao, setItemEmEdicao] = useState<ItemPayload>(ITEM_VAZIO);
+  const [origemRoteiro, setOrigemRoteiro] = useState('');
   const [enviando, setEnviando] = useState(false);
-
   const eventosSetor = eventosNoSetorDaVtr(vtr.setor, dataCartao, eventos);
   const categoria = vtr.categoria || 'Ordinária';
 
-  async function handleIncluirItem() {
-    const inicio = novoItem.inicio;
-    const fim = novoItem.fim;
-    const local = novoItem.local.trim();
-    const atividade = novoItem.atividade;
-
-    if (!inicio || !local) {
+  function validarItem(payload: ItemPayload, ignorarId?: string): boolean {
+    if (!payload.inicio || !payload.local.trim()) {
       toast('Informe pelo menos o horário de início e o local.', 'warning');
+      return false;
+    }
+    if (payload.fim) {
+      const conflito = vtr.itens.find((item) => item.id !== ignorarId && itensSobrepostos(item, payload));
+      if (conflito && !window.confirm(
+        `O horário sobrepõe ${formatHoraCartao(conflito.inicio)} às ${formatHoraCartao(conflito.fim)} (${conflito.atividade}). Deseja salvar mesmo assim?`,
+      )) return false;
+    }
+    return true;
+  }
+
+  async function incluirItem() {
+    const payload = { ...novoItem, local: novoItem.local.trim() };
+    if (!validarItem(payload)) return;
+    setEnviando(true);
+    const resultado = await onAdicionarItem(vtr.id, payload);
+    setEnviando(false);
+    toast(resultado.ok ? 'Item incluído; roteiro reordenado pela janela 07h–07h.' : resultado.mensagem, resultado.ok ? 'success' : 'danger');
+    if (resultado.ok) setNovoItem(ITEM_VAZIO);
+  }
+
+  async function salvarItem(itemId: string) {
+    const payload = { ...itemEmEdicao, local: itemEmEdicao.local.trim() };
+    if (!validarItem(payload, itemId)) return;
+    const resultado = await onAtualizarItem(vtr.id, itemId, payload);
+    toast(resultado.ok ? 'Horário, local e atividade atualizados.' : resultado.mensagem, resultado.ok ? 'success' : 'danger');
+    if (resultado.ok) setEditandoId(null);
+  }
+
+  async function duplicarItem(item: CartaoItem) {
+    const resultado = await onDuplicarItem(vtr.id, payloadDoItem(item));
+    toast(resultado.ok ? 'Item duplicado no roteiro.' : resultado.mensagem, resultado.ok ? 'success' : 'danger');
+  }
+
+  async function excluirItem(itemId: string) {
+    if (!window.confirm('Excluir este item do roteiro?')) return;
+    const resultado = await onExcluirItem(vtr.id, itemId);
+    toast(resultado.ok ? 'Item removido do roteiro.' : resultado.mensagem, resultado.ok ? 'info' : 'danger');
+  }
+
+  async function copiarRoteiro(substituir: boolean) {
+    if (!origemRoteiro) {
+      toast('Selecione a viatura de origem.', 'warning');
       return;
     }
-
-    // Sobreposição de horário com itens já lançados nesta mesma viatura — mesmo
-    // aviso não-bloqueante de handleAddCartaoItem() (confirm nativo).
-    if (fim) {
-      const conflito = vtr.itens.find((item) => itensSobrepostos(item, { inicio, fim }));
-      if (conflito) {
-        const confirmar = window.confirm(
-          `Atenção: este horário (${formatHoraCartao(inicio)} às ${formatHoraCartao(fim)}) sobrepõe o item já lançado ` +
-            `"${formatHoraCartao(conflito.inicio)} às ${formatHoraCartao(conflito.fim)}" (${conflito.atividade}) nesta viatura.\n\n` +
-            `Deseja incluir mesmo assim?`,
-        );
-        if (!confirmar) return;
-      }
-    }
-
-    setEnviando(true);
-    const resultado = await onAdicionarItem(vtr.id, { inicio, fim, local, atividade });
-    setEnviando(false);
-    if (resultado.ok) {
-      toast('Item incluído no roteiro.', 'success');
-      setNovoItem(ITEM_VAZIO);
-    } else {
-      toast(resultado.mensagem, 'danger');
-    }
-  }
-
-  async function handleExcluirItem(itemId: string) {
-    const resultado = await onExcluirItem(vtr.id, itemId);
-    if (resultado.ok) {
-      toast('Item removido do roteiro.', 'info');
-    } else {
-      toast(resultado.mensagem, 'danger');
-    }
-  }
-
-  async function handleSalvarAtividade(itemId: string) {
-    const resultado = await onSalvarAtividade(vtr.id, itemId, atividadeEmEdicao);
-    if (resultado.ok) {
-      toast('Atividade atualizada.', 'success');
-    } else {
-      toast(resultado.mensagem, 'danger');
-    }
+    if (substituir && vtr.itens.length && !window.confirm('Substituir todo o roteiro atual pelo roteiro da viatura escolhida?')) return;
+    const resultado = await onCopiarRoteiro(vtr.id, origemRoteiro, substituir);
+    toast(resultado.ok ? `Roteiro ${substituir ? 'substituído' : 'adicionado'} com sucesso.` : resultado.mensagem, resultado.ok ? 'success' : 'danger');
+    if (resultado.ok) setOrigemRoteiro('');
   }
 
   return (
     <div className="cartao-vtr-card">
       <div className="cartao-vtr-header">
         <div>
-          <h3>
-            VTR {vtr.prefixo} — {vtr.setor}{' '}
-            {categoria !== 'Ordinária' && (
-              <span className={`badge cartao-badge-categoria ${categoriaBadgeClass(categoria)}`}>{categoria}</span>
-            )}
-          </h3>
+          <h3>VTR {vtr.prefixo} — {vtr.setor}{' '}{categoria !== 'Ordinária' && <span className={`badge cartao-badge-categoria ${categoriaBadgeClass(categoria)}`}>{categoria}</span>}</h3>
           <div className="vtr-meta">
             <span><strong>Companhia:</strong> {vtr.companhia || 'Não informada'}</span>
             <span><strong>Comandante:</strong> {vtr.comandante || 'Não informado'}</span>
+            {vtr.composicao && <span><strong>Composição:</strong> {vtr.composicao}</span>}
             {vtr.observacao && <span><strong>Obs:</strong> {vtr.observacao}</span>}
           </div>
         </div>
-        {podeEditar && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn-icon btn-sm" title="Editar viatura" aria-label="Editar viatura" onClick={() => onEditarViatura(vtr)}>
-              <Pencil style={{ width: 14, height: 14 }} />
-            </button>
-            <button className="btn-icon btn-sm" title="Remover viatura" aria-label="Remover viatura" onClick={() => onExcluirViatura(vtr)}>
-              <Trash2 style={{ width: 14, height: 14 }} />
-            </button>
-          </div>
-        )}
+        {podeEditar && <div className="acoes-linha"><button className="btn-icon btn-sm" title="Editar viatura" aria-label="Editar viatura" onClick={() => onEditarViatura(vtr)}><Pencil /></button><button className="btn-icon btn-sm" title="Remover viatura" aria-label="Remover viatura" onClick={() => onExcluirViatura(vtr)}><Trash2 /></button></div>}
       </div>
 
       <div className="cartao-vtr-body">
-        {eventosSetor.length > 0 && (
-          <div className="cartao-evento-alerta">
-            <CalendarCheck />
-            <div>
-              <strong>OBSERVAÇÃO — EVENTO NO SETOR NESTA DATA:</strong>
-              {eventosSetor.map((evt) => (
-                <div className="cartao-evento-linha" key={evt.id}>
-                  • <strong>{evt.nome_evento}</strong> ({evt.tipo_evento})
-                  {' — '}{evt.horario_inicio ? `às ${formatHoraCartao(evt.horario_inicio)}` : 'horário não informado'}
-                  {' — '}{evt.local_itinerario}
-                  {evt.num_os_manual && <><br />&nbsp;&nbsp;{evt.num_os_manual}</>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {eventosSetor.length > 0 && <div className="cartao-evento-alerta"><CalendarCheck /><div><strong>EVENTOS NO SETOR NESTA DATA</strong>{eventosSetor.map((evento) => <div className="cartao-evento-linha" key={evento.id}>• <strong>{evento.nome_evento}</strong> ({evento.tipo_evento}) — {evento.horario_inicio ? `às ${formatHoraCartao(evento.horario_inicio)}` : 'horário não informado'} — {evento.local_itinerario}</div>)}</div></div>}
 
+        {podeEditar && todasViaturas.length > 1 && <div className="roteiro-copiar"><Copy /><span>Copiar roteiro de</span><select value={origemRoteiro} onChange={(e) => setOrigemRoteiro(e.target.value)}><option value="">Selecione...</option>{todasViaturas.filter((item) => item.id !== vtr.id).map((item) => <option key={item.id} value={item.id}>{item.prefixo}</option>)}</select><button type="button" className="btn btn-secondary btn-sm" onClick={() => void copiarRoteiro(false)}>Adicionar</button><button type="button" className="btn btn-secondary btn-sm" onClick={() => void copiarRoteiro(true)}>Substituir</button></div>}
+
+        <div className="roteiro-ordem-nota">A ordem é recalculada automaticamente pelo horário do turno: 07h00 até 06h59 do dia seguinte.</div>
         <table className="cartao-itens-table">
-          <thead>
-            <tr><th>Horário</th><th>Local / Itinerário</th><th>Atividade</th><th></th></tr>
-          </thead>
+          <thead><tr><th>Horário</th><th>Local / Itinerário</th><th>Atividade</th><th></th></tr></thead>
           <tbody>
-            {vtr.itens.length === 0 ? (
-              <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 16 }}>Sem itens de roteiro.</td></tr>
-            ) : (
-              marcarViradaDeDia(vtr.itens, dataCartao).map((entrada) => {
-                if (entrada.tipo === 'virada') {
-                  return (
-                    <tr className="cartao-item-virada" key={`virada-${entrada.rotulo}`}>
-                      <td colSpan={4}>{entrada.rotulo}</td>
-                    </tr>
-                  );
-                }
-                const item = entrada.item;
-                const emEdicao = editandoAtividade?.vtrId === vtr.id && editandoAtividade?.itemId === item.id;
-                return (
-                  <tr key={item.id}>
-                    <td className="cartao-item-hora">{formatHoraCartao(item.inicio)}{item.fim ? ` às ${formatHoraCartao(item.fim)}` : ''}</td>
-                    <td>{item.local}</td>
-                    <td>
-                      {emEdicao ? (
-                        <select
-                          className="cartao-edit-atividade-select"
-                          defaultValue={item.atividade}
-                          onChange={(e) => setAtividadeEmEdicao(e.target.value)}
-                        >
-                          {ATIVIDADES_CARTAO.map((a) => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                      ) : (
-                        <span className={`badge ${atividadeBadgeClass(item.atividade)}`}>{item.atividade}</span>
-                      )}
-                    </td>
-                    <td style={{ width: 64, whiteSpace: 'nowrap' }}>
-                      {!podeEditar ? null : emEdicao ? (
-                        <>
-                          <button className="btn-icon btn-sm" title="Salvar atividade" aria-label="Salvar atividade" onClick={() => handleSalvarAtividade(item.id)}>
-                            <Check style={{ width: 12, height: 12 }} />
-                          </button>
-                          <button className="btn-icon btn-sm" title="Cancelar" aria-label="Cancelar" onClick={onCancelarEdicaoAtividade}>
-                            <X style={{ width: 12, height: 12 }} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            className="btn-icon btn-sm" title="Mudar atividade" aria-label="Mudar atividade"
-                            onClick={() => { setAtividadeEmEdicao(item.atividade); onIniciarEdicaoAtividade(vtr.id, item.id); }}
-                          >
-                            <Pencil style={{ width: 12, height: 12 }} />
-                          </button>
-                          <button className="btn-icon btn-sm" title="Remover item" aria-label="Remover item" onClick={() => handleExcluirItem(item.id)}>
-                            <X style={{ width: 12, height: 12 }} />
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+            {vtr.itens.length === 0 ? <tr><td colSpan={4} className="cartao-vazio-linha">Sem itens de roteiro.</td></tr> : marcarViradaDeDia(vtr.itens, dataCartao).map((entrada) => {
+              if (entrada.tipo === 'virada') return <tr className="cartao-item-virada" key={`virada-${vtr.id}`}><td colSpan={4}>{entrada.rotulo}</td></tr>;
+              const item = entrada.item;
+              const editando = editandoId === item.id;
+              return <tr key={item.id}>
+                <td className="cartao-item-hora">{editando ? <div className="roteiro-edicao-horas"><input type="time" value={itemEmEdicao.inicio} onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, inicio: e.target.value })} /><input type="time" value={itemEmEdicao.fim} onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, fim: e.target.value })} /></div> : <>{formatHoraCartao(item.inicio)}{item.fim ? ` às ${formatHoraCartao(item.fim)}` : ''}</>}</td>
+                <td>{editando ? <input className="roteiro-edicao-local" value={itemEmEdicao.local} onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, local: e.target.value })} /> : item.local}</td>
+                <td>{editando ? <select value={itemEmEdicao.atividade} onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, atividade: e.target.value })}>{ATIVIDADES_CARTAO.map((atividade) => <option key={atividade}>{atividade}</option>)}</select> : <span className={`badge ${atividadeBadgeClass(item.atividade)}`}>{item.atividade}</span>}</td>
+                <td className="roteiro-item-acoes">{podeEditar && (editando ? <><button className="btn-icon btn-sm" title="Salvar item" aria-label="Salvar item" onClick={() => void salvarItem(item.id)}><Check /></button><button className="btn-icon btn-sm" title="Cancelar" aria-label="Cancelar" onClick={() => setEditandoId(null)}><X /></button></> : <><button className="btn-icon btn-sm" title="Editar horário, local e atividade" aria-label="Editar item" onClick={() => { setItemEmEdicao(payloadDoItem(item)); setEditandoId(item.id); }}><Pencil /></button><button className="btn-icon btn-sm" title="Duplicar item" aria-label="Duplicar item" onClick={() => void duplicarItem(item)}><CopyPlus /></button><button className="btn-icon btn-sm" title="Excluir item" aria-label="Excluir item" onClick={() => void excluirItem(item.id)}><X /></button></>)}</td>
+              </tr>;
+            })}
           </tbody>
         </table>
 
-        {podeEditar && (
-          <div className="cartao-item-form">
-            <div className="form-group">
-              <label>Início *</label>
-              <input type="time" value={novoItem.inicio} onChange={(e) => setNovoItem({ ...novoItem, inicio: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Fim</label>
-              <input type="time" value={novoItem.fim} onChange={(e) => setNovoItem({ ...novoItem, fim: e.target.value })} />
-            </div>
-            <div className="form-group" style={{ flexGrow: 1 }}>
-              <label>Local / Itinerário *</label>
-              <input
-                type="text" placeholder="Ex: Rot. Eng. Roberto Freire c/ Via Costeira"
-                value={novoItem.local} onChange={(e) => setNovoItem({ ...novoItem, local: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Atividade</label>
-              <select value={novoItem.atividade} onChange={(e) => setNovoItem({ ...novoItem, atividade: e.target.value })}>
-                {ATIVIDADES_CARTAO.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            <button className={`btn btn-primary btn-sm${enviando ? ' btn-carregando' : ''}`} disabled={enviando} onClick={handleIncluirItem}>
-              <Plus style={{ width: 12, height: 12 }} /> Incluir
-            </button>
-          </div>
-        )}
+        {podeEditar && <div className="cartao-item-form">
+          <div className="form-group"><label>Início *</label><input type="time" value={novoItem.inicio} onChange={(e) => setNovoItem({ ...novoItem, inicio: e.target.value })} /></div>
+          <div className="form-group"><label>Fim</label><input type="time" value={novoItem.fim} onChange={(e) => setNovoItem({ ...novoItem, fim: e.target.value })} /></div>
+          <div className="form-group" style={{ flexGrow: 1 }}><label>Local / Itinerário *</label><input type="text" value={novoItem.local} onChange={(e) => setNovoItem({ ...novoItem, local: e.target.value })} /></div>
+          <div className="form-group"><label>Atividade</label><select value={novoItem.atividade} onChange={(e) => setNovoItem({ ...novoItem, atividade: e.target.value })}>{ATIVIDADES_CARTAO.map((atividade) => <option key={atividade}>{atividade}</option>)}</select></div>
+          <button className={`btn btn-primary btn-sm${enviando ? ' btn-carregando' : ''}`} disabled={enviando} onClick={() => void incluirItem()}><Plus /> Incluir</button>
+        </div>}
       </div>
     </div>
   );

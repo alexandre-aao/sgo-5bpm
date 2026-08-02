@@ -73,5 +73,63 @@ export function useItensRoteiro(cartaoId: string | undefined, recarregar: () => 
     [cartaoId, recarregar],
   );
 
-  return { adicionarItem, removerItem, atualizarAtividade };
+  const atualizarItem = useCallback(
+    async (vtrId: string, itemId: string, payload: ItemPayload): Promise<ResultadoAcao> => {
+      if (!cartaoId) return { ok: false, mensagem: 'Nenhum cartão carregado.' };
+      try {
+        const res = await apiFetch(`/api/cartoes/${cartaoId}/viaturas/${vtrId}/itens/${itemId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao atualizar o item de roteiro.') };
+        await recarregar();
+        return { ok: true };
+      } catch (erro) {
+        console.error('Erro ao atualizar item de roteiro:', erro);
+        return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+      }
+    }, [cartaoId, recarregar],
+  );
+
+  const duplicarItem = useCallback(
+    async (vtrId: string, payload: ItemPayload): Promise<ResultadoAcao> => adicionarItem(vtrId, payload),
+    [adicionarItem],
+  );
+
+  const copiarRoteiro = useCallback(
+    async (vtrAlvoId: string, origemViaturaId: string, substituir: boolean): Promise<ResultadoAcao> => {
+      if (!cartaoId) return { ok: false, mensagem: 'Nenhum cartão carregado.' };
+      try {
+        const res = await apiFetch(`/api/cartoes/${cartaoId}/viaturas/${vtrAlvoId}/copiar-roteiro`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origem_viatura_id: origemViaturaId, substituir }),
+        });
+        if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao copiar o roteiro.') };
+        await recarregar();
+        return { ok: true };
+      } catch (erro) {
+        console.error('Erro ao copiar roteiro:', erro);
+        return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+      }
+    }, [cartaoId, recarregar],
+  );
+
+  const aplicarAtividade = useCallback(
+    async (viaturasIds: string[], atividade: string): Promise<ResultadoAcao> => {
+      if (!cartaoId) return { ok: false, mensagem: 'Nenhum cartão carregado.' };
+      try {
+        const res = await apiFetch(`/api/cartoes/${cartaoId}/roteiro/atividade`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ viaturas_ids: viaturasIds, atividade }),
+        });
+        if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao aplicar a atividade.') };
+        await recarregar();
+        return { ok: true };
+      } catch (erro) {
+        console.error('Erro ao aplicar atividade em lote:', erro);
+        return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+      }
+    }, [cartaoId, recarregar],
+  );
+
+  return { adicionarItem, removerItem, atualizarAtividade, atualizarItem, duplicarItem, copiarRoteiro, aplicarAtividade };
 }

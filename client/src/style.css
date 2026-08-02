@@ -4648,68 +4648,6 @@ body.sgo-sincronizando .topbar::before {
 .rel-pdf-rodape { padding: 8px 18px; font-size: 9px; color: #555; border-top: 1px solid #e2e8f0; }
 
 /* -------------------------------------------------------------
-   CARTÃO PROGRAMA EM PDF (por viatura)
-
-   Documento próprio, com design DIFERENTE dos outros relatórios PDF
-   (.rel-pdf-*, estilo SGEPM em A4 paisagem) — pedido explícito do usuário: o
-   cartão não é impresso, é mandado por WhatsApp e lido na tela do celular em
-   serviço. Não propagar mudança daqui para os relatórios de Eventos/Diário/
-   Consolidado, nem o contrário.
-
-   Cores cruas aqui são intencionais, mesma exceção já aberta para .rel-pdf-*:
-   é papel/PDF, preto sobre branco nos dois temas do app, com UMA cor
-   institucional (o marinho #002145) no número do cartão e na barra do aviso.
-   ------------------------------------------------------------- */
-.cp-pdf {
-  background: #fff;
-  color: #000;
-  /* Família única, dois pesos (600/700). Sem itálico, sem emoji. */
-  font-family: var(--font-body);
-  line-height: 1.25;
-  /* Em pt de propósito: o alvo é a página física de 100mm, não o viewport. */
-  font-size: 11pt;
-  font-weight: 600;
-}
-
-/* Na página estreita o conteúdo ocupa tudo; em A4 fica numa coluna legível em
-   vez de esticar a linha por 180mm. */
-.cp-pdf--celular { page: cartaoCelular; width: 84mm; }
-.cp-pdf--a4 { page: cartaoA4; width: 120mm; }
-
-.cp-topo { padding-bottom: 3mm; }
-.cp-orgao { font-size: 8.5pt; font-weight: 700; letter-spacing: .02em; }
-.cp-numero { font-size: 12pt; font-weight: 700; color: #002145; margin-top: 1mm; }
-
-/* Régua dupla logo abaixo do topo institucional; simples entre os demais blocos. */
-.cp-regua-dupla { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 2px; }
-.cp-regua { border-top: 1px solid #b8bfc9; margin: 3mm 0; }
-
-.cp-bloco { break-inside: avoid; }
-
-/* Rótulo em caixa alta pequena e cinza; valor em negrito. Grid de duas colunas
-   mantém os valores alinhados sem depender de tabela. */
-.cp-linha { display: grid; grid-template-columns: 26mm 1fr; gap: 2mm; margin-bottom: 1.6mm; }
-.cp-rotulo { font-size: 7.5pt; font-weight: 600; letter-spacing: .06em; color: #555; padding-top: .6mm; }
-.cp-valor { font-size: 11pt; font-weight: 700; }
-
-.cp-secao { font-size: 8pt; font-weight: 700; letter-spacing: .08em; color: #555; margin-bottom: 2mm; }
-
-/* Roteiro em três colunas: horário · sigla · local. */
-.cp-roteiro { width: 100%; border-collapse: collapse; }
-.cp-roteiro td { padding: .9mm 0; vertical-align: top; font-size: 10pt; font-weight: 700; }
-.cp-hora { white-space: nowrap; padding-right: 2mm !important; }
-.cp-sigla { width: 12mm; color: #002145; }
-.cp-local { font-weight: 600; }
-
-.cp-avisos-grupo + .cp-avisos-grupo { margin-top: 3mm; }
-/* Barra lateral na cor institucional — o único outro uso de cor no documento. */
-.cp-aviso { border-left: 2px solid #002145; padding-left: 2.5mm; margin-bottom: 2.5mm; break-inside: avoid; }
-.cp-aviso-cabecalho { font-size: 8pt; font-weight: 700; letter-spacing: .04em; }
-.cp-aviso-texto { font-size: 10pt; font-weight: 600; margin-top: .8mm; }
-
-.cp-rodape { font-size: 7pt; font-weight: 600; color: #555; display: flex; flex-direction: column; gap: .8mm; }
-
-/* -------------------------------------------------------------
    AVISOS OPERACIONAIS
    Badges de prioridade fogem do slug automático de propósito: "atencao" e
    "critica" são chaves do banco (sem acento), e a escala de gravidade precisa
@@ -4781,88 +4719,6 @@ body.sgo-sincronizando .topbar::before {
 .aviso-selecionavel-texto { font-size: 0.84rem; }
 .aviso-teto-atingido { font-size: 0.76rem; color: var(--warning-fg); font-weight: 600; }
 
-.cp-pdf-opcoes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.cp-pdf-dica { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 10px; }
-
-/* Pendências que bloqueiam a emissão (campo obrigatório em branco). Vermelho,
-   não âmbar: âmbar já é o banner de conflito do cartão, que NÃO bloqueia. */
-.cp-pendencias {
-  background-color: var(--danger-bg);
-  border: 1px solid var(--danger-border);
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-bottom: 14px;
-}
-
-.cp-pendencias-titulo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--danger-fg);
-}
-
-.cp-pendencias-titulo svg { width: 16px; height: 16px; flex-shrink: 0; }
-
-.cp-pendencias ul { margin: 0; padding-left: 20px; }
-
-.cp-pendencias li {
-  font-size: 0.8rem;
-  color: var(--danger-fg);
-  margin-bottom: 3px;
-}
-
-.cp-pendencias-rodape {
-  margin: 8px 0 0;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-/* Painel de opções de geração (Conteúdo · Recorte · Avisos · Layout) */
-.cp-geracao-eixos {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.cp-geracao-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.cp-geracao-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background-color: var(--surface-2);
-}
-.cp-geracao-identificacao { display: flex; flex-direction: column; gap: 2px; }
-.cp-geracao-identificacao span { font-size: 0.78rem; color: var(--text-muted); }
-
-/* Uma viatura por página no recorte Companhia/Geral. */
-.cp-pagina-quebra { break-after: page; }
-
-/* O documento só existe para a impressora — na tela o operador vê a lista. */
-.cp-pdf-palco-impressao { display: none; }
-
-/* Prévia em tela: o documento aparece como uma folha sobre o fundo do modal. */
-.cp-pdf-palco {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
-  background: var(--surface-3);
-  border-radius: var(--radius-sm);
-  overflow: auto;
-}
-.cp-pdf-palco .cp-pdf {
-  padding: 8mm;
-  box-shadow: var(--shadow-md);
-}
-
 .lista-sei-texto {
   white-space: pre-wrap;
   word-break: break-word;
@@ -4880,82 +4736,212 @@ body.sgo-sincronizando .topbar::before {
 }
 
 /* -------------------------------------------------------------
-   CENTRAL DE IMPRESSÃO (/impressao) — Saídas 1 e 2
-   Design institucional próprio (.impressao-*), distinto tanto do .rel-pdf-
-   (relatórios estilo SGEPM, paisagem) quanto do .cp- (Cartão Programa em PDF
-   por viatura, retrato 100x180mm/A4 — exceção documentada no CLAUDE.md).
-   Cores cruas são intencionais aqui, mesma exceção já aberta para os outros
-   dois: é papel/PDF, preto sobre branco nos dois temas do app.
+   CENTRAL DE EMISSÃO DO CARTÃO PROGRAMA
    ------------------------------------------------------------- */
-.impressao-preview-area {
-  background: #fff;
-  border-radius: 8px;
-  overflow: auto;
-  max-height: 75vh;
-  padding: 16px;
-  display: flex;
-  justify-content: center;
+.central-emissao { display: flex; flex-direction: column; gap: 16px; }
+.central-emissao-topo {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 18px 20px;
+}
+.central-emissao-topo p { margin: 6px 0 0; color: var(--text-muted); font-size: .82rem; }
+.central-emissao-data { min-width: 210px; margin: 0; }
+.central-emissao-grid { display: grid; grid-template-columns: minmax(360px, .85fr) minmax(500px, 1.15fr); gap: 16px; }
+.central-emissao-config { padding: 18px; }
+.central-emissao-config > h3,
+.central-conferencia > h3,
+.central-previa-topo h3 { margin: 0 0 12px; font-size: .9rem; color: var(--text-main); }
+.central-emissao-config > h3:not(:first-child) { margin-top: 22px; }
+.central-modos { display: flex; flex-direction: column; gap: 8px; }
+.central-modo {
+  width: 100%; display: grid; grid-template-columns: 26px 1fr 16px; align-items: center; gap: 10px;
+  padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 9px;
+  background: var(--surface-2); color: var(--text-main); text-align: left; cursor: pointer;
+  font-family: var(--font-body); transition: border-color .15s ease, background .15s ease;
+}
+.central-modo:hover { border-color: var(--text-faint); }
+.central-modo.ativo { border-color: var(--primary); background: var(--primary-soft); }
+.central-modo > svg { width: 19px; color: var(--text-muted); }
+.central-modo.ativo > svg { color: var(--primary); }
+.central-modo span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; }
+.central-modo strong { font-size: .82rem; }
+.central-modo small { color: var(--text-muted); font-size: .7rem; line-height: 1.35; }
+.central-radio { width: 14px; height: 14px; border: 1px solid var(--text-faint); border-radius: 50%; }
+.central-modo.ativo .central-radio { border: 4px solid var(--primary); }
+.central-config-campos { border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+.central-viaturas-selecao { padding: 12px; margin: 0; border-bottom: 1px solid var(--border-color); }
+.central-label-acoes { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.central-label-acoes button { border: 0; background: none; color: var(--primary); cursor: pointer; font-size: .7rem; }
+.central-check-lista { display: flex; flex-direction: column; gap: 7px; max-height: 160px; overflow: auto; margin-top: 8px; }
+.central-check-lista .checkbox-inline { align-items: flex-start; font-size: .73rem; }
+.central-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.central-config-grid label {
+  display: flex; flex-direction: column; gap: 5px; padding: 10px 12px;
+  border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);
+  color: var(--text-muted); font-size: .67rem; font-weight: 600;
+}
+.central-config-grid select { min-width: 0; width: 100%; font-size: .76rem; }
+.central-emissao-conferencia { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.central-conferencia, .central-previa-panel { padding: 18px; }
+.central-indicadores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.central-indicadores > div {
+  min-width: 0; display: grid; grid-template-columns: 22px auto 1fr; gap: 7px; align-items: center;
+  padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-2);
+}
+.central-indicadores svg { width: 18px; color: var(--primary); }
+.central-indicadores strong { font-size: 1.05rem; }
+.central-indicadores span { color: var(--text-muted); font-size: .65rem; line-height: 1.25; }
+.central-validacao { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 8px; }
+.central-validacao > svg { width: 17px; flex-shrink: 0; }
+.central-validacao strong { font-size: .77rem; }
+.central-validacao ul { margin: 5px 0 0; padding-left: 18px; max-height: 105px; overflow: auto; }
+.central-validacao li { font-size: .71rem; margin-bottom: 3px; }
+.central-validacao.erro { color: var(--danger-fg); border: 1px solid var(--danger-border); background: var(--danger-bg); }
+.central-validacao.aviso { color: var(--warning-fg); border: 1px solid var(--warning-border); background: var(--warning-bg); }
+.central-alertas-escolha { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: .72rem; color: var(--text-muted); }
+.central-alertas-escolha svg { width: 15px; }
+.central-alertas-escolha.com { color: var(--warning-fg); }
+.central-previa-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.central-previa-nav { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: .72rem; }
+.central-previa-nav button { display: grid; place-items: center; border: 0; background: none; color: inherit; cursor: pointer; }
+.central-previa-nav button:disabled { opacity: .35; }
+.central-previa-nav svg { width: 16px; }
+.central-previa-documento {
+  height: 520px; overflow: auto; display: flex; justify-content: center; align-items: flex-start;
+  padding: 16px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-3);
+}
+.central-previa-documento .documento-cartao { zoom: .55; box-shadow: var(--shadow-md); }
+.central-emissao-acoes { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; }
+.central-saidas { display: flex; flex-wrap: wrap; gap: 8px; }
+.central-historico { overflow: hidden; }
+.central-historico-toggle { width: 100%; display: flex; align-items: center; gap: 9px; padding: 14px 18px; border: 0; background: none; color: var(--text-main); cursor: pointer; }
+.central-historico-toggle svg { width: 17px; color: var(--primary); }
+.central-historico-toggle span { font-weight: 600; }
+.central-historico-toggle small { margin-left: auto; color: var(--text-muted); }
+.central-historico-lista { border-top: 1px solid var(--border-color); }
+.central-historico-lista > p { padding: 14px 18px; color: var(--text-muted); font-size: .78rem; }
+.central-historico-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 18px; border-bottom: 1px solid var(--border-color); }
+.central-historico-item > div { display: flex; flex-direction: column; gap: 3px; }
+.central-historico-item > div:last-child { align-items: flex-end; }
+.central-historico-item strong, .central-historico-item span { font-size: .75rem; }
+.central-historico-item small { color: var(--text-muted); font-size: .68rem; }
+.badge.emissao-retificado { background: var(--warning-bg); color: var(--warning-fg); }
+.badge.emissao-substituido { background: var(--surface-3); color: var(--text-muted); text-decoration: line-through; }
+.badge.emissao-gerado { background: var(--info-bg); color: var(--info-fg); }
+.badge.emissao-enviado { background: var(--success-bg); color: var(--success-fg); }
+.central-emissao-vazio { display: grid; place-items: center; gap: 10px; padding: 48px; color: var(--text-muted); }
+.central-emissao-vazio svg { width: 32px; }
+#central-emissao-impressao { display: none; }
+
+.bairros-multiselect { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; }
+.bairros-multiselect legend { padding: 0 5px; font-size: .72rem; font-weight: 600; color: var(--text-muted); }
+.bairros-multiselect > div { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.bairros-multiselect small { display: block; margin-top: 6px; color: var(--text-muted); }
+.autocomplete-results button.autocomplete-item { width: 100%; border: 0; text-align: left; font-family: inherit; }
+.cartao-vazio-inline, .cartao-vazio-linha { padding: 18px; text-align: center; color: var(--text-muted); font-size: .78rem; }
+.roteiro-acoes-lote { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface-2); }
+.roteiro-acoes-lote > div:first-child { display: flex; align-items: center; gap: 9px; }
+.roteiro-acoes-lote > div:first-child svg { width: 18px; color: var(--primary); }
+.roteiro-acoes-lote > div:first-child span { display: flex; flex-direction: column; gap: 2px; }
+.roteiro-acoes-lote strong { font-size: .78rem; }
+.roteiro-acoes-lote small { font-size: .67rem; color: var(--text-muted); }
+.roteiro-lote-controles, .roteiro-lote-checks { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.roteiro-lote-controles select { font-size: .75rem; }
+.roteiro-lote-checks .checkbox-inline { font-size: .7rem; }
+.roteiro-copiar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--surface-2); font-size: .72rem; }
+.roteiro-copiar > svg { width: 15px; color: var(--primary); }
+.roteiro-copiar select { min-width: 140px; font-size: .72rem; }
+.roteiro-ordem-nota { margin: 0 0 7px; color: var(--text-muted); font-size: .67rem; }
+.roteiro-edicao-horas { display: flex; flex-direction: column; gap: 4px; }
+.roteiro-edicao-horas input { min-width: 94px; font-size: .72rem; }
+.roteiro-edicao-local { width: 100%; min-width: 180px; font-size: .72rem; }
+.roteiro-item-acoes { width: 106px; white-space: nowrap; }
+.roteiro-item-acoes svg, .cartao-vtr-header .btn-sm svg { width: 13px; height: 13px; }
+
+/* Documento normalizado — única renderização para celular, A4, consolidado,
+   arquivo/SEI e compartilhamento textual. */
+.documento-cartao {
+  box-sizing: border-box; position: relative; flex-shrink: 0; background: #fff; color: #111;
+  font-family: Arial, Helvetica, sans-serif; font-size: 9pt; line-height: 1.32;
+}
+.documento-cartao *, .documento-cartao *::before, .documento-cartao *::after { box-sizing: border-box; }
+.documento-cartao--a4 { width: 210mm; min-height: 297mm; padding: 12mm 15mm 15mm; page: centralCartaoA4; }
+.documento-cartao--celular { width: 100mm; min-height: 180mm; padding: 7mm 7mm 12mm; page: centralCartaoCelular; font-size: 8.5pt; }
+.doc-cartao-cabecalho {
+  min-height: 24mm; display: grid; grid-template-columns: 16mm 1fr auto; grid-template-rows: 1fr auto;
+  column-gap: 4mm; align-items: center; padding-bottom: 2mm; border-bottom: .5pt solid #222;
+}
+.doc-cartao-cabecalho img { grid-row: 1 / 3; width: 15mm; max-height: 16mm; object-fit: contain; }
+.doc-cartao-identidade { display: flex; flex-direction: column; gap: .6mm; }
+.doc-cartao-identidade > span { font-size: 8pt; }
+.doc-cartao-identidade > strong { font-size: 10.5pt; }
+.doc-cartao-identidade h1 { margin: .5mm 0 0; font-size: 14pt; line-height: 1.05; }
+.doc-cartao-numero { align-self: start; font-size: 8.5pt; font-weight: 700; white-space: nowrap; }
+.doc-cartao-meta { grid-column: 2 / 4; display: flex; gap: 3mm; font-size: 8.5pt; }
+.doc-cartao-meta span + span::before { content: '·'; margin-right: 3mm; color: #777; }
+.doc-cartao-servico { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.3mm 7mm; padding: 3mm 0; border-bottom: .5pt solid #bbb; }
+.doc-cartao-linha { display: grid; grid-template-columns: minmax(28mm, auto) 1fr; gap: 2mm; align-items: baseline; }
+.doc-cartao-linha > span { color: #555; font-size: 7.5pt; }
+.doc-cartao-linha > strong { font-size: 8.5pt; }
+.doc-cartao-resumo { display: flex; gap: 5mm; flex-wrap: wrap; padding: 2.5mm 0; border-bottom: .5pt solid #bbb; font-size: 8pt; }
+.doc-cartao-grupo-titulo { margin: 4mm 0 1.5mm; padding-bottom: 1mm; border-bottom: 1pt solid #002145; color: #002145; font-size: 10pt; text-transform: uppercase; break-after: avoid; }
+.doc-cartao-viatura { padding: 3mm 0; border-bottom: .5pt solid #bbb; }
+.doc-cartao-vtr-titulo { display: flex; justify-content: space-between; gap: 4mm; align-items: baseline; margin-bottom: 2mm; }
+.doc-cartao-vtr-titulo h2 { margin: 0; color: #002145; font-size: 11pt; }
+.doc-cartao-vtr-titulo span { color: #666; font-size: 7pt; }
+.doc-cartao-dados-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1mm 6mm; }
+.doc-cartao-bloco { margin-top: 2.5mm; }
+.doc-cartao-bloco h3 { margin: 0 0 1.2mm; color: #444; font-size: 7.5pt; letter-spacing: .05em; break-after: avoid; }
+.doc-cartao-evento { display: flex; flex-direction: column; gap: .4mm; padding: 1mm 0; break-inside: avoid; }
+.doc-cartao-evento span { color: #444; font-size: 8pt; }
+.doc-cartao-roteiro { width: 100%; border-collapse: collapse; font-size: 8pt; }
+.doc-cartao-roteiro th { padding: 1mm 1.5mm; color: #fff; background: #002145; text-align: left; }
+.doc-cartao-roteiro td { padding: 1mm 1.5mm; border-bottom: .35pt solid #ccd2d8; vertical-align: top; }
+.doc-cartao-roteiro th:first-child, .doc-cartao-roteiro td:first-child { width: 28mm; white-space: nowrap; }
+.doc-cartao-roteiro th:last-child, .doc-cartao-roteiro td:last-child { width: 37mm; }
+.doc-cartao-alerta { display: flex; flex-direction: column; gap: .6mm; padding: 1.5mm 2mm; margin: 1mm 0; border-left: 1.5pt solid #9a6a00; background: #fff9e8; break-inside: avoid; }
+.doc-cartao-alerta strong { font-size: 7.5pt; }
+.doc-cartao-alerta span { font-size: 8pt; }
+.doc-cartao-rodape { margin-top: 4mm; padding-top: 1.5mm; border-top: .5pt solid #aaa; color: #666; font-size: 7.5pt; text-align: center; }
+.doc-cartao-pagina { break-after: page; }
+.doc-cartao-pagina:last-child { break-after: auto; }
+.documento-cartao--celular .doc-cartao-cabecalho { grid-template-columns: 14mm 1fr; grid-template-rows: auto; min-height: 22mm; }
+.documento-cartao--celular .doc-cartao-cabecalho img { width: 13mm; }
+.documento-cartao--celular .doc-cartao-identidade > span { font-size: 6.5pt; }
+.documento-cartao--celular .doc-cartao-identidade > strong { font-size: 8pt; }
+.documento-cartao--celular .doc-cartao-identidade h1 { font-size: 11pt; }
+.documento-cartao--celular .doc-cartao-numero { grid-column: 1 / 3; grid-row: auto; padding-top: 1mm; }
+.documento-cartao--celular .doc-cartao-meta { grid-column: 1 / 3; flex-wrap: wrap; font-size: 7pt; }
+.documento-cartao--celular .doc-cartao-servico,
+.documento-cartao--celular .doc-cartao-dados-grid { grid-template-columns: 1fr; }
+.documento-cartao--celular .doc-cartao-linha { grid-template-columns: 27mm 1fr; }
+.documento-cartao--celular .doc-cartao-resumo { display: grid; grid-template-columns: repeat(2, 1fr); }
+.documento-cartao--celular .doc-cartao-roteiro th:nth-child(2),
+.documento-cartao--celular .doc-cartao-roteiro td:nth-child(2) { width: auto; }
+.documento-cartao--celular .doc-cartao-roteiro th:last-child,
+.documento-cartao--celular .doc-cartao-roteiro td:last-child { width: 24mm; }
+
+@media (max-width: 980px) {
+  .central-emissao-grid { grid-template-columns: 1fr; }
+  .central-previa-documento .documento-cartao { zoom: .48; }
 }
 
-.folha {
-  background: #fff;
-  color: #000;
-  font-family: Helvetica, Arial, sans-serif;
-  width: 210mm;
-  min-height: 297mm;
-  padding: 20mm 15mm 20mm 30mm;
-  box-shadow: var(--shadow-md);
-  flex-shrink: 0;
-  page: impressaoRetrato;
-}
-
-.impressao-cabecalho {
-  display: flex;
-  align-items: center;
-  gap: 8mm;
-  border-bottom: 1pt solid #000;
-  padding-bottom: 3mm;
-  margin-bottom: 5mm;
-}
-.impressao-cabecalho img { height: 18mm; width: auto; }
-.impressao-cabecalho .orgao {
-  font-weight: 700;
-  font-size: 11pt;
-  text-transform: uppercase;
-  letter-spacing: .3pt;
-}
-.impressao-cabecalho .unidade { font-size: 10pt; }
-
-.impressao-titulo {
-  text-align: center;
-  font-size: 12pt;
-  font-weight: 700;
-  text-transform: uppercase;
-  margin: 0 0 4mm;
-}
-.impressao-periodo {
-  text-align: center;
-  font-size: 10pt;
-  font-weight: 600;
-  margin: 0 0 3mm;
-}
-.impressao-emissao {
-  text-align: center;
-  font-size: 8pt;
-  color: #555;
-  margin: 0 0 6mm;
-}
-
-.assinatura {
-  margin-top: 15mm;
-  text-align: center;
-  font-size: 10pt;
-  break-inside: avoid;
-}
-.assinatura .linha {
-  width: 80mm;
-  margin: 0 auto 1.5mm;
-  border-top: 0.5pt solid #000;
+@media (max-width: 600px) {
+  .central-emissao-topo, .central-emissao-acoes { align-items: stretch; flex-direction: column; }
+  .central-emissao-data { min-width: 0; }
+  .central-emissao-config, .central-conferencia, .central-previa-panel { padding: 14px; }
+  .central-config-grid { grid-template-columns: 1fr; }
+  .central-indicadores { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .central-indicadores > div { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+  .central-indicadores span { font-size: .58rem; }
+  .central-previa-documento { height: 430px; padding: 8px; }
+  .central-previa-documento .documento-cartao { zoom: .38; }
+  .central-saidas { display: grid; grid-template-columns: 1fr; }
+  .central-emissao-acoes .btn { width: 100%; }
+  .central-historico-item { align-items: flex-start; flex-direction: column; }
+  .central-historico-item > div:last-child { align-items: flex-start; }
+  .roteiro-acoes-lote, .roteiro-lote-controles { align-items: stretch; flex-direction: column; }
+  .roteiro-lote-checks { padding: 6px 0; }
+  .roteiro-copiar select, .roteiro-copiar .btn { width: 100%; }
 }
 
 /* -------------------------------------------------------------

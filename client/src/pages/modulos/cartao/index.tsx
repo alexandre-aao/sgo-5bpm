@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, FileDown, Maximize2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, Maximize2 } from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
@@ -26,13 +26,11 @@ import { CriarDoPadrao } from './CriarDoPadrao';
 import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarExclusaoForte';
 import { podeExcluirCartao, proximoDiaISO, dataBr } from '../../../lib/janelaCartao';
 import { useBairros } from '../../../hooks/useBairros';
-import { ModalCartaoPdf } from './pdf/ModalCartaoPdf';
-import { ModalGerarCartoes } from './pdf/ModalGerarCartoes';
 import { useAvisos } from '../../../hooks/useAvisos';
-import { avisosSelecionadosParaPdf } from './pdf/avisosDoCartao';
 
 export default function CartaoProgramaPage() {
   const { usuario } = useAuth();
+  const navigate = useNavigate();
   const { dados } = useAppData();
   const { toast } = useToast();
   // Cadastro de bairros: alimenta o vínculo da viatura que traz os Avisos
@@ -77,15 +75,11 @@ export default function CartaoProgramaPage() {
     }
   }, [templateAberto, recarregar]);
 
-  const { adicionarViatura, editarViatura, removerViatura, marcarStatusEnvio } = useViaturasCartao(cartaoEditando?.id, recarregarAtivo);
-  const { adicionarItem, removerItem, atualizarAtividade } = useItensRoteiro(cartaoEditando?.id, recarregarAtivo);
+  const { adicionarViatura, editarViatura, removerViatura } = useViaturasCartao(cartaoEditando?.id, recarregarAtivo);
+  const { adicionarItem, removerItem, atualizarItem, duplicarItem, copiarRoteiro, aplicarAtividade } = useItensRoteiro(cartaoEditando?.id, recarregarAtivo);
 
   const [aba, setAba] = useState<'viaturas' | 'roteiro'>('viaturas');
   const [vtrEmEdicao, setVtrEmEdicao] = useState<CartaoViatura | null>(null);
-  // Viatura cuja prévia de cartão (PDF) está aberta.
-  const [vtrCartaoPdf, setVtrCartaoPdf] = useState<CartaoViatura | null>(null);
-  const [modalGerarAberto, setModalGerarAberto] = useState(false);
-
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarTemplatesPanel, setMostrarTemplatesPanel] = useState(false);
   const [modalNovoTemplateAberto, setModalNovoTemplateAberto] = useState(false);
@@ -134,29 +128,14 @@ export default function CartaoProgramaPage() {
     if (templateAberto?.id === id) setTemplateAberto(null);
   }
 
-  // Só o Adjunto e a P3 registram o envio: o Oficial pode ver e gerar o cartão,
-  // mas não é ele quem manda ao comandante, então não move o status do turno.
-  async function registrarEnvio(viaturaIds: string[], status: 'gerado' | 'enviado') {
-    if (!podeEditar) return;
-    for (const id of viaturaIds) {
-      const resultado = await marcarStatusEnvio(id, status);
-      if (!resultado.ok) {
-        toast(resultado.mensagem, 'danger');
-        return;
-      }
-    }
-  }
-
-  function handleAbrirGerar() {
+  function abrirCentralEmissao(viaturaId?: string) {
     if (!cartaoEditando || cartaoEditando.viaturas.length === 0) {
-      toast('Adicione ao menos uma viatura ao cartão antes de gerar.', 'warning');
+      toast('Adicione ao menos uma viatura ao cartão antes de emitir.', 'warning');
       return;
     }
-    // Fecha a prévia individual: os dois modais usam o mesmo id (#modal-cartao-pdf),
-    // que é o gancho do bloco @media print — dois abertos ao mesmo tempo mandariam
-    // os dois documentos para a impressora.
-    setVtrCartaoPdf(null);
-    setModalGerarAberto(true);
+    const busca = new URLSearchParams({ cartao: cartaoEditando.id });
+    if (viaturaId) busca.set('viatura', viaturaId);
+    navigate(`/impressao?${busca.toString()}`);
   }
 
   function handleAbrirExcluir() {
@@ -224,18 +203,11 @@ export default function CartaoProgramaPage() {
                 <Link to={`/cartao/${cartaoEditando.id}`} className="btn btn-secondary btn-sm">
                   <Maximize2 /> Tela Cheia
                 </Link>
-                {/* Antes era um window.print() solto, que mandava a TELA inteira
-                    (menu, filtros, cards) para a impressora. As saídas oficiais
-                    vivem na Central de Impressão — mesmo destino do botão da
-                    tela cheia. */}
-                <Link to={`/impressao?cartao=${cartaoEditando.id}`} className="btn btn-secondary btn-sm">
-                  <Printer /> Imprimir
+                <Link to={`/impressao?cartao=${cartaoEditando.id}`} className="btn btn-primary btn-sm">
+                  <Printer /> Central de Emissão
                 </Link>
               </>
             )}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={handleAbrirGerar}>
-              <FileDown /> Gerar Cartões
-            </button>
             {ehP3 && (
               <div className="dropdown" ref={menuRef}>
                 <button
@@ -327,7 +299,7 @@ export default function CartaoProgramaPage() {
                   podeEditar={podeEditar}
                   onEditar={setVtrEmEdicao}
                   onExcluir={handleExcluirViatura}
-                  onVerCartao={setVtrCartaoPdf}
+                  onVerCartao={(vtr) => abrirCentralEmissao(vtr.id)}
                 />
               ) : (
                 <RoteiroGrid
@@ -337,7 +309,10 @@ export default function CartaoProgramaPage() {
                   podeEditar={podeEditar}
                   onAdicionarItem={adicionarItem}
                   onExcluirItem={removerItem}
-                  onSalvarAtividade={atualizarAtividade}
+                  onAtualizarItem={atualizarItem}
+                  onDuplicarItem={duplicarItem}
+                  onCopiarRoteiro={copiarRoteiro}
+                  onAplicarAtividade={aplicarAtividade}
                   onEditarViatura={setVtrEmEdicao}
                   onExcluirViatura={handleExcluirViatura}
                 />
@@ -347,6 +322,7 @@ export default function CartaoProgramaPage() {
             {podeEditar && (
               <FormAdicionarViatura
                 viaturasCadastradas={dados.viaturas}
+                pessoal={dados.pessoal}
                 bairros={bairros}
                 avisos={avisos}
                 onAdicionar={adicionarViatura}
@@ -359,32 +335,10 @@ export default function CartaoProgramaPage() {
         </>
       )}
 
-      {modalGerarAberto && cartaoEditando && (
-        <ModalGerarCartoes
-          cartao={cartaoEditando}
-          pessoal={dados.pessoal}
-          bairros={bairros}
-          avisos={avisos}
-          onFechar={() => setModalGerarAberto(false)}
-          onGerado={(ids) => void registrarEnvio(ids, 'gerado')}
-          onEnviado={(ids) => void registrarEnvio(ids, 'enviado')}
-        />
-      )}
-
-      {vtrCartaoPdf && cartaoEditando && !modalGerarAberto && (
-        <ModalCartaoPdf
-          cartao={cartaoEditando}
-          viatura={vtrCartaoPdf}
-          pessoal={dados.pessoal}
-          bairros={bairros}
-          avisos={avisosSelecionadosParaPdf(vtrCartaoPdf, avisos, bairros)}
-          onFechar={() => setVtrCartaoPdf(null)}
-        />
-      )}
-
       {vtrEmEdicao && (
         <ModalEditarViatura
           viatura={vtrEmEdicao}
+          pessoal={dados.pessoal}
           bairros={bairros}
           avisos={avisos}
           onFechar={() => setVtrEmEdicao(null)}

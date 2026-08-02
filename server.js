@@ -2067,8 +2067,9 @@ function hashConteudoCartaoViatura(cartao, viatura) {
     cartao.numero, cartao.ano, cartao.data,
     cartao.fiscal, cartao.fiscal_pessoal_id, cartao.adjunto, cartao.adjunto_pessoal_id,
     cartao.delta07_viatura,
-    viatura.prefixo, viatura.companhia, viatura.comandante, viatura.comandante_pessoal_id,
-    viatura.bairro_id,
+    viatura.prefixo, viatura.companhia, viatura.categoria, viatura.setor,
+    viatura.comandante, viatura.comandante_pessoal_id, viatura.composicao,
+    viatura.observacao, viatura.bairro_id, (viatura.bairros_ids || []).join('|'),
     (viatura.avisos_ids || []).join('|'),
     (viatura.itens || []).map(i => `${i.inicio}~${i.fim}~${i.local}~${i.atividade}`).join('|')
   ];
@@ -2372,6 +2373,7 @@ app.post('/api/cartoes/:id/viaturas', exigirEdicaoCartao, asyncRoute(async (req,
     companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VALIDAS, padrao: '', label: 'Companhia' },
     categoria: { obrigatorio: false, tipo: 'string', valores: CATEGORIAS_VIATURA, padrao: 'Ordinária', label: 'Categoria' },
     comandante: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Comandante' },
+    composicao: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Composição da guarnição' },
     observacao: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Observação' },
     // bairro_id liga a viatura ao cadastro de bairros (é o que traz os Avisos
     // Operacionais do bairro). `setor` continua existindo em paralelo: é texto
@@ -2388,9 +2390,13 @@ app.post('/api/cartoes/:id/viaturas', exigirEdicaoCartao, asyncRoute(async (req,
     companhia: v.valores.companhia,
     categoria: v.valores.categoria,
     comandante: v.valores.comandante,
+    composicao: v.valores.composicao,
     observacao: v.valores.observacao,
     ...camposEnvioIniciais(),
     bairro_id: v.valores.bairro_id,
+    bairros_ids: [...new Set(Array.isArray(req.body.bairros_ids)
+      ? req.body.bairros_ids.filter(id => typeof id === 'string' && id)
+      : (v.valores.bairro_id ? [v.valores.bairro_id] : []))].slice(0, 12),
     comandante_pessoal_id: v.valores.comandante_pessoal_id,
     // O Adjunto já escolhe os avisos no mesmo formulário em que aloca a viatura
     // no bairro, então eles podem chegar já no POST.
@@ -2428,9 +2434,17 @@ app.put('/api/cartoes/:id/viaturas/:vid', exigirEdicaoCartao, asyncRoute(async (
   // Não há migração de boot pra preenchê-los: reescrever todos os cartões
   // custaria banco à toa, e todo leitor (frontend e gerador de PDF) trata a
   // ausência com `|| ''`. Aqui eles entram naturalmente na primeira edição.
-  ['prefixo', 'setor', 'companhia', 'categoria', 'comandante', 'observacao', 'bairro_id', 'comandante_pessoal_id'].forEach(campo => {
+  ['prefixo', 'setor', 'companhia', 'categoria', 'comandante', 'composicao', 'observacao', 'bairro_id', 'comandante_pessoal_id'].forEach(campo => {
     if (req.body[campo] !== undefined) viatura[campo] = req.body[campo];
   });
+
+  if (req.body.bairros_ids !== undefined) {
+    if (!Array.isArray(req.body.bairros_ids)) {
+      return res.status(400).json({ error: 'bairros_ids deve ser uma lista de ids de bairro.' });
+    }
+    viatura.bairros_ids = [...new Set(req.body.bairros_ids.filter(id => typeof id === 'string' && id))].slice(0, 12);
+    viatura.bairro_id = viatura.bairros_ids[0] || '';
+  }
 
   // Avisos selecionados para o cartão desta viatura: só os ids, nunca o texto.
   // Teto de 4 aplicado também aqui (o cliente já limita, mas a regra protege o
@@ -2492,6 +2506,103 @@ app.put('/api/cartoes/:id/viaturas/:vid/status', exigirEdicaoCartao, asyncRoute(
   res.json(viatura);
 }));
 
+// Histórico da Central de Emissão. É leitura operacional, disponível a todos
+// os perfis autenticados que já podem consultar o Cartão Programa.
+app.get('/api/cartoes/:id/emissoes', asyncRoute(async (req, res) => {
+  const { data, error } = await supabase
+    .from('emissoes_cartao')
+    .select('id, usuario, usuario_nome, emitido_em, modalidade, formato, tipo_documento, agrupamento, com_alertas, viaturas_ids, versao, acao, status')
+    .eq('cartao_id', req.params.id)
+    .order('emitido_em', { ascending: false })
+    .limit(30);
+  if (error) throw new Error(`Falha ao ler histórico de emissões: ${error.message}`);
+  res.json(data || []);
+}));
+
+// Porta única de registro de impressão/PDF/compartilhamento. O horário é
+// calculado no servidor e as viaturas selecionadas recebem o mesmo status;
+// assim não existe caminho de emissão que deixe o Cartão como pendente.
+app.post('/api/cartoes/:id/emissoes', asyncRoute(async (req, res) => {
+  const cartao = await buscarCartaoPorId(req.params.id);
+  if (!cartao || cartao.is_template) {
+    return res.status(404).json({ error: 'Cartão Programa do dia não encontrado.' });
+  }
+
+  const modalidades = ['guarnicao', 'arquivo_sei', 'consolidado', 'personalizado'];
+  const formatos = ['celular', 'a4'];
+  const tipos = ['individual', 'consolidado'];
+  const agrupamentos = ['nenhum', 'companhia', 'categoria'];
+  const acao = req.body.acao === 'enviado' ? 'enviado' : 'gerado';
+  if (!modalidades.includes(req.body.modalidade) || !formatos.includes(req.body.formato)
+      || !tipos.includes(req.body.tipo_documento) || !agrupamentos.includes(req.body.agrupamento)) {
+    return res.status(400).json({ error: 'Configuração de emissão inválida.' });
+  }
+
+  const ids = [...new Set(Array.isArray(req.body.viaturas_ids) ? req.body.viaturas_ids.filter(id => typeof id === 'string') : [])];
+  const selecionadas = (cartao.viaturas || []).filter(v => ids.includes(v.id));
+  if (selecionadas.length === 0 || selecionadas.length !== ids.length) {
+    return res.status(400).json({ error: 'Selecione ao menos uma viatura válida deste Cartão.' });
+  }
+
+  const eraRetificacao = selecionadas.some(v => v.status_envio === 'alterado' || (v.versao || 1) > 1);
+  const versao = Math.max(...selecionadas.map(v => v.versao || 1));
+  const emitidoEm = new Date().toISOString();
+  selecionadas.forEach(viatura => {
+    viatura.status_envio = acao;
+    viatura.gerado_em = emitidoEm;
+    viatura.hash_conteudo = hashConteudoCartaoViatura(cartao, viatura);
+  });
+
+  const snapshot = {
+    cartao: {
+      id: cartao.id,
+      data: cartao.data,
+      ano: cartao.ano,
+      numero: cartao.numero,
+      tipo_periodo: cartao.tipo_periodo,
+      fiscal: cartao.fiscal,
+      fiscal_pessoal_id: cartao.fiscal_pessoal_id,
+      adjunto: cartao.adjunto,
+      adjunto_pessoal_id: cartao.adjunto_pessoal_id,
+      delta07_viatura: cartao.delta07_viatura
+    },
+    // Deliberadamente não inclui `oficial_sobreaviso`: é dado de controle
+    // interno e não pertence ao documento nem ao snapshot documental.
+    viaturas: selecionadas.map(v => ({ ...v }))
+  };
+
+  const registro = {
+    id: generateId('cpe'),
+    cartao_id: cartao.id,
+    usuario: req.user.usuario,
+    usuario_nome: req.user.nome || '',
+    emitido_em: emitidoEm,
+    modalidade: req.body.modalidade,
+    formato: req.body.formato,
+    tipo_documento: req.body.tipo_documento,
+    agrupamento: req.body.agrupamento,
+    com_alertas: !!req.body.com_alertas,
+    viaturas_ids: ids,
+    versao,
+    acao,
+    status: eraRetificacao ? 'retificado' : acao,
+    snapshot
+  };
+
+  // A função Postgres atualiza as viaturas, registra a emissão e substitui
+  // versões anteriores na mesma transação, evitando qualquer estado parcial.
+  const { error: erroRegistro } = await supabase.rpc('registrar_emissao_cartao', {
+    p_cartao_id: cartao.id,
+    p_viaturas: cartao.viaturas || [],
+    p_emissao: registro,
+    p_retificacao: eraRetificacao
+  });
+  if (erroRegistro) {
+    throw new Error(`Falha ao registrar emissão do Cartão Programa: ${erroRegistro.message}`);
+  }
+  res.status(201).json({ emissao: registro, viaturas: selecionadas });
+}));
+
 // Adicionar item de roteiro à viatura
 app.post('/api/cartoes/:id/viaturas/:vid/itens', exigirEdicaoCartao, asyncRoute(async (req, res) => {
   const db = await readDB();
@@ -2529,8 +2640,7 @@ app.post('/api/cartoes/:id/viaturas/:vid/itens', exigirEdicaoCartao, asyncRoute(
 
 // Atualizar item de roteiro
 app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', exigirEdicaoCartao, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
   if (cartao.is_template && req.user.role !== 'P3') {
     return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
@@ -2542,14 +2652,68 @@ app.put('/api/cartoes/:id/viaturas/:vid/itens/:iid', exigirEdicaoCartao, asyncRo
   const item = viatura.itens.find(i => i.id === req.params.iid);
   if (!item) return res.status(404).json({ error: 'Item de roteiro não encontrado' });
 
-  ['inicio', 'fim', 'local', 'atividade'].forEach(campo => {
-    if (req.body[campo] !== undefined) item[campo] = req.body[campo];
+  const valid = validarCampos(req.body, {
+    inicio: { obrigatorio: false, tipo: 'string', max: 5, label: 'Horário de Início' },
+    fim: { obrigatorio: false, tipo: 'string', max: 5, label: 'Horário de Fim' },
+    local: { obrigatorio: false, tipo: 'string', max: 150, label: 'Local' },
+    atividade: { obrigatorio: false, tipo: 'string', max: 100, label: 'Atividade' }
   });
+  if (!valid.ok) return res.status(400).json({ error: valid.erro });
+  if (valid.valores.inicio !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(valid.valores.inicio)) {
+    return res.status(400).json({ error: 'Horário de início inválido.' });
+  }
+  if (valid.valores.fim !== undefined && valid.valores.fim && !/^([01]\d|2[0-3]):[0-5]\d$/.test(valid.valores.fim)) {
+    return res.status(400).json({ error: 'Horário de fim inválido.' });
+  }
+  Object.assign(item, valid.valores);
 
   viatura.itens = ordenarPorTurno(viatura.itens);
   reavaliarStatusEnvio(cartao);
   await writeRow('cartoes', cartao);
   res.json(item);
+}));
+
+// Copia o roteiro de outra viatura para a viatura-alvo. Os itens recebem ids
+// novos e são reordenados pela janela 07h→07h, inclusive após a meia-noite.
+app.post('/api/cartoes/:id/viaturas/:vid/copiar-roteiro', exigirEdicaoCartao, asyncRoute(async (req, res) => {
+  const cartao = await buscarCartaoPorId(req.params.id);
+  if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
+  const alvo = (cartao.viaturas || []).find(v => v.id === req.params.vid);
+  const origem = (cartao.viaturas || []).find(v => v.id === req.body.origem_viatura_id);
+  if (!alvo || !origem || alvo.id === origem.id) {
+    return res.status(400).json({ error: 'Informe uma viatura de origem diferente e válida.' });
+  }
+  const copiados = (origem.itens || []).map(item => ({ ...item, id: generateId('cpi') }));
+  alvo.itens = ordenarPorTurno(req.body.substituir ? copiados : [...(alvo.itens || []), ...copiados]);
+  reavaliarStatusEnvio(cartao);
+  await writeRow('cartoes', cartao);
+  res.json({ itens: alvo.itens, copiados: copiados.length });
+}));
+
+// Aplica uma atividade a todos os itens das viaturas selecionadas em uma única
+// escrita do JSONB, evitando uma sequência de PUTs concorrentes no mesmo cartão.
+app.put('/api/cartoes/:id/roteiro/atividade', exigirEdicaoCartao, asyncRoute(async (req, res) => {
+  const cartao = await buscarCartaoPorId(req.params.id);
+  if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+  if (cartao.is_template && req.user.role !== 'P3') {
+    return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+  }
+  const ids = new Set(Array.isArray(req.body.viaturas_ids) ? req.body.viaturas_ids : []);
+  const atividade = String(req.body.atividade || '').trim();
+  if (!atividade || atividade.length > 100 || ids.size === 0) {
+    return res.status(400).json({ error: 'Selecione viaturas e informe uma atividade válida.' });
+  }
+  let alterados = 0;
+  (cartao.viaturas || []).forEach(viatura => {
+    if (!ids.has(viatura.id)) return;
+    (viatura.itens || []).forEach(item => { item.atividade = atividade; alterados += 1; });
+  });
+  reavaliarStatusEnvio(cartao);
+  await writeRow('cartoes', cartao);
+  res.json({ alterados });
 }));
 
 // Remover item de roteiro
@@ -2586,6 +2750,7 @@ app.get('/api/backup', exigirP3, asyncRoute(async (req, res) => {
   // baixaria a tabela sem usar), então readDB não a traz — aqui é somada
   // explicitamente, porque é dado de negócio e precisa estar no backup.
   backup.avisos = await readTabela('avisos');
+  backup.emissoes_cartao = await readTabela('emissoes_cartao');
   res.json(backup);
 }));
 

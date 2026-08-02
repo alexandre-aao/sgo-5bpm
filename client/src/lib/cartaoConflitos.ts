@@ -8,6 +8,7 @@ export interface CartaoItem {
   fim: string;
   local: string;
   atividade: string;
+  ordem?: number;
 }
 
 export interface CartaoViatura {
@@ -17,12 +18,17 @@ export interface CartaoViatura {
   companhia: string;
   categoria: string;
   comandante: string;
+  /** Composição textual da equipe além do comandante. Cartões antigos não têm. */
+  composicao?: string;
   observacao: string;
   itens: CartaoItem[];
   /** Campos da migration 001 (Cartão Programa em PDF + Avisos Operacionais).
    *  Opcionais de propósito: viaturas gravadas antes dela não os têm, e não há
    *  migração de boot preenchendo — todo leitor trata a ausência. */
   bairro_id?: string;
+  /** Bairros atendidos. `bairro_id` permanece como primeiro bairro para
+   * compatibilidade com cartões e integrações anteriores. */
+  bairros_ids?: string[];
   comandante_pessoal_id?: string;
   /** "3º SGT PM SILVA" congelado na geração do PDF: o cartão já enviado não muda
    *  se o militar for promovido depois. */

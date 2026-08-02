@@ -46,6 +46,8 @@ export default function CartaoTelaCheiaPage() {
   }, [id]);
 
   useEffect(() => {
+    // Carregamento inicial da rota; a atualização ocorre após o fetch assíncrono.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void carregar();
   }, [carregar]);
 
