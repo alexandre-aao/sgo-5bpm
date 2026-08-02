@@ -28,12 +28,9 @@ function recortarCanvas(canvas: HTMLCanvasElement, inicioY: number, altura: numb
   return recorte;
 }
 
-/** Gera um arquivo PDF real no navegador. Não depende do diálogo nativo de
- * impressão, que pode ser bloqueado em webviews ou não disparar `afterprint`. */
-export async function baixarDocumentosCartaoPdf(
-  documentos: DocumentoCartao[],
-  nomeArquivo: string,
-): Promise<void> {
+/** Gera um arquivo PDF real no navegador. O Blob retornado vira um link
+ * explícito de download, preservando o clique do usuário até a etapa de guardar. */
+export async function gerarDocumentosCartaoPdf(documentos: DocumentoCartao[]): Promise<Blob> {
   const lote = document.getElementById('central-emissao-impressao');
   if (!lote || documentos.length === 0) throw new Error('Nenhum documento disponível para baixar.');
 
@@ -84,7 +81,7 @@ export async function baixarDocumentosCartaoPdf(
       canvas.height = 1;
     }
 
-    await pdf.save(`${nomeArquivo}.pdf`, { returnPromise: true });
+    return pdf.output('blob');
   } finally {
     lote.classList.remove('central-emissao-exportando');
   }

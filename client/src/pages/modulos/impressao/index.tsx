@@ -17,7 +17,7 @@ import {
   type FormatoDocumento, type ModalidadeEmissao, type TipoDocumento,
 } from './documentoCartao';
 import { DocumentoCartaoView, LoteDocumentosCartao } from './RenderDocumentoCartao';
-import { baixarDocumentosCartaoPdf } from './gerarPdfCartao';
+import { gerarDocumentosCartaoPdf } from './gerarPdfCartao';
 import { validarCentralEmissao } from './validacaoEmissao';
 
 interface RegistroEmissao {
@@ -38,6 +38,12 @@ interface RegistroEmissao {
 interface EmissaoConfirmada {
   instante: Date;
   documentos: DocumentoCartao[];
+  chaveConfiguracao: string;
+}
+
+interface PdfPronto {
+  url: string;
+  nomeArquivo: string;
   chaveConfiguracao: string;
 }
 
@@ -106,6 +112,8 @@ export default function CentralEmissaoPage() {
   const [confirmada, setConfirmada] = useState<EmissaoConfirmada | null>(null);
   const [indicePrevia, setIndicePrevia] = useState(0);
   const [imprimindo, setImprimindo] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [pdfPronto, setPdfPronto] = useState<PdfPronto | null>(null);
   const [historico, setHistorico] = useState<RegistroEmissao[]>([]);
   const [historicoAberto, setHistoricoAberto] = useState(false);
 
@@ -179,6 +187,10 @@ export default function CentralEmissaoPage() {
     if (!cartaoIdInicial) void carregarPorData(data);
   }, [cartaoIdInicial, carregarPorData, data]);
 
+  useEffect(() => () => {
+    if (pdfPronto) URL.revokeObjectURL(pdfPronto.url);
+  }, [pdfPronto]);
+
   const viaturasElegiveis = useMemo(
     () => cartao ? filtrarViaturasPorConteudo(cartao.viaturas || [], configuracao.conteudo) : [],
     [cartao, configuracao.conteudo],
@@ -200,6 +212,7 @@ export default function CentralEmissaoPage() {
 
   function invalidarConferencia() {
     setConfirmada(null);
+    setPdfPronto(null);
     setIndicePrevia(0);
   }
 
@@ -241,6 +254,7 @@ export default function CentralEmissaoPage() {
     const documentos = montarDocumentosCartao(
       cartao, viaturasSelecionadas, dados.pessoal, bairros, dados.eventos, avisos, configuracao, instante,
     );
+    setPdfPronto(null);
     setConfirmada({ instante, documentos, chaveConfiguracao: chaveAtual });
     setIndicePrevia(0);
     toast('Emissão conferida. O horário foi registrado; escolha a forma de saída.', 'success');
@@ -277,22 +291,28 @@ export default function CentralEmissaoPage() {
       : `cartao-programa-${cartao?.data || 'sem-data'}-lote-${confirmada.documentos.length}-v${Math.max(...confirmada.documentos.map((d) => d.controle.versao))}`;
   }
 
-  async function baixarPdf() {
+  async function gerarPdf() {
     if (!estaConfirmada || !confirmada) {
       toast('Confirme a emissão antes de imprimir ou salvar.', 'warning');
       return;
     }
-    if (imprimindo) return;
-    setImprimindo(true);
+    if (imprimindo || gerandoPdf) return;
+    setGerandoPdf(true);
     try {
-      await baixarDocumentosCartaoPdf(confirmada.documentos, nomeDoArquivoConfirmado());
+      const blob = await gerarDocumentosCartaoPdf(confirmada.documentos);
+      const nomeArquivo = `${nomeDoArquivoConfirmado()}.pdf`;
+      setPdfPronto({
+        url: URL.createObjectURL(blob),
+        nomeArquivo,
+        chaveConfiguracao: chaveAtual,
+      });
       const ok = await registrarEmissao('gerado');
-      if (ok) toast('PDF baixado e emissão registrada como “Gerado”.', 'success');
+      if (ok) toast('PDF pronto. Clique em “Guardar PDF” para baixar ou abrir o arquivo.', 'success');
     } catch (erro) {
       console.error('Falha ao gerar PDF do Cartão Programa:', erro);
-      toast(erro instanceof Error ? erro.message : 'Não foi possível baixar o PDF.', 'danger');
+      toast(erro instanceof Error ? erro.message : 'Não foi possível gerar o PDF.', 'danger');
     } finally {
-      setImprimindo(false);
+      setGerandoPdf(false);
     }
   }
 
@@ -353,6 +373,7 @@ export default function CentralEmissaoPage() {
   }
 
   const previa = documentosExibidos[Math.min(indicePrevia, Math.max(0, documentosExibidos.length - 1))];
+  const pdfDisponivel = pdfPronto?.chaveConfiguracao === chaveAtual ? pdfPronto : null;
 
   return (
     <div className="central-emissao">
@@ -453,8 +474,15 @@ export default function CentralEmissaoPage() {
           <div className="panel central-emissao-acoes">
             <div className="central-saidas">
               <button type="button" className="btn btn-secondary" disabled={!estaConfirmada} onClick={() => void compartilharTexto()}><Share2 /> Compartilhar texto</button>
-              <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo} onClick={() => void baixarPdf()}><Download /> {imprimindo ? 'Preparando...' : 'Baixar PDF'}</button>
-              <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo} onClick={imprimirDocumento}><Printer /> Imprimir</button>
+              {pdfDisponivel ? (
+                <a
+                  className="btn btn-primary" href={pdfDisponivel.url} download={pdfDisponivel.nomeArquivo}
+                  target="_blank" rel="noopener" onClick={() => toast('Arquivo PDF aberto. Use a opção Guardar do navegador, se necessário.', 'info')}
+                ><Download /> Guardar PDF</a>
+              ) : (
+                <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo || gerandoPdf} onClick={() => void gerarPdf()}><Download /> {gerandoPdf ? 'Gerando PDF...' : 'Gerar PDF'}</button>
+              )}
+              <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo || gerandoPdf} onClick={imprimirDocumento}><Printer /> Imprimir</button>
             </div>
             <button type="button" className="btn btn-primary" disabled={validacao.erros.length > 0} onClick={confirmarEmissao}><CheckCircle2 /> {estaConfirmada ? 'Emissão confirmada' : 'Confirmar emissão'}</button>
           </div>
