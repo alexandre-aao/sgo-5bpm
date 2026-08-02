@@ -17,6 +17,7 @@ import {
   type FormatoDocumento, type ModalidadeEmissao, type TipoDocumento,
 } from './documentoCartao';
 import { DocumentoCartaoView, LoteDocumentosCartao } from './RenderDocumentoCartao';
+import { baixarDocumentosCartaoPdf } from './gerarPdfCartao';
 import { validarCentralEmissao } from './validacaoEmissao';
 
 interface RegistroEmissao {
@@ -269,30 +270,70 @@ export default function CentralEmissaoPage() {
     return true;
   }
 
-  function imprimirOuSalvar(destino: 'imprimir' | 'pdf') {
+  function nomeDoArquivoConfirmado(): string {
+    if (!confirmada) return `cartao-programa-${cartao?.data || 'sem-data'}`;
+    return confirmada.documentos.length === 1
+      ? confirmada.documentos[0].controle.nomeArquivo
+      : `cartao-programa-${cartao?.data || 'sem-data'}-lote-${confirmada.documentos.length}-v${Math.max(...confirmada.documentos.map((d) => d.controle.versao))}`;
+  }
+
+  async function baixarPdf() {
     if (!estaConfirmada || !confirmada) {
       toast('Confirme a emissão antes de imprimir ou salvar.', 'warning');
       return;
     }
     if (imprimindo) return;
     setImprimindo(true);
+    try {
+      await baixarDocumentosCartaoPdf(confirmada.documentos, nomeDoArquivoConfirmado());
+      const ok = await registrarEmissao('gerado');
+      if (ok) toast('PDF baixado e emissão registrada como “Gerado”.', 'success');
+    } catch (erro) {
+      console.error('Falha ao gerar PDF do Cartão Programa:', erro);
+      toast(erro instanceof Error ? erro.message : 'Não foi possível baixar o PDF.', 'danger');
+    } finally {
+      setImprimindo(false);
+    }
+  }
+
+  function imprimirDocumento() {
+    if (!estaConfirmada || !confirmada) {
+      toast('Confirme a emissão antes de imprimir.', 'warning');
+      return;
+    }
+    if (imprimindo) return;
+    setImprimindo(true);
     const tituloOriginal = document.title;
-    const nome = confirmada.documentos.length === 1
-      ? confirmada.documentos[0].controle.nomeArquivo
-      : `cartao-programa-${cartao?.data || 'sem-data'}-lote-${confirmada.documentos.length}-v${Math.max(...confirmada.documentos.map((d) => d.controle.versao))}`;
-    document.title = nome;
-    if (destino === 'pdf') toast('No diálogo do Chrome, escolha “Salvar como PDF”.', 'info');
+    document.title = nomeDoArquivoConfirmado();
+    let finalizada = false;
+    let iniciouImpressao = false;
 
     const depoisDeImprimir = () => {
+      if (finalizada) return;
+      finalizada = true;
+      window.removeEventListener('beforeprint', antesDeImprimir);
       document.title = tituloOriginal;
       setImprimindo(false);
       void registrarEmissao('gerado').then((ok) => {
         if (ok) toast('Emissão registrada e viaturas marcadas como “Gerado”.', 'success');
       });
     };
+    const antesDeImprimir = () => { iniciouImpressao = true; };
+    window.addEventListener('beforeprint', antesDeImprimir, { once: true });
     window.addEventListener('afterprint', depoisDeImprimir, { once: true });
-    // Deixa a versão confirmada chegar ao layout de impressão antes de abrir o diálogo.
-    window.setTimeout(() => window.print(), 50);
+    window.print();
+
+    // Webviews podem ignorar window.print() e nunca emitir afterprint. Nesse caso,
+    // devolve o controle da tela e orienta para o download direto, sem registro falso.
+    window.setTimeout(() => {
+      if (iniciouImpressao || finalizada) return;
+      finalizada = true;
+      window.removeEventListener('beforeprint', antesDeImprimir);
+      window.removeEventListener('afterprint', depoisDeImprimir);
+      document.title = tituloOriginal;
+      setImprimindo(false);
+      toast('O navegador bloqueou a impressão. Use “Baixar PDF” para guardar o documento.', 'warning');
+    }, 1200);
   }
 
   async function compartilharTexto() {
@@ -412,8 +453,8 @@ export default function CentralEmissaoPage() {
           <div className="panel central-emissao-acoes">
             <div className="central-saidas">
               <button type="button" className="btn btn-secondary" disabled={!estaConfirmada} onClick={() => void compartilharTexto()}><Share2 /> Compartilhar texto</button>
-              <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo} onClick={() => imprimirOuSalvar('pdf')}><Download /> Baixar PDF</button>
-              <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo} onClick={() => imprimirOuSalvar('imprimir')}><Printer /> Imprimir</button>
+              <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo} onClick={() => void baixarPdf()}><Download /> {imprimindo ? 'Preparando...' : 'Baixar PDF'}</button>
+              <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo} onClick={imprimirDocumento}><Printer /> Imprimir</button>
             </div>
             <button type="button" className="btn btn-primary" disabled={validacao.erros.length > 0} onClick={confirmarEmissao}><CheckCircle2 /> {estaConfirmada ? 'Emissão confirmada' : 'Confirmar emissão'}</button>
           </div>

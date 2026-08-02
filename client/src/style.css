@@ -4831,6 +4831,13 @@ body.sgo-sincronizando .topbar::before {
 .central-emissao-vazio { display: grid; place-items: center; gap: 10px; padding: 48px; color: var(--text-muted); }
 .central-emissao-vazio svg { width: 32px; }
 #central-emissao-impressao { display: none; }
+#central-emissao-impressao.central-emissao-exportando {
+  display: block; position: fixed; top: 0; left: -12000px; z-index: -1;
+  width: max-content; height: auto; overflow: visible; background: #fff;
+}
+#central-emissao-impressao.central-emissao-exportando .documento-cartao {
+  zoom: 1; box-shadow: none;
+}
 
 .bairros-multiselect { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; }
 .bairros-multiselect legend { padding: 0 5px; font-size: .72rem; font-weight: 600; color: var(--text-muted); }
