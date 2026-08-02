@@ -560,6 +560,55 @@ app.post('/api/login', loginRateLimiter, asyncRoute(async (req, res) => {
   res.json({ usuario: user.usuario, role: user.role, nome: user.nome, token, expira });
 }));
 
+// Entrega o PDF já montado pela Central de Emissão como uma resposta HTTP real.
+// Alguns webviews ignoram links blob: e window.print(); um POST de formulário com
+// Content-Disposition funciona como download ou abre o visualizador nativo sem
+// persistir o documento operacional no servidor. O token vai no corpo (nunca na URL)
+// porque formulários HTML não conseguem definir o cabeçalho Authorization.
+const receberFormularioPdf = express.urlencoded({ extended: false, limit: '20mb', parameterLimit: 8 });
+const entregaPdfRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Muitas solicitações de PDF. Aguarde um minuto e tente novamente.'
+});
+
+app.post('/api/cartoes/:id/arquivo-pdf', entregaPdfRateLimiter, receberFormularioPdf, asyncRoute(async (req, res) => {
+  const token = String(req.body.token || '');
+  const sessao = token ? await buscarSessaoPorToken(token) : null;
+  if (!sessao || sessao.expira <= Date.now()) {
+    return res.status(401).type('text/plain').send('Sessão expirada. Faça login novamente.');
+  }
+
+  const cartao = await buscarCartaoPorId(req.params.id);
+  if (!cartao || cartao.is_template) {
+    return res.status(404).type('text/plain').send('Cartão Programa do dia não encontrado.');
+  }
+
+  const base64 = String(req.body.pdf_base64 || '').replace(/^data:application\/pdf;base64,/, '');
+  const arquivo = Buffer.from(base64, 'base64');
+  if (!base64 || arquivo.length < 5 || arquivo.subarray(0, 5).toString('ascii') !== '%PDF-') {
+    return res.status(400).type('text/plain').send('Arquivo PDF inválido. Gere o documento novamente.');
+  }
+  if (arquivo.length > 15 * 1024 * 1024) {
+    return res.status(413).type('text/plain').send('O PDF ultrapassou o limite de 15 MB.');
+  }
+
+  const nomeRecebido = String(req.body.nome_arquivo || 'cartao-programa.pdf');
+  const nomeSeguro = nomeRecebido.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 160) || 'cartao-programa.pdf';
+  const nomeArquivo = nomeSeguro.toLowerCase().endsWith('.pdf') ? nomeSeguro : `${nomeSeguro}.pdf`;
+  const disposicao = req.body.disposicao === 'inline' ? 'inline' : 'attachment';
+
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `${disposicao}; filename="${nomeArquivo}"`,
+    'Cache-Control': 'private, no-store, max-age=0',
+    'Content-Length': String(arquivo.length)
+  });
+  res.send(arquivo);
+}));
+
 // A partir daqui, todas as rotas /api exigem sessão válida
 app.use('/api', autenticar);
 

@@ -4,7 +4,8 @@ import {
   Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, FileCheck2, FileSliders,
   FolderArchive, History, Info, Printer, Send, Share2, ShieldAlert, TriangleAlert, Users, XCircle,
 } from 'lucide-react';
-import { apiFetch } from '../../../lib/api';
+import { API_BASE_URL, apiFetch } from '../../../lib/api';
+import { useAuth } from '../../../context/useAuth';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { Carregando } from '../../../components/estado/Carregando';
 import { useAppData } from '../../../context/useAppData';
@@ -42,9 +43,54 @@ interface EmissaoConfirmada {
 }
 
 interface PdfPronto {
-  url: string;
+  base64: string;
   nomeArquivo: string;
   chaveConfiguracao: string;
+}
+
+function blobParaBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const resultado = String(leitor.result || '');
+      const separador = resultado.indexOf(',');
+      if (separador < 0) reject(new Error('Não foi possível preparar o arquivo PDF.'));
+      else resolve(resultado.slice(separador + 1));
+    };
+    leitor.onerror = () => reject(new Error('Não foi possível preparar o arquivo PDF.'));
+    leitor.readAsDataURL(blob);
+  });
+}
+
+function enviarPdfAoNavegador(
+  cartaoId: string,
+  token: string,
+  pdf: PdfPronto,
+  disposicao: 'attachment' | 'inline',
+): void {
+  const formulario = document.createElement('form');
+  formulario.method = 'POST';
+  formulario.action = `${API_BASE_URL}/api/cartoes/${encodeURIComponent(cartaoId)}/arquivo-pdf`;
+  formulario.target = '_blank';
+  formulario.style.display = 'none';
+
+  const campos = {
+    token,
+    pdf_base64: pdf.base64,
+    nome_arquivo: pdf.nomeArquivo,
+    disposicao,
+  };
+  Object.entries(campos).forEach(([nome, valor]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = nome;
+    input.value = valor;
+    formulario.appendChild(input);
+  });
+
+  document.body.appendChild(formulario);
+  formulario.submit();
+  formulario.remove();
 }
 
 const MODOS: Array<{
@@ -100,6 +146,7 @@ export default function CentralEmissaoPage() {
   const { bairros } = useBairros();
   const { avisos } = useAvisos();
   const { toast } = useToast();
+  const { usuario } = useAuth();
 
   const [data, setData] = useState('');
   const [cartao, setCartao] = useState<CartaoDetalhado | null>(null);
@@ -111,7 +158,6 @@ export default function CentralEmissaoPage() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [confirmada, setConfirmada] = useState<EmissaoConfirmada | null>(null);
   const [indicePrevia, setIndicePrevia] = useState(0);
-  const [imprimindo, setImprimindo] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [pdfPronto, setPdfPronto] = useState<PdfPronto | null>(null);
   const [historico, setHistorico] = useState<RegistroEmissao[]>([]);
@@ -186,10 +232,6 @@ export default function CentralEmissaoPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!cartaoIdInicial) void carregarPorData(data);
   }, [cartaoIdInicial, carregarPorData, data]);
-
-  useEffect(() => () => {
-    if (pdfPronto) URL.revokeObjectURL(pdfPronto.url);
-  }, [pdfPronto]);
 
   const viaturasElegiveis = useMemo(
     () => cartao ? filtrarViaturasPorConteudo(cartao.viaturas || [], configuracao.conteudo) : [],
@@ -296,13 +338,14 @@ export default function CentralEmissaoPage() {
       toast('Confirme a emissão antes de imprimir ou salvar.', 'warning');
       return;
     }
-    if (imprimindo || gerandoPdf) return;
+    if (gerandoPdf) return;
     setGerandoPdf(true);
     try {
       const blob = await gerarDocumentosCartaoPdf(confirmada.documentos);
+      const base64 = await blobParaBase64(blob);
       const nomeArquivo = `${nomeDoArquivoConfirmado()}.pdf`;
       setPdfPronto({
-        url: URL.createObjectURL(blob),
+        base64,
         nomeArquivo,
         chaveConfiguracao: chaveAtual,
       });
@@ -316,44 +359,18 @@ export default function CentralEmissaoPage() {
     }
   }
 
-  function imprimirDocumento() {
-    if (!estaConfirmada || !confirmada) {
-      toast('Confirme a emissão antes de imprimir.', 'warning');
+  function entregarPdf(disposicao: 'attachment' | 'inline') {
+    if (!cartao || !pdfDisponivel || !usuario?.token) {
+      toast('Gere o PDF antes de guardar ou imprimir.', 'warning');
       return;
     }
-    if (imprimindo) return;
-    setImprimindo(true);
-    const tituloOriginal = document.title;
-    document.title = nomeDoArquivoConfirmado();
-    let finalizada = false;
-    let iniciouImpressao = false;
-
-    const depoisDeImprimir = () => {
-      if (finalizada) return;
-      finalizada = true;
-      window.removeEventListener('beforeprint', antesDeImprimir);
-      document.title = tituloOriginal;
-      setImprimindo(false);
-      void registrarEmissao('gerado').then((ok) => {
-        if (ok) toast('Emissão registrada e viaturas marcadas como “Gerado”.', 'success');
-      });
-    };
-    const antesDeImprimir = () => { iniciouImpressao = true; };
-    window.addEventListener('beforeprint', antesDeImprimir, { once: true });
-    window.addEventListener('afterprint', depoisDeImprimir, { once: true });
-    window.print();
-
-    // Webviews podem ignorar window.print() e nunca emitir afterprint. Nesse caso,
-    // devolve o controle da tela e orienta para o download direto, sem registro falso.
-    window.setTimeout(() => {
-      if (iniciouImpressao || finalizada) return;
-      finalizada = true;
-      window.removeEventListener('beforeprint', antesDeImprimir);
-      window.removeEventListener('afterprint', depoisDeImprimir);
-      document.title = tituloOriginal;
-      setImprimindo(false);
-      toast('O navegador bloqueou a impressão. Use “Baixar PDF” para guardar o documento.', 'warning');
-    }, 1200);
+    enviarPdfAoNavegador(cartao.id, usuario.token, pdfDisponivel, disposicao);
+    toast(
+      disposicao === 'attachment'
+        ? 'Download solicitado ao navegador.'
+        : 'PDF aberto para visualização e impressão.',
+      'success',
+    );
   }
 
   async function compartilharTexto() {
@@ -475,14 +492,13 @@ export default function CentralEmissaoPage() {
             <div className="central-saidas">
               <button type="button" className="btn btn-secondary" disabled={!estaConfirmada} onClick={() => void compartilharTexto()}><Share2 /> Compartilhar texto</button>
               {pdfDisponivel ? (
-                <a
-                  className="btn btn-primary" href={pdfDisponivel.url} download={pdfDisponivel.nomeArquivo}
-                  target="_blank" rel="noopener" onClick={() => toast('Arquivo PDF aberto. Use a opção Guardar do navegador, se necessário.', 'info')}
-                ><Download /> Guardar PDF</a>
+                <button type="button" className="btn btn-primary" onClick={() => entregarPdf('attachment')}>
+                  <Download /> Guardar PDF
+                </button>
               ) : (
-                <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo || gerandoPdf} onClick={() => void gerarPdf()}><Download /> {gerandoPdf ? 'Gerando PDF...' : 'Gerar PDF'}</button>
+                <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || gerandoPdf} onClick={() => void gerarPdf()}><Download /> {gerandoPdf ? 'Gerando PDF...' : 'Gerar PDF'}</button>
               )}
-              <button type="button" className="btn btn-secondary" disabled={!estaConfirmada || imprimindo || gerandoPdf} onClick={imprimirDocumento}><Printer /> Imprimir</button>
+              <button type="button" className="btn btn-secondary" disabled={!pdfDisponivel || gerandoPdf} onClick={() => entregarPdf('inline')}><Printer /> Abrir / imprimir PDF</button>
             </div>
             <button type="button" className="btn btn-primary" disabled={validacao.erros.length > 0} onClick={confirmarEmissao}><CheckCircle2 /> {estaConfirmada ? 'Emissão confirmada' : 'Confirmar emissão'}</button>
           </div>
