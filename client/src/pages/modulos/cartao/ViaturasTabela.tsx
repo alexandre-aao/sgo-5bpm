@@ -2,6 +2,7 @@ import { Pencil, Trash2, FileText } from 'lucide-react';
 import type { CartaoViatura, StatusEnvio } from '../../../lib/cartaoConflitos';
 import { ROTULO_STATUS_ENVIO } from '../../../lib/cartaoConflitos';
 import { categoriaBadgeClass } from './constantes';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 function statusEnvioBadgeClass(status: StatusEnvio | undefined): string {
   return `envio-${status || 'pendente'}`;
@@ -33,11 +34,9 @@ export function ViaturasTabela({ viaturas, podeEditar, onEditar, onExcluir, onVe
         </thead>
         <tbody>
           {viaturas.length === 0 ? (
-            <tr>
-              <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
-                Nenhuma viatura adicionada. Use o formulário abaixo para montar o cartão.
-              </td>
-            </tr>
+            <LinhaTabelaVazia colunas={7}>
+              Nenhuma viatura adicionada. Use o formulário abaixo para montar o cartão.
+            </LinhaTabelaVazia>
           ) : (
             viaturas.map((vtr) => (
               <tr key={vtr.id}>

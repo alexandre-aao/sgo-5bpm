@@ -5,6 +5,7 @@ import { TIPOS_EVENTO } from '../../../lib/tiposEvento';
 import { SeletorBairro } from '../../../components/SeletorBairro';
 import { useToast } from '../../../context/useToast';
 import type { EventoPayload, ResultadoAcao } from './useEventoDrawer';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalEditarEventoProps {
   evento: Tables<'eventos'>;
@@ -33,6 +34,7 @@ function formularioDoEvento(evento: Tables<'eventos'>): EventoPayload {
 // Ao contrário do formulário de criação, Demandante não é obrigatório aqui
 // (mesma diferença do app antigo) e o select de Tipo não tem opção em branco.
 export function ModalEditarEvento({ evento, onFechar, onSalvar }: ModalEditarEventoProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const [form, setForm] = useState<EventoPayload>(() => formularioDoEvento(evento));
   const [enviando, setEnviando] = useState(false);
@@ -67,10 +69,10 @@ export function ModalEditarEvento({ evento, onFechar, onSalvar }: ModalEditarEve
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box modal-box-lg">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box modal-box-lg" ref={refCaixa}>
         <div className="modal-header">
-          <h3><Pencil /> Editar Evento</h3>
+          <h3 id={idTitulo}><Pencil /> Editar Evento</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form className="styled-form" onSubmit={handleSubmit}>

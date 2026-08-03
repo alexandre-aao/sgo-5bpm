@@ -4,6 +4,7 @@ import type { Tables } from '../../../types/supabase';
 import { TIPOS_OPERACAO } from '../../../lib/tiposOperacao';
 import { useToast } from '../../../context/useToast';
 import type { OperacaoPayload, ResultadoAcao } from './useOperacaoDrawer';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalOperacaoProps {
   /** undefined/null = modo criação; presente = modo edição, pré-preenchido. */
@@ -58,6 +59,7 @@ function formularioDaOperacao(operacao: Tables<'operacoes'>): OperacaoPayload {
 // abrirModalOperacao()/handleSalvarOperacao() em public/app.js. Ao contrário do
 // Evento, o Bairro aqui é texto livre (não select do cadastro de bairros).
 export function ModalOperacao({ operacao, onFechar, onSalvar }: ModalOperacaoProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const modoEdicao = !!operacao;
   const [form, setForm] = useState<OperacaoPayload>(() => (operacao ? formularioDaOperacao(operacao) : formularioVazio()));
@@ -103,10 +105,10 @@ export function ModalOperacao({ operacao, onFechar, onSalvar }: ModalOperacaoPro
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box modal-box-lg">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box modal-box-lg" ref={refCaixa}>
         <div className="modal-header">
-          <h3>{modoEdicao ? <Pencil /> : <ShieldAlert />} {modoEdicao ? 'Editar Operação' : 'Nova Operação'}</h3>
+          <h3 id={idTitulo}>{modoEdicao ? <Pencil /> : <ShieldAlert />} {modoEdicao ? 'Editar Operação' : 'Nova Operação'}</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>

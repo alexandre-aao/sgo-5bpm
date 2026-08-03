@@ -3,6 +3,7 @@ import { MapPinPlus, Plus, Check, Pencil, Trash2 } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { useToast } from '../../../context/useToast';
 import type { BairroPayload, ResultadoAcao } from '../../../hooks/useBairros';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 interface GerenciarBairrosPanelProps {
   bairros: Tables<'bairros_coordenadas'>[];
@@ -120,11 +121,7 @@ export function GerenciarBairrosPanel({ bairros, criarBairro, atualizarBairro, e
           </thead>
           <tbody>
             {bairros.length === 0 ? (
-              <tr>
-                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
-                  Nenhum bairro cadastrado ainda.
-                </td>
-              </tr>
+              <LinhaTabelaVazia colunas={4}>Nenhum bairro cadastrado ainda.</LinhaTabelaVazia>
             ) : (
               bairros.map((b) => (
                 <tr key={b.id}>

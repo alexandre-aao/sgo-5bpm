@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { History, FolderOpen } from 'lucide-react';
 import { apiFetch } from '../../../lib/api';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 interface CartaoResumo {
   id: string;
@@ -66,11 +67,9 @@ export function CartoesRecentes({ dataSelecionada, onAbrir }: CartoesRecentesPro
           </thead>
           <tbody>
             {carregando ? null : recentes.length === 0 ? (
-              <tr>
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
-                  Nenhum Cartão Programa anterior lançado.
-                </td>
-              </tr>
+              <LinhaTabelaVazia colunas={5}>
+                Nenhum Cartão Programa anterior lançado.
+              </LinhaTabelaVazia>
             ) : (
               recentes.map((c) => (
                 <tr key={c.id}>

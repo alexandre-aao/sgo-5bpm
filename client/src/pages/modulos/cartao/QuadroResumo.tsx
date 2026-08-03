@@ -1,6 +1,7 @@
 import { Table2 } from 'lucide-react';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
 import { formatHoraCartao } from '../../../lib/cartaoConflitos';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 const ORDEM_COMPANHIA: Record<string, number> = { '1ª Companhia': 1, '2ª Companhia': 2, '3ª Companhia': 3 };
 
@@ -45,11 +46,9 @@ export function QuadroResumo({ viaturas }: QuadroResumoProps) {
           </thead>
           <tbody>
             {ordenadas.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 16 }}>
-                  Nenhuma viatura no cartão.
-                </td>
-              </tr>
+              <LinhaTabelaVazia colunas={6}>
+                Nenhuma viatura no cartão.
+              </LinhaTabelaVazia>
             ) : (
               ordenadas.map((vtr) => (
                 <tr key={vtr.id}>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CalendarDays, Zap, CalendarPlus, ShieldPlus, ClipboardList, FileText, Map } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -46,11 +47,7 @@ export function DashRail({ eventos }: DashRailProps) {
             </thead>
             <tbody>
               {proximos.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="text-center" style={{ color: 'var(--text-muted)', padding: 20 }}>
-                    Nenhum evento futuro.
-                  </td>
-                </tr>
+                <LinhaTabelaVazia colunas={3}>Nenhum evento futuro.</LinhaTabelaVazia>
               ) : (
                 proximos.map((evt) => {
                   const [, mes, dia] = evt.data_inicio.split('-');

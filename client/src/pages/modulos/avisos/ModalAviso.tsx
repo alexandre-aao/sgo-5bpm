@@ -5,6 +5,7 @@ import { COMPANHIAS } from '../../../lib/categoriasViatura';
 import { useToast } from '../../../context/useToast';
 import { LIMITE_TEXTO_AVISO, PRIORIDADES_AVISO, ROTULO_PRIORIDADE, hojeISO } from '../../../lib/avisos';
 import type { AvisoPayload, ResultadoAcao } from '../../../hooks/useAvisos';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalAvisoProps {
   aviso: Tables<'avisos'> | null;
@@ -14,6 +15,7 @@ interface ModalAvisoProps {
 }
 
 export function ModalAviso({ aviso, bairros, onFechar, onSalvar }: ModalAvisoProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const [form, setForm] = useState<AvisoPayload>(() => ({
     texto: aviso?.texto || '',
@@ -47,10 +49,10 @@ export function ModalAviso({ aviso, bairros, onFechar, onSalvar }: ModalAvisoPro
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box" ref={refCaixa}>
         <div className="modal-header">
-          <h3><Megaphone /> {aviso ? 'Editar Alerta' : 'Novo Alerta'}</h3>
+          <h3 id={idTitulo}><Megaphone /> {aviso ? 'Editar Alerta' : 'Novo Alerta'}</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -143,7 +145,7 @@ export function ModalAviso({ aviso, bairros, onFechar, onSalvar }: ModalAvisoPro
             </label>
           </div>
 
-          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+          <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
               <Check /> {aviso ? 'Salvar Alerta' : 'Cadastrar Alerta'}

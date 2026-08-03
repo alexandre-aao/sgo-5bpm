@@ -1,4 +1,5 @@
 import type { RelatorioDiariaItem } from './useRelatorioDiarias';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 interface TabelaConsolidadoProps {
   lista: RelatorioDiariaItem[];
@@ -19,11 +20,9 @@ export function TabelaConsolidado({ lista }: TabelaConsolidadoProps) {
         </thead>
         <tbody>
           {lista.length === 0 ? (
-            <tr>
-              <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                Nenhum militar localizado para o período/filtro selecionado.
-              </td>
-            </tr>
+            <LinhaTabelaVazia colunas={5}>
+              Nenhum militar localizado para o período/filtro selecionado.
+            </LinhaTabelaVazia>
           ) : (
             lista.map((item) => (
               <tr key={item.militar_id}>

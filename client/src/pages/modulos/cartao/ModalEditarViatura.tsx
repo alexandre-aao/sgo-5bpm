@@ -10,6 +10,7 @@ import { AutocompleteComandante } from './AutocompleteComandante';
 import { SeletorBairrosViatura } from './SeletorBairrosViatura';
 import type { ViaturaPayload } from './useViaturasCartao';
 import type { ResultadoAcao } from './useCartaoPrograma';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalEditarViaturaProps {
   viatura: CartaoViatura;
@@ -25,6 +26,7 @@ interface ModalEditarViaturaProps {
 // desmonta ao fechar — cada abertura já é uma instância nova, então o estado
 // inicial (lazy) é suficiente; não precisa de useEffect pra resincronizar.
 export function ModalEditarViatura({ viatura, pessoal, bairros, avisos, onFechar, onSalvar }: ModalEditarViaturaProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const [form, setForm] = useState<ViaturaPayload>(() => ({
     prefixo: viatura.prefixo || '',
@@ -63,10 +65,10 @@ export function ModalEditarViatura({ viatura, pessoal, bairros, avisos, onFechar
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box" ref={refCaixa}>
         <div className="modal-header">
-          <h3><Car /> Editar Viatura</h3>
+          <h3 id={idTitulo}><Car /> Editar Viatura</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -128,7 +130,7 @@ export function ModalEditarViatura({ viatura, pessoal, bairros, avisos, onFechar
             selecionados={form.avisos_ids}
             onChange={(avisos_ids) => setForm((atual) => ({ ...atual, avisos_ids }))}
           />
-          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+          <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
               <Check /> Salvar Viatura

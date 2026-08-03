@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Pencil, UserPlus, X, Check } from 'lucide-react';
 import { useToast } from '../../../context/useToast';
 import type { EditarUsuarioPayload, NovoUsuarioPayload, ResultadoAcao, UsuarioPublico } from './useUsuariosCrud';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalUsuarioProps {
   usuario?: UsuarioPublico | null;
@@ -10,6 +11,7 @@ interface ModalUsuarioProps {
 }
 
 export function ModalUsuario({ usuario, onFechar, onSalvar }: ModalUsuarioProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const modoEdicao = !!usuario;
   const [login, setLogin] = useState(usuario?.usuario ?? '');
@@ -36,10 +38,10 @@ export function ModalUsuario({ usuario, onFechar, onSalvar }: ModalUsuarioProps)
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box" ref={refCaixa}>
         <div className="modal-header">
-          <h3>{modoEdicao ? <Pencil /> : <UserPlus />} {modoEdicao ? 'Editar Usuário' : 'Novo Usuário'}</h3>
+          <h3 id={idTitulo}>{modoEdicao ? <Pencil /> : <UserPlus />} {modoEdicao ? 'Editar Usuário' : 'Novo Usuário'}</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -74,7 +76,7 @@ export function ModalUsuario({ usuario, onFechar, onSalvar }: ModalUsuarioProps)
               />
             </div>
           )}
-          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+          <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
               <Check /> Salvar

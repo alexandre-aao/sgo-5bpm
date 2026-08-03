@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { CalendarPlus, X, Check } from 'lucide-react';
 import { apiFetch } from '../../../lib/api';
 import { useToast } from '../../../context/useToast';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalMissaoAvulsaProps {
   dataPreenchida: string;
@@ -13,6 +14,7 @@ interface ModalMissaoAvulsaProps {
 // zerada (a diária real vem do efetivo escalado depois) — espelha
 // abrirModalMissaoAvulsa()/handleCriarMissaoAvulsa() em public/app.js.
 export function ModalMissaoAvulsa({ dataPreenchida, onFechar, onCriada }: ModalMissaoAvulsaProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const [nome, setNome] = useState('');
   const [data, setData] = useState(dataPreenchida);
@@ -56,10 +58,10 @@ export function ModalMissaoAvulsa({ dataPreenchida, onFechar, onCriada }: ModalM
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box" ref={refCaixa}>
         <div className="modal-header">
-          <h3><CalendarPlus /> Lançar Missão Avulsa</h3>
+          <h3 id={idTitulo}><CalendarPlus /> Lançar Missão Avulsa</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>
@@ -91,7 +93,7 @@ export function ModalMissaoAvulsa({ dataPreenchida, onFechar, onCriada }: ModalM
               value={local} onChange={(e) => setLocal(e.target.value)}
             />
           </div>
-          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+          <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
               <Check /> Criar e Escalar Militares

@@ -1,6 +1,7 @@
 import { ShieldAlert } from 'lucide-react';
 import { BadgeSituacao } from '../operacoes/BadgeSituacao';
 import type { OperacaoDoMes } from './usePlanejadorDiarias';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 interface OperacoesDoMesProps {
   operacoes: OperacaoDoMes[];
@@ -35,11 +36,7 @@ export function OperacoesDoMes({ operacoes, onAbrir }: OperacoesDoMesProps) {
           </thead>
           <tbody>
             {operacoes.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
-                  Nenhuma operação para este mês.
-                </td>
-              </tr>
+              <LinhaTabelaVazia colunas={6}>Nenhuma operação para este mês.</LinhaTabelaVazia>
             ) : (
               operacoes.map((op) => (
                 <tr key={op.id} style={{ cursor: 'pointer' }} onClick={() => onAbrir(op.id)}>

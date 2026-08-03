@@ -3,6 +3,7 @@ import { LayoutTemplate, X, Check } from 'lucide-react';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { useToast } from '../../../context/useToast';
 import { useTemplatesCartao } from './useTemplatesCartao';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalNovoTemplateProps {
   onFechar: () => void;
@@ -12,6 +13,7 @@ interface ModalNovoTemplateProps {
 // Espelha #modal-novo-template + handleCriarTemplate() em public/app.js. Depois
 // de criado, o cartão padrão abre direto no editor de viaturas/roteiro (onCriado).
 export function ModalNovoTemplate({ onFechar, onCriado }: ModalNovoTemplateProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const { criarTemplate } = useTemplatesCartao();
   const [nome, setNome] = useState('');
@@ -37,10 +39,10 @@ export function ModalNovoTemplate({ onFechar, onCriado }: ModalNovoTemplateProps
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box" ref={refCaixa}>
         <div className="modal-header">
-          <h3><LayoutTemplate /> Novo Cartão Padrão de Patrulhamento</h3>
+          <h3 id={idTitulo}><LayoutTemplate /> Novo Cartão Padrão de Patrulhamento</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -71,7 +73,7 @@ export function ModalNovoTemplate({ onFechar, onCriado }: ModalNovoTemplateProps
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             Depois de criado, adicione as viaturas e os roteiros do cartão padrão normalmente — o campo Comandante pode ficar em branco, já que será preenchido pelo Adjunto no dia.
           </p>
-          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+          <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
               <Check /> Criar Cartão Padrão

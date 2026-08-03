@@ -121,7 +121,34 @@
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --border-radius: 14px;  /* cards/painéis */
   --radius-sm: 8px;       /* botões, inputs, badges, ícone-container */
+  --radius-xs: 6px;       /* .btn-sm — já era usado como literal */
   --radius-pill: 999px;
+
+  /* Escala de espaçamento (grade de 4px). Os tokens saíram dos valores que as
+     telas já usavam por style inline — não é uma escala nova imposta por cima,
+     é a que existe de fato, agora nomeada. Usar sempre o degrau mais próximo:
+     valor solto em px numa regra de componente é desvio. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Escala tipográfica. Antes havia cinco tamanhos para o MESMO papel semântico
+     (0.72/0.75/0.78/0.8/0.85rem) espalhados em style inline. Estes cinco degraus
+     cobrem todos eles; --text-sm é o texto auxiliar padrão. */
+  --text-xs: 0.72rem;    /* badge, .btn-sm, nota de rodapé */
+  --text-sm: 0.78rem;    /* texto auxiliar / dica de campo */
+  --text-base: 0.82rem;  /* corpo de formulário e tabela */
+  --text-md: 0.9rem;     /* destaque em bloco */
+  --text-lg: 1rem;       /* título de modal/painel */
+
+  /* Ícone dentro de texto ou de chip — eram 12/13/14px soltos por style inline. */
+  --icone-sm: 12px;
+  --icone-md: 14px;
+  --icone-lg: 16px;
 }
 
 /* Tema Escuro (azulado). Só remapeia tokens — nenhuma regra de componente
@@ -945,7 +972,7 @@ a {
   transition: var(--transition-fast);
 }
 
-.btn-icon:hover {
+.btn-icon:not(:disabled):hover {
   background-color: var(--surface-2);
   color: var(--text-main);
 }
@@ -958,6 +985,18 @@ a {
 
 /* Valor ausente numa célula ("—", "Sem categoria") */
 .celula-vazia { color: var(--text-muted); }
+
+/* Linha de "nada a mostrar" dentro de um <tbody> — ver LinhaTabelaVazia.tsx.
+   Unifica os cinco paddings (16/20/22/24/32px) que as tabelas usavam soltos.
+   Precisa do `.styled-table td` no seletor: aquela regra define padding e cor e
+   ganharia por especificidade — mesmo motivo de .celula-numero logo acima.
+   (Antes o estilo inline de cada tabela vencia por ser inline.) */
+.celula-tabela-vazia,
+.styled-table td.celula-tabela-vazia {
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--space-6);
+}
 
 /* Número em destaque numa célula: peso, não cor (Etapa 1, item 3).
    Precisa do `td` no seletor: `.styled-table td` já define a cor e ganharia
@@ -999,16 +1038,46 @@ a {
   background-color: var(--danger-bg);
 }
 
+/* -------------------------------------------------------------
+   CHIP DE ÍCONE — base única
+   Antes eram 7 declarações do MESMO componente espalhadas por ~3.000 linhas
+   deste arquivo, e .kpi-icone / .resumo-mini-icone / .turno-equipe-icone eram
+   byte a byte idênticas. A base cuida do alinhamento e do tamanho padrão
+   (38px / raio 10px); cada variante abaixo só declara o que a diferencia.
+   A cor (fundo + ícone) continua vindo de quem usa, via var() no JSX.
+   ------------------------------------------------------------- */
+.icone-chip,
+.kpi-icone,
+.mod-icone,
+.dash-alerta-icone,
+.resumo-mini-icone,
+.turno-equipe-icone,
+.estado-vazio-icone,
 .estado-erro-icone {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  width: var(--chip-tamanho, 38px);
+  height: var(--chip-tamanho, 38px);
+  border-radius: var(--chip-raio, 10px);
+}
+
+.icone-chip-sm,
+.dash-alerta-icone,
+.estado-erro-icone {
+  --chip-tamanho: 30px;
+  --chip-raio: var(--radius-sm);
+}
+
+.icone-chip-lg {
+  --chip-tamanho: 44px;
+  --chip-raio: 11px;
+}
+
+.estado-erro-icone {
   background-color: var(--bg-panel);
   color: var(--danger-fg);
-  flex-shrink: 0;
 }
 
 .estado-erro-icone svg { width: 16px; height: 16px; }
@@ -1034,15 +1103,11 @@ a {
 }
 
 .estado-vazio-icone {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
+  --chip-tamanho: 44px;
+  --chip-raio: var(--radius-sm);
   background-color: var(--surface-2);
   color: var(--text-muted);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .estado-vazio-icone svg { width: 22px; height: 22px; }
@@ -1126,7 +1191,9 @@ textarea:focus-visible {
   color: var(--primary-fg);
 }
 
-.btn-primary:hover {
+/* Os :hover das variantes usam :not(:disabled) — senão continuavam repintando
+   um botão morto, desfazendo o estado desabilitado definido mais abaixo. */
+.btn-primary:not(:disabled):hover {
   background-color: var(--primary-hover);
 }
 
@@ -1139,7 +1206,7 @@ textarea:focus-visible {
   color: var(--text-main);
 }
 
-.btn-secondary:hover {
+.btn-secondary:not(:disabled):hover {
   background-color: var(--surface-2);
   border-color: var(--text-body);
 }
@@ -1151,7 +1218,7 @@ textarea:focus-visible {
   color: var(--text-body);
 }
 
-.btn-ghost:hover {
+.btn-ghost:not(:disabled):hover {
   background-color: var(--surface-2);
   color: var(--text-main);
 }
@@ -1161,7 +1228,7 @@ textarea:focus-visible {
   color: var(--primary-fg);
 }
 
-.btn-danger:hover {
+.btn-danger:not(:disabled):hover {
   background-color: var(--danger-hover);
 }
 
@@ -1169,6 +1236,31 @@ textarea:focus-visible {
   padding: 5px 10px;
   font-size: 0.72rem;
   border-radius: 6px;
+}
+
+/* Estado desabilitado — global.
+   Antes só existia .central-previa-nav button:disabled, então um .btn-primary ou
+   .btn-danger com disabled ficava IDÊNTICO ao habilitado (mesma cor, cursor:
+   pointer, opacidade 1): o operador clicava e nada acontecia, sem explicação.
+   Vale principalmente onde não há .btn-carregando pra dar o retorno — confirmação
+   de exclusão, "Confirmar emissão" da Central de Impressão e as setas de página. */
+.btn:disabled,
+.btn-icon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Campo desabilitado. O .form-group input define background-color: var(--bg-panel),
+   que sobrescreve o cinza nativo do navegador — sem esta regra um campo travado
+   (login em modo edição, data de fim de aviso permanente) fica visualmente igual
+   a um campo editável. */
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+  background-color: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
 /* Estado de carregamento de botão de submit — ver comBotaoCarregando() em app.js.
@@ -1428,15 +1520,7 @@ body.sgo-sincronizando .topbar::before {
   line-height: 1.3;
 }
 
-.kpi-icone {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+/* .kpi-icone usa o tamanho padrão do chip — ver a base em "CHIP DE ÍCONE". */
 
 .kpi-icone i { width: 20px; height: 20px; }
 
@@ -1528,15 +1612,7 @@ body.sgo-sincronizando .topbar::before {
 
 .dash-alerta-item:first-child { border-top: none; }
 
-.dash-alerta-icone {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+/* .dash-alerta-icone: só o tamanho muda (30px), declarado junto de .icone-chip-sm. */
 
 .dash-alerta-icone i { width: 17px; height: 17px; }
 
@@ -1598,12 +1674,8 @@ body.sgo-sincronizando .topbar::before {
 }
 
 .mod-icone {
-  width: 44px;
-  height: 44px;
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  --chip-tamanho: 44px;
+  --chip-raio: 11px;
   margin-bottom: 10px;
 }
 
@@ -2083,9 +2155,13 @@ body.sgo-sincronizando .topbar::before {
   color: var(--text-muted);
 }
 
+/* Borda em --border-controle, não --border-color: o limite de um campo é limite
+   de COMPONENTE, que a WCAG 1.4.11 exige em 3:1. Com --border-color dava 1,23:1
+   no tema claro e 1,30:1 no escuro; com este token dá 3,60:1 e 4,63:1. É o mesmo
+   token que .btn-secondary/.btn-icon já usavam — ver a nota no :root. */
 .form-group input, .form-group select, .form-group textarea {
   background-color: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-controle);
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.82rem;
@@ -2118,6 +2194,45 @@ body.sgo-sincronizando .topbar::before {
   border-top: 1px solid var(--border-color);
   padding-top: 20px;
   margin-top: 10px;
+}
+
+/* Variante de modal: o rodapé já é o fim da caixa, então não precisa do divisor
+   nem do respiro do formulário de página inteira. Substitui o
+   style={{ border:'none', paddingTop:8, marginTop:0 }} repetido em 10 modais. */
+.form-actions-modal {
+  border-top: none;
+  padding-top: var(--space-2);
+  margin-top: 0;
+}
+
+/* Texto auxiliar (dica sob um campo, legenda de painel, nota de rodapé).
+   Substitui os fontSize inline de 0.72/0.75/0.78/0.8/0.85rem espalhados pelas
+   telas — cinco valores para o mesmo papel semântico. */
+.texto-auxiliar {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Aviso de ação destrutiva. É a informação mais importante do modal de exclusão
+   (diz o que se perde), então não pode seguir como o texto mais apagado da caixa. */
+.aviso-destrutivo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--danger-bg);
+  color: var(--danger-fg);
+  font-size: var(--text-base);
+}
+
+.aviso-destrutivo svg {
+  width: var(--icone-lg);
+  height: var(--icone-lg);
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 /* -------------------------------------------------------------
@@ -2333,15 +2448,7 @@ body.sgo-sincronizando .topbar::before {
   gap: 12px;
 }
 
-.turno-equipe-icone {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+/* .turno-equipe-icone usa o tamanho padrão do chip — ver "CHIP DE ÍCONE". */
 
 .turno-equipe-icone i { width: 19px; height: 19px; }
 
@@ -4101,15 +4208,7 @@ body.sgo-sincronizando .topbar::before {
   padding: 14px;
 }
 
-.resumo-mini-icone {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+/* .resumo-mini-icone usa o tamanho padrão do chip — ver "CHIP DE ÍCONE". */
 
 .resumo-mini-icone i { width: 19px; height: 19px; }
 

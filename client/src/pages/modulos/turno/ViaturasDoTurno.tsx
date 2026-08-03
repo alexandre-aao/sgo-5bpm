@@ -2,6 +2,7 @@ import { Route } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
 import { categoriaBadgeClass } from '../cartao/constantes';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 interface ViaturasDoTurnoProps {
   viaturas: CartaoViatura[];
@@ -32,11 +33,7 @@ export function ViaturasDoTurno({ viaturas }: ViaturasDoTurnoProps) {
           </thead>
           <tbody>
             {viaturas.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="text-center" style={{ color: 'var(--text-muted)', padding: 22 }}>
-                  Nenhuma viatura lançada para este dia.
-                </td>
-              </tr>
+              <LinhaTabelaVazia colunas={5}>Nenhuma viatura lançada para este dia.</LinhaTabelaVazia>
             ) : (
               viaturas.map((v) => (
                 <tr key={v.id}>

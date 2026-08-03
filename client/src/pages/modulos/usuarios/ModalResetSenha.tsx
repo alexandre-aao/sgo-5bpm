@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { KeyRound, X } from 'lucide-react';
 import { useToast } from '../../../context/useToast';
 import type { ResultadoAcao, UsuarioPublico } from './useUsuariosCrud';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalResetSenhaProps {
   usuario: UsuarioPublico;
@@ -10,6 +11,7 @@ interface ModalResetSenhaProps {
 }
 
 export function ModalResetSenha({ usuario, onFechar, onResetar }: ModalResetSenhaProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const [senha, setSenha] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -28,10 +30,10 @@ export function ModalResetSenha({ usuario, onFechar, onResetar }: ModalResetSenh
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box" ref={refCaixa}>
         <div className="modal-header">
-          <h3><KeyRound /> Resetar Senha</h3>
+          <h3 id={idTitulo}><KeyRound /> Resetar Senha</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -45,7 +47,7 @@ export function ModalResetSenha({ usuario, onFechar, onResetar }: ModalResetSenh
               value={senha} onChange={(e) => setSenha(e.target.value)}
             />
           </div>
-          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+          <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
               <KeyRound /> Redefinir Senha

@@ -1,5 +1,6 @@
 import { Trophy } from 'lucide-react';
 import type { DashboardResumo } from './useDashboardResumo';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 interface TopMilitaresProps {
   topMilitares: DashboardResumo['top_militares'];
@@ -27,11 +28,7 @@ export function TopMilitares({ topMilitares }: TopMilitaresProps) {
           </thead>
           <tbody>
             {topMilitares.length === 0 ? (
-              <tr>
-                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
-                  Nenhuma escala lançada neste período.
-                </td>
-              </tr>
+              <LinhaTabelaVazia colunas={4}>Nenhuma escala lançada neste período.</LinhaTabelaVazia>
             ) : (
               topMilitares.map((m, i) => (
                 <tr key={`${m.militar_nome}-${i}`}>

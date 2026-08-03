@@ -4,6 +4,7 @@ import type { Tables } from '../../../types/supabase';
 import { CATEGORIAS_VIATURA, COMPANHIAS } from '../../../lib/categoriasViatura';
 import { useToast } from '../../../context/useToast';
 import type { ResultadoAcao, ViaturaCadastroPayload } from './useViaturasCrud';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalViaturaProps {
   /** undefined/null = modo criação; presente = modo edição, pré-preenchido. */
@@ -30,6 +31,7 @@ function formularioDaViatura(viatura: Tables<'viaturas'>): ViaturaCadastroPayloa
 // Modal "Nova/Editar Viatura" — espelha #modal-viatura + abrirModalViatura()/
 // handleSalvarViatura() em public/app.js.
 export function ModalViatura({ viatura, onFechar, onSalvar }: ModalViaturaProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const modoEdicao = !!viatura;
   const [form, setForm] = useState<ViaturaCadastroPayload>(() => (viatura ? formularioDaViatura(viatura) : formularioVazio()));
@@ -62,10 +64,10 @@ export function ModalViatura({ viatura, onFechar, onSalvar }: ModalViaturaProps)
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box" ref={refCaixa}>
         <div className="modal-header">
-          <h3>{modoEdicao ? <Pencil /> : <Plus />} {modoEdicao ? 'Editar Viatura' : 'Nova Viatura'}</h3>
+          <h3 id={idTitulo}>{modoEdicao ? <Pencil /> : <Plus />} {modoEdicao ? 'Editar Viatura' : 'Nova Viatura'}</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -110,7 +112,7 @@ export function ModalViatura({ viatura, onFechar, onSalvar }: ModalViaturaProps)
               value={form.observacao} onChange={(e) => atualizar('observacao', e.target.value)}
             />
           </div>
-          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+          <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
               <Check /> Salvar

@@ -4,6 +4,7 @@ import type { Tables } from '../../../types/supabase';
 import { CATEGORIAS_PESSOAL, POSTOS_GRADUACAO, SUBUNIDADES_PESSOAL } from '../../../lib/postosGraduacao';
 import { useToast } from '../../../context/useToast';
 import type { PessoaPayload, ResultadoAcao } from './usePessoalCrud';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 
 interface ModalPessoaProps {
   /** undefined/null = modo criação; presente = modo edição, pré-preenchido. */
@@ -36,6 +37,7 @@ const OFICIAIS = POSTOS_GRADUACAO.filter((p) => p.tipo === 'Oficial');
 // propósito: não existe no form antigo (só populado pela importação em massa
 // do SGEPM) — editar aqui nunca deve tocar em pessoa.nome_guerra.
 export function ModalPessoa({ pessoa, onFechar, onSalvar }: ModalPessoaProps) {
+  const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
   const modoEdicao = !!pessoa;
   const [form, setForm] = useState<PessoaPayload>(() => (pessoa ? formularioDaPessoa(pessoa) : formularioVazio()));
@@ -76,10 +78,10 @@ export function ModalPessoa({ pessoa, onFechar, onSalvar }: ModalPessoaProps) {
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box">
+    <div className="modal-overlay" {...propsOverlay}>
+      <div className="modal-box" ref={refCaixa}>
         <div className="modal-header">
-          <h3>{modoEdicao ? <Pencil /> : <UserPlus />} {modoEdicao ? 'Editar Pessoa' : 'Nova Pessoa'}</h3>
+          <h3 id={idTitulo}>{modoEdicao ? <Pencil /> : <UserPlus />} {modoEdicao ? 'Editar Pessoa' : 'Nova Pessoa'}</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -125,7 +127,7 @@ export function ModalPessoa({ pessoa, onFechar, onSalvar }: ModalPessoaProps) {
               ))}
             </div>
           </div>
-          <div className="form-actions" style={{ border: 'none', paddingTop: 8, marginTop: 0 }}>
+          <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
               <Check /> Salvar

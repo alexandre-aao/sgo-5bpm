@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 interface OperacoesRecentesProps {
   operacoes: Tables<'operacoes'>[];
@@ -36,11 +37,7 @@ export function OperacoesRecentes({ operacoes, escalas }: OperacoesRecentesProps
           </thead>
           <tbody>
             {recentes.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center" style={{ color: 'var(--text-muted)', padding: 20 }}>
-                  Nenhuma operação cadastrada.
-                </td>
-              </tr>
+              <LinhaTabelaVazia colunas={6}>Nenhuma operação cadastrada.</LinhaTabelaVazia>
             ) : (
               recentes.map((op) => {
                 const escalasOp = escalas.filter((s) => s.operacao_id === op.id);

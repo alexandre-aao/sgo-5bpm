@@ -1,6 +1,7 @@
 import { LayoutTemplate, FolderOpen, Trash2, CheckCircle2 } from 'lucide-react';
 import { useToast } from '../../../context/useToast';
 import { useTemplatesCartao } from './useTemplatesCartao';
+import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
 interface TemplatesPanelProps {
   onAbrir: (id: string) => void;
@@ -61,11 +62,9 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
           </thead>
           <tbody>
             {carregando ? null : templates.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
-                  Nenhum cartão padrão cadastrado ainda.
-                </td>
-              </tr>
+              <LinhaTabelaVazia colunas={6}>
+                Nenhum cartão padrão cadastrado ainda.
+              </LinhaTabelaVazia>
             ) : (
               templates.map((t) => (
                 <tr key={t.id}>
