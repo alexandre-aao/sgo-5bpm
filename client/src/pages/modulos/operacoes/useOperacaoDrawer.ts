@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
 import type { Tables } from '../../../types/supabase';
+import type { RecorrenciaRegra } from '../../../lib/recorrencia';
 
 export type ResultadoAcao = { ok: true } | { ok: false; mensagem: string };
 
@@ -24,6 +25,9 @@ export interface OperacaoPayload {
   num_os_manual: string;
   num_sei: string;
   demandante: string;
+  /** Presente só na CRIAÇÃO com recorrência — é o que faz o payload ir para
+   *  POST /api/operacoes/lote em vez de POST /api/operacoes. O PUT ignora. */
+  recorrencia_regra?: RecorrenciaRegra | null;
 }
 
 async function extrairErro(res: Response, padrao: string): Promise<string> {

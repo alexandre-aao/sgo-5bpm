@@ -5361,3 +5361,191 @@ body.sgo-sincronizando .topbar::before {
   }
   .table-cards-mobile .card-title-cell::before { content: none; }
 }
+
+/* ---- Recorrência de Operações (modal Nova Operação) ----
+   Bloco condicional: só aparece quando a recorrência é diferente de "Nenhuma".
+   Fica visualmente recuado do resto do formulário (superfície própria + faixa
+   lateral na cor de acento) porque muda a semântica de dois campos vizinhos —
+   Data de Término vira "Fim da Recorrência" e Diárias Estimadas passa a ser por
+   ocorrência —, e essa mudança precisa ser óbvia. */
+.recorrencia-bloco {
+  background-color: var(--surface-2);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.recorrencia-bloco .form-row { margin-bottom: 0; }
+
+/* Botões de dia da semana. As iniciais se repetem (S T Q Q S S D), então cada
+   botão carrega o nome inteiro em aria-label/title — o rótulo visível sozinho
+   não identifica o dia. */
+.dias-semana-grupo {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.dia-semana-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border-controle);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-panel);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.dia-semana-btn:hover:not(.ativo) {
+  border-color: var(--primary);
+  color: var(--text-main);
+}
+
+.dia-semana-btn.ativo {
+  background-color: var(--primary-solid);
+  border-color: var(--primary-solid);
+  color: #fff;
+}
+
+/* Datas avulsas: campo de data + botão, e a lista do que já foi escolhido. */
+.recorrencia-avulsa-add {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.recorrencia-avulsa-add input { flex: 1; }
+
+.recorrencia-avulsa-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.recorrencia-avulsa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-xs);
+  background-color: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.btn-chip-remover {
+  display: inline-flex;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.btn-chip-remover:hover { opacity: 1; }
+.btn-chip-remover svg { width: var(--icone-sm); height: var(--icone-sm); }
+
+/* Prévia conferível: a lista aqui é exatamente o que será gravado. */
+.recorrencia-preview {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-color);
+}
+
+.recorrencia-preview-cabecalho {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.recorrencia-preview-cabecalho strong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  color: var(--text-main);
+}
+
+.recorrencia-preview-cabecalho svg { width: var(--icone-lg); height: var(--icone-lg); color: var(--primary); }
+
+/* auto-fill (não auto-fit): com poucas datas as células mantêm a largura em vez
+   de esticarem para ocupar a linha inteira. */
+.recorrencia-datas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: var(--space-1);
+  max-height: 210px;
+  overflow-y: auto;
+  padding: var(--space-1);
+  background-color: var(--bg-panel);
+  border-radius: var(--radius-xs);
+}
+
+.recorrencia-data {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.recorrencia-data:hover { background-color: var(--surface-2); }
+
+.recorrencia-data input { cursor: pointer; accent-color: var(--primary-solid); }
+
+/* Data desmarcada continua na lista (é o que permite remarcá-la), mas riscada e
+   apagada para não ser confundida com uma que será criada. */
+.recorrencia-data.desmarcada {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.recorrencia-resumo {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.recorrencia-resumo strong { color: var(--text-main); }
+
+.recorrencia-erro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  background-color: var(--danger-bg);
+  color: var(--danger-fg);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.recorrencia-erro svg { width: var(--icone-lg); height: var(--icone-lg); flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  .recorrencia-bloco { padding: var(--space-3) var(--space-3) var(--space-1); }
+  /* .col-md-8 tem min-width: 280px global, que não cabe dentro do bloco recuado
+     num viewport de 375px — estourava a caixa para a direita. Dentro do bloco as
+     colunas viram largura cheia; a regra global fica intocada. */
+  .recorrencia-bloco .form-group[class*="col-md-"] { min-width: 0; flex-basis: 100%; }
+  .recorrencia-datas { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); max-height: 168px; }
+  .recorrencia-avulsa-add { flex-wrap: wrap; }
+  .recorrencia-avulsa-add input { flex: 1 1 100%; }
+}

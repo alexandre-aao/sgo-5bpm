@@ -22,17 +22,24 @@ export default function OperacoesPage() {
 
   const operacoesFiltradas = getOperacoesFiltradas(dados.operacoes, dados.escalas, filtros);
 
+  // Com recorrência o destino é /lote (cria N ocorrências ligadas por
+  // grupo_recorrencia_id numa escrita só); sem ela, o POST unitário de sempre.
+  // Só o lote abre a gaveta ao final — no lote seriam N gavetas possíveis, então
+  // a tela volta para a lista já com as ocorrências novas.
   async function handleCriarOperacao(payload: OperacaoPayload) {
+    const emLote = !!payload.recorrencia_regra;
     try {
-      const res = await apiFetch('/api/operacoes', {
+      const res = await apiFetch(emLote ? '/api/operacoes/lote' : '/api/operacoes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const corpo = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
-      if (!res.ok) return { ok: false as const, mensagem: corpo.error || 'Falha ao criar a operação.' };
+      if (!res.ok) {
+        return { ok: false as const, mensagem: corpo.error || `Falha ao criar ${emLote ? 'as operações' : 'a operação'}.` };
+      }
       await recarregar();
-      if (corpo.id) setOperacaoAbertaId(corpo.id);
+      if (!emLote && corpo.id) setOperacaoAbertaId(corpo.id);
       return { ok: true as const };
     } catch (erro) {
       console.error('Erro ao criar operação:', erro);
