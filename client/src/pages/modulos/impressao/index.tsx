@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, FileCheck2, FileSliders,
-  FolderArchive, History, Info, Printer, Send, Share2, ShieldAlert, TriangleAlert, Users, XCircle,
+  FolderArchive, History, Info, Printer, Send, Share2, ShieldAlert, Table2, TriangleAlert, Users, XCircle,
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../../../lib/api';
 import { useAuth } from '../../../context/useAuth';
@@ -102,11 +102,13 @@ const MODOS: Array<{
   { id: 'guarnicao', titulo: 'Enviar à guarnição', descricao: 'Uma viatura por documento, celular e alertas ativados.', Icone: Send },
   { id: 'arquivo_sei', titulo: 'Arquivo ou SEI', descricao: 'A4 institucional completo, sem alertas e sem assinatura.', Icone: FolderArchive },
   { id: 'consolidado', titulo: 'Consolidado operacional', descricao: 'Todas as viaturas, resumo quantitativo e agrupamento.', Icone: Users },
+  { id: 'quadro_resumo', titulo: 'Quadro Resumo', descricao: 'Folha única: Companhia, VTR, setor, QTLs e Madrugada Segura.', Icone: Table2 },
   { id: 'personalizado', titulo: 'Personalizada', descricao: 'Controle de layout, conteúdo, alertas e agrupamento.', Icone: FileSliders },
 ];
 
 const ROTULO_MODALIDADE: Record<ModalidadeEmissao, string> = {
-  guarnicao: 'Guarnição', arquivo_sei: 'Arquivo / SEI', consolidado: 'Consolidado', personalizado: 'Personalizada',
+  guarnicao: 'Guarnição', arquivo_sei: 'Arquivo / SEI', consolidado: 'Consolidado',
+  quadro_resumo: 'Quadro Resumo', personalizado: 'Personalizada',
 };
 
 function chaveDaConfiguracao(configuracao: ConfiguracaoEmissao, ids: Set<string>): string {

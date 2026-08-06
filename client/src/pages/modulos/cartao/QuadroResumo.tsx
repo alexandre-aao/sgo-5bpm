@@ -1,28 +1,19 @@
 import { Table2 } from 'lucide-react';
 import type { CartaoViatura } from '../../../lib/cartaoConflitos';
-import { formatHoraCartao } from '../../../lib/cartaoConflitos';
+import {
+  horarioDaAtividade, madrugadaSeguraTexto, ordenarViaturasQuadroResumo,
+} from '../../../lib/quadroResumo';
 import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
-
-const ORDEM_COMPANHIA: Record<string, number> = { '1ª Companhia': 1, '2ª Companhia': 2, '3ª Companhia': 3 };
-
-function horarioQtl(item: CartaoViatura['itens'][number] | undefined): string {
-  if (!item) return '-';
-  return `${formatHoraCartao(item.inicio)}${item.fim ? ' às ' + formatHoraCartao(item.fim) : ''}`;
-}
 
 interface QuadroResumoProps {
   viaturas: CartaoViatura[];
 }
 
 // Tabela oficial de impressão: Companhia x Viatura x Setor x QTL Almoço x QTL
-// Jantar x Observação (Madrugada Segura) — espelha renderQuadroResumo().
+// Jantar x Madrugada Segura. A ordenação e a leitura das colunas de horário
+// ficam em lib/quadroResumo.ts, compartilhadas com a saída de impressão.
 export function QuadroResumo({ viaturas }: QuadroResumoProps) {
-  const ordenadas = [...viaturas].sort((a, b) => {
-    const oa = ORDEM_COMPANHIA[a.companhia] || 99;
-    const ob = ORDEM_COMPANHIA[b.companhia] || 99;
-    if (oa !== ob) return oa - ob;
-    return (a.prefixo || '').localeCompare(b.prefixo || '');
-  });
+  const ordenadas = ordenarViaturasQuadroResumo(viaturas);
 
   return (
     <div className="panel cartao-resumo-panel">
@@ -55,9 +46,9 @@ export function QuadroResumo({ viaturas }: QuadroResumoProps) {
                   <td data-label="Companhia">{vtr.companhia || '-'}</td>
                   <td className="card-title-cell">{vtr.prefixo}</td>
                   <td data-label="Setor">{vtr.setor}</td>
-                  <td data-label="QTL Almoço">{horarioQtl(vtr.itens.find((i) => i.atividade === 'QTL Almoço'))}</td>
-                  <td data-label="QTL Jantar">{horarioQtl(vtr.itens.find((i) => i.atividade === 'QTL Jantar'))}</td>
-                  <td data-label="Observação">{vtr.observacao || '-'}</td>
+                  <td data-label="QTL Almoço">{horarioDaAtividade(vtr.itens, 'QTL Almoço') || '-'}</td>
+                  <td data-label="QTL Jantar">{horarioDaAtividade(vtr.itens, 'QTL Jantar') || '-'}</td>
+                  <td data-label="Madrugada Segura">{madrugadaSeguraTexto(vtr.itens, vtr.observacao) || '-'}</td>
                 </tr>
               ))
             )}

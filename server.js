@@ -415,6 +415,15 @@ function getLocalDateStrServer(date = new Date()) {
 
 // Categorias válidas para viaturas do Cartão Programa
 const CATEGORIAS_VIATURA = ['Ordinária', 'Força Tática', 'Suplementar'];
+
+// DUAS listas de propósito, não é duplicação a consolidar:
+// - COMPANHIAS_VIATURA inclui a PCS, que também emprega viatura. Nem `viaturas`
+//   nem o JSONB de viaturas do cartão têm CHECK no banco, então basta validar aqui.
+// - COMPANHIAS_VALIDAS (sem PCS) é a de `avisos`, onde o banco TEM o CHECK
+//   `avisos_companhia_check` restrito às três companhias. Incluir PCS aqui faria o
+//   Postgres recusar a linha depois de a validação do app ter passado.
+//   Estender o alcance da PMRN aos alertas exige migration antes.
+const COMPANHIAS_VIATURA = ['PCS', '1ª Companhia', '2ª Companhia', '3ª Companhia'];
 const COMPANHIAS_VALIDAS = ['1ª Companhia', '2ª Companhia', '3ª Companhia'];
 const STATUS_VIATURA = ['Ativa', 'Manutenção'];
 
@@ -1936,7 +1945,7 @@ app.get('/api/viaturas', asyncRoute(async (req, res) => {
 app.post('/api/viaturas', asyncRoute(async (req, res) => {
   const valid = validarCampos(req.body, {
     prefixo: { obrigatorio: true, tipo: 'string', max: 30, label: 'Prefixo' },
-    companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VALIDAS, padrao: '', label: 'Companhia' },
+    companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VIATURA, padrao: '', label: 'Companhia' },
     categoria: { obrigatorio: false, tipo: 'string', valores: CATEGORIAS_VIATURA, padrao: 'Ordinária', label: 'Categoria' },
     status: { obrigatorio: false, tipo: 'string', valores: STATUS_VIATURA, padrao: 'Ativa', label: 'Status' },
     setor: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Setor' },
@@ -1978,7 +1987,7 @@ app.put('/api/viaturas/:id', asyncRoute(async (req, res) => {
     viatura.prefixo = String(req.body.prefixo).trim();
   }
   if (req.body.companhia !== undefined) {
-    if (req.body.companhia && !COMPANHIAS_VALIDAS.includes(req.body.companhia)) {
+    if (req.body.companhia && !COMPANHIAS_VIATURA.includes(req.body.companhia)) {
       return res.status(400).json({ error: 'Companhia inválida.' });
     }
     viatura.companhia = req.body.companhia || '';
@@ -2960,7 +2969,7 @@ app.post('/api/cartoes/:id/viaturas', exigirEdicaoCartao, asyncRoute(async (req,
   const v = validarCampos(req.body, {
     prefixo: { obrigatorio: true, tipo: 'string', max: 30, label: 'Prefixo da VTR' },
     setor: { obrigatorio: true, tipo: 'string', max: 100, label: 'Setor / Bairro' },
-    companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VALIDAS, padrao: '', label: 'Companhia' },
+    companhia: { obrigatorio: false, tipo: 'string', valores: COMPANHIAS_VIATURA, padrao: '', label: 'Companhia' },
     categoria: { obrigatorio: false, tipo: 'string', valores: CATEGORIAS_VIATURA, padrao: 'Ordinária', label: 'Categoria' },
     comandante: { obrigatorio: false, tipo: 'string', max: 150, padrao: '', label: 'Comandante' },
     composicao: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Composição da guarnição' },
@@ -3013,7 +3022,7 @@ app.put('/api/cartoes/:id/viaturas/:vid', exigirEdicaoCartao, asyncRoute(async (
   const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
 
-  if (req.body.companhia !== undefined && req.body.companhia && !COMPANHIAS_VALIDAS.includes(req.body.companhia)) {
+  if (req.body.companhia !== undefined && req.body.companhia && !COMPANHIAS_VIATURA.includes(req.body.companhia)) {
     return res.status(400).json({ error: 'Companhia inválida.' });
   }
   if (req.body.categoria !== undefined && !CATEGORIAS_VIATURA.includes(req.body.categoria)) {

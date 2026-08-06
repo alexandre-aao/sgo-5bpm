@@ -26,6 +26,9 @@ create table if not exists eventos (
   data_termino date,
   horario_inicio text default '',
   local_itinerario text default '',
+  -- Rua e número (migration 005). Opcional: eventos anteriores a ela não têm, e
+  -- não houve backfill — `local_itinerario` guardava o bairro, não o endereço.
+  endereco text default '',
   bairro text default '',
   created_at timestamptz default now()
 );

@@ -1,4 +1,4 @@
-import { COMPANHIAS } from '../../../lib/categoriasViatura';
+import { COMPANHIAS_VIATURA, rotuloCurtoCompanhia } from '../../../lib/categoriasViatura';
 
 interface SeletorCompanhiaProps {
   valor: string;
@@ -14,7 +14,7 @@ export function SeletorCompanhia({ valor, onChange, id }: SeletorCompanhiaProps)
     <div className="form-group">
       <span className="form-label-estatico" id={id ? `${id}-label` : undefined}>Companhia</span>
       <div className="companhia-switch" role="group" aria-labelledby={id ? `${id}-label` : undefined}>
-        {COMPANHIAS.map((companhia) => {
+        {COMPANHIAS_VIATURA.map((companhia) => {
           const ativo = valor === companhia;
           return (
             <button
@@ -24,7 +24,7 @@ export function SeletorCompanhia({ valor, onChange, id }: SeletorCompanhiaProps)
               aria-pressed={ativo}
               onClick={() => onChange(ativo ? '' : companhia)}
             >
-              {companhia.split(' ')[0]} CIA
+              {rotuloCurtoCompanhia(companhia)}
             </button>
           );
         })}

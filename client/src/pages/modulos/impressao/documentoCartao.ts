@@ -3,10 +3,13 @@ import type { CartaoDetalhado, CartaoItem, CartaoViatura } from '../../../lib/ca
 import { normalizarTexto } from '../../../lib/cartaoConflitos';
 import { abreviarPosto } from '../../../lib/abrevPosto';
 import { dataBr, janela24h } from '../../../lib/janelaCartao';
+import { horarioDaAtividade, madrugadaSeguraTexto, ordenarViaturasQuadroResumo } from '../../../lib/quadroResumo';
 
-export type ModalidadeEmissao = 'guarnicao' | 'arquivo_sei' | 'consolidado' | 'personalizado';
+export type ModalidadeEmissao = 'guarnicao' | 'arquivo_sei' | 'consolidado' | 'quadro_resumo' | 'personalizado';
 export type FormatoDocumento = 'celular' | 'a4';
-export type TipoDocumento = 'individual' | 'consolidado';
+/** 'quadro_resumo' é a folha única de conferência: cabeçalho + a tabela
+ *  Companhia/VTR/Setor/QTLs/Madrugada Segura, sem roteiro por viatura. */
+export type TipoDocumento = 'individual' | 'consolidado' | 'quadro_resumo';
 export type AgrupamentoDocumento = 'nenhum' | 'companhia' | 'categoria';
 export type ConteudoDocumento = 'ordinario' | 'reforco' | 'completo';
 
@@ -33,6 +36,12 @@ export const CONFIGURACOES_MODALIDADE: Record<ModalidadeEmissao, Omit<Configurac
   consolidado: {
     formato: 'a4', tipoDocumento: 'consolidado', agrupamento: 'companhia', conteudo: 'completo',
     comAlertas: false, incluirEventos: true, incluirObservacoes: true,
+  },
+  // A folha de conferência não carrega evento, alerta nem agrupamento: a tabela já
+  // traz a Companhia como coluna, e um título de grupo a quebraria em várias.
+  quadro_resumo: {
+    formato: 'a4', tipoDocumento: 'quadro_resumo', agrupamento: 'nenhum', conteudo: 'completo',
+    comAlertas: false, incluirEventos: false, incluirObservacoes: true,
   },
   personalizado: {
     formato: 'a4', tipoDocumento: 'consolidado', agrupamento: 'nenhum', conteudo: 'completo',
@@ -180,11 +189,13 @@ function slugArquivo(texto: string): string {
 }
 
 function nomeArquivo(data: string, viaturas: DocumentoViatura[], tipo: TipoDocumento, versao: number): string {
-  const alvo = tipo === 'consolidado'
-    ? 'consolidado'
-    : viaturas.length === 1
-      ? `vtr-${slugArquivo(viaturas[0].prefixo)}`
-      : `lote-${viaturas.length}-vtr`;
+  const alvo = tipo === 'quadro_resumo'
+    ? 'quadro-resumo'
+    : tipo === 'consolidado'
+      ? 'consolidado'
+      : viaturas.length === 1
+        ? `vtr-${slugArquivo(viaturas[0].prefixo)}`
+        : `lote-${viaturas.length}-vtr`;
   return `cartao-programa-${data}-${alvo}-v${versao}`;
 }
 
@@ -295,6 +306,9 @@ export function montarDocumentosCartao(
 
 export function estimarPaginas(documentos: DocumentoCartao[]): number {
   return documentos.reduce((total, documento) => {
+    // Folha única por definição: é uma linha de tabela por viatura, e o cartão do
+    // dia tem 5 a 7 viaturas. Não estimar por peso evita prometer 2 páginas.
+    if (documento.controle.tipoDocumento === 'quadro_resumo') return total + 1;
     if (documento.controle.tipoDocumento === 'individual') {
       const viatura = documento.viaturas[0];
       const peso = viatura.roteiro.length + viatura.eventos.length * 2 + viatura.alertas.length * 2
@@ -316,6 +330,25 @@ export function documentoCartaoEmTexto(documento: DocumentoCartao): string {
   par('Fiscal de Operações', documento.servico.fiscal);
   par('Adjunto', documento.servico.adjunto);
   par('VTR do Delta 07', documento.servico.delta07Viatura);
+
+  // O Quadro Resumo é uma tabela: repetir o bloco por viatura viraria um texto
+  // longo justamente onde se quer a visão de uma folha só.
+  if (documento.controle.tipoDocumento === 'quadro_resumo') {
+    linhas.push('', '*QUADRO RESUMO*');
+    ordenarViaturasQuadroResumo(documento.viaturas).forEach((viatura) => {
+      const campos = [
+        viatura.companhia || 'Sem Companhia',
+        `VTR ${viatura.prefixo}`,
+        viatura.setor,
+        `Almoço: ${horarioDaAtividade(viatura.roteiro, 'QTL Almoço') || '-'}`,
+        `Jantar: ${horarioDaAtividade(viatura.roteiro, 'QTL Jantar') || '-'}`,
+        `Madrugada Segura: ${madrugadaSeguraTexto(viatura.roteiro, viatura.observacao) || '-'}`,
+      ];
+      linhas.push(`- ${campos.filter(Boolean).join(' · ')}`);
+    });
+    linhas.push('', documento.controle.rodape);
+    return linhas.join('\n');
+  }
 
   documento.viaturas.forEach((viatura) => {
     linhas.push('', `*VTR ${viatura.prefixo}*`);

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Pencil, Plus, X, Check } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
-import { CATEGORIAS_VIATURA, COMPANHIAS } from '../../../lib/categoriasViatura';
+import { CATEGORIAS_VIATURA, COMPANHIAS_VIATURA } from '../../../lib/categoriasViatura';
 import { useToast } from '../../../context/useToast';
 import type { ResultadoAcao, ViaturaCadastroPayload } from './useViaturasCrud';
 import { useModalA11y } from '../../../hooks/useModalA11y';
@@ -82,7 +82,7 @@ export function ModalViatura({ viatura, onFechar, onSalvar }: ModalViaturaProps)
             <label htmlFor="vtrcad-companhia">Companhia</label>
             <select id="vtrcad-companhia" value={form.companhia} onChange={(e) => atualizar('companhia', e.target.value)}>
               <option value="">Não informada</option>
-              {COMPANHIAS.map((c) => <option key={c} value={c}>{c}</option>)}
+              {COMPANHIAS_VIATURA.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="form-group">

@@ -2286,6 +2286,9 @@ body.sgo-sincronizando .topbar::before {
    visual do .dia-switch, com alvo de toque confortável no celular. */
 .companhia-switch {
   display: inline-flex;
+  /* Passou de 3 para 4 opções com a entrada da PCS: sem o wrap, o grupo estoura
+     a largura do formulário no celular em vez de quebrar. */
+  flex-wrap: wrap;
   background-color: var(--surface-3);
   border-radius: 11px;
   padding: 4px;
@@ -4318,8 +4321,12 @@ body.sgo-sincronizando .topbar::before {
 /* Badges por tipo de atividade */
 .badge.atv-pb { background-color: var(--primary-solid); color: var(--primary-fg); }
 .badge.atv-patrulhamento { background-color: var(--info); color: #fff; }
+.badge.atv-itinerario { background-color: var(--info-fg); color: #fff; }
 .badge.atv-qtl-almoco { background-color: var(--badge-neutro); color: #fff; }
 .badge.atv-qtl-jantar { background-color: var(--badge-neutro-escuro); color: #fff; }
+/* Madrugada Segura é turno de madrugada: tinta escura para separar dos QTLs, que
+   são a outra atividade de horário fixo do Quadro Resumo. */
+.badge.atv-madrugada-segura { background-color: #3730a3; color: #fff; }
 .badge.atv-corredor-seguro { background-color: var(--success); color: #fff; }
 .badge.atv-barreira-itinerante { background-color: var(--warning); color: #000; }
 .badge.atv-outros { background-color: var(--badge-neutro); color: #fff; }
@@ -5004,6 +5011,15 @@ body.sgo-sincronizando .topbar::before {
 .doc-cartao-roteiro td { padding: 1mm 1.5mm; border-bottom: .35pt solid #ccd2d8; vertical-align: top; }
 .doc-cartao-roteiro th:first-child, .doc-cartao-roteiro td:first-child { width: 28mm; white-space: nowrap; }
 .doc-cartao-roteiro th:last-child, .doc-cartao-roteiro td:last-child { width: 37mm; }
+/* Quadro Resumo (folha única de conferência). Mesmo desenho do roteiro, mas com
+   as seis colunas distribuídas: aqui nenhuma domina, então não se fixa largura
+   por posição como no roteiro — só o setor pode quebrar em duas linhas. */
+.doc-cartao-quadro { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+.doc-cartao-quadro th { padding: 1.2mm 1.5mm; color: #fff; background: #002145; text-align: left; }
+.doc-cartao-quadro td { padding: 1.2mm 1.5mm; border-bottom: .35pt solid #ccd2d8; vertical-align: top; white-space: nowrap; }
+.doc-cartao-quadro td:nth-child(3) { white-space: normal; }
+.doc-cartao-quadro tbody tr:nth-child(even) td { background: #f5f7fa; }
+
 .doc-cartao-alerta { display: flex; flex-direction: column; gap: .6mm; padding: 1.5mm 2mm; margin: 1mm 0; border-left: 1.5pt solid #9a6a00; background: #fff9e8; break-inside: avoid; }
 .doc-cartao-alerta strong { font-size: 7.5pt; }
 .doc-cartao-alerta span { font-size: 8pt; }

@@ -1,11 +1,45 @@
 import type { DocumentoCartao, DocumentoViatura } from './documentoCartao';
+import {
+  horarioDaAtividade, madrugadaSeguraTexto, ordenarViaturasQuadroResumo,
+} from '../../../lib/quadroResumo';
 
 const ROTULO_MODALIDADE = {
   guarnicao: 'Enviar à guarnição',
   arquivo_sei: 'Documento para arquivo ou SEI',
   consolidado: 'Consolidado operacional',
+  quadro_resumo: 'Quadro Resumo',
   personalizado: 'Configuração personalizada',
 };
+
+/** Folha única de conferência: a mesma tabela do Quadro Resumo da tela do Cartão,
+ *  com a ordenação vinda da lib compartilhada para as duas não divergirem. */
+function TabelaQuadroResumo({ viaturas }: { viaturas: DocumentoViatura[] }) {
+  return (
+    <div className="doc-cartao-bloco">
+      <h3>QUADRO RESUMO</h3>
+      <table className="doc-cartao-quadro">
+        <thead>
+          <tr>
+            <th>Companhia</th><th>Viatura</th><th>Setor</th>
+            <th>QTL Almoço</th><th>QTL Jantar</th><th>Madrugada Segura</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ordenarViaturasQuadroResumo(viaturas).map((viatura) => (
+            <tr key={viatura.id}>
+              <td>{viatura.companhia || '-'}</td>
+              <td>{viatura.prefixo}</td>
+              <td>{viatura.setor || '-'}</td>
+              <td>{horarioDaAtividade(viatura.roteiro, 'QTL Almoço') || '-'}</td>
+              <td>{horarioDaAtividade(viatura.roteiro, 'QTL Jantar') || '-'}</td>
+              <td>{madrugadaSeguraTexto(viatura.roteiro, viatura.observacao) || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function Linha({ rotulo, valor }: { rotulo: string; valor?: string }) {
   if (!valor) return null;
@@ -122,7 +156,9 @@ export function DocumentoCartaoView({ documento }: { documento: DocumentoCartao 
         </div>
       )}
 
-      {grupos(documento).map((grupo) => (
+      {documento.controle.tipoDocumento === 'quadro_resumo' ? (
+        <TabelaQuadroResumo viaturas={documento.viaturas} />
+      ) : grupos(documento).map((grupo) => (
         <div className="doc-cartao-grupo" key={grupo.titulo || 'geral'}>
           {grupo.titulo && <h2 className="doc-cartao-grupo-titulo">{grupo.titulo}</h2>}
           {grupo.viaturas.map((viatura) => <Viatura key={viatura.id} viatura={viatura} mostrarAlertas={documento.controle.comAlertas} />)}
