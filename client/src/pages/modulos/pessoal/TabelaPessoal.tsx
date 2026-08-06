@@ -39,7 +39,7 @@ export function TabelaPessoal({ pessoal, filtroAtivo, onEditar, onExcluir, onLim
   return (
     <>
       <div className="table-responsive tabela-scroll">
-        <table className="styled-table">
+        <table className="styled-table table-cards-mobile">
           <thead>
             <tr>
               <ThOrdenavel coluna="matricula" ordenacao={ordenacao} onAlternar={alternar}>Matrícula</ThOrdenavel>
@@ -74,12 +74,13 @@ export function TabelaPessoal({ pessoal, filtroAtivo, onEditar, onExcluir, onLim
             ) : (
               itens.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.matricula || <span className="celula-vazia">—</span>}</td>
-                  <td><strong>{p.nome}</strong></td>
-                  <td>{p.subunidade || <span className="celula-vazia">—</span>}</td>
-                  <td>{p.posto_graduacao}</td>
-                  <td><span className={`badge tipo-${p.tipo === 'Praça' ? 'praca' : 'oficial'}`}>{p.tipo}</span></td>
-                  <td>
+                  <td data-label="Matrícula">{p.matricula || <span className="celula-vazia">—</span>}</td>
+                  {/* O nome é o título do card no celular; os demais campos ganham rótulo. */}
+                  <td className="card-title-cell">{p.nome}</td>
+                  <td data-label="Subunidade">{p.subunidade || <span className="celula-vazia">—</span>}</td>
+                  <td data-label="Posto/Graduação">{p.posto_graduacao}</td>
+                  <td data-label="Tipo"><span className={`badge tipo-${p.tipo === 'Praça' ? 'praca' : 'oficial'}`}>{p.tipo}</span></td>
+                  <td data-label="Categorias">
                     {p.categorias.length > 0 ? (
                       p.categorias.map((c) => (
                         <span key={c} className={`badge ${categoriaPessoalBadgeClass(c)}`} style={{ margin: 2 }}>{c}</span>

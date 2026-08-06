@@ -40,7 +40,7 @@ export function TabelaViaturas({
   return (
     <>
       <div className="table-responsive tabela-scroll">
-        <table className="styled-table">
+        <table className="styled-table table-cards-mobile">
           <thead>
             <tr>
               <ThOrdenavel coluna="prefixo" ordenacao={ordenacao} onAlternar={alternar}>Prefixo</ThOrdenavel>
@@ -74,11 +74,12 @@ export function TabelaViaturas({
             ) : (
               itens.map((v) => (
                 <tr key={v.id}>
-                  <td><strong>{v.prefixo}</strong></td>
-                  <td>{v.companhia || <span className="celula-vazia">—</span>}</td>
-                  <td>{v.categoria}</td>
-                  <td><span className={`badge ${statusViaturaBadgeClass(v.status)}`}>{v.status}</span></td>
-                  <td>{v.observacao || <span className="celula-vazia">—</span>}</td>
+                  {/* O prefixo identifica a viatura — titula o card no celular. */}
+                  <td className="card-title-cell">{v.prefixo}</td>
+                  <td data-label="Companhia">{v.companhia || <span className="celula-vazia">—</span>}</td>
+                  <td data-label="Categoria">{v.categoria}</td>
+                  <td data-label="Status"><span className={`badge ${statusViaturaBadgeClass(v.status)}`}>{v.status}</span></td>
+                  <td data-label="Observação">{v.observacao || <span className="celula-vazia">—</span>}</td>
                   <td className="text-right">
                     <div className="acoes-linha">
                       <button type="button" className="btn-icon btn-sm" title="Editar" aria-label="Editar" onClick={() => onEditar(v)}>

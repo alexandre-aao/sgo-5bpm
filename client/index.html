@@ -3,7 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover é o que faz os env(safe-area-inset-*) já usados na
+         barra inferior, na sidebar e nos drawers valerem alguma coisa no iOS.
+         Sem ele, todos resolvem para 0 e o conteúdo fica sob o notch/home bar. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA instalável (sem service worker: não há cache offline nesta fase). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Azul nos DOIS temas, de propósito: a topbar do celular é a faixa azul em
+         claro e escuro, então a barra do navegador acompanha sempre. -->
+    <meta name="theme-color" content="#2563EB" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SGO 5º BPM" />
     <!-- Google Fonts: Inter — mesma família única do app antigo (ver design-tokens.md) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

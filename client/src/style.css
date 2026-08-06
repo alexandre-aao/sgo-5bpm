@@ -5813,3 +5813,75 @@ body.sgo-sincronizando .topbar::before {
   .escala-escopo-opcao { width: 100%; }
   .sub-list-item-acoes { flex-wrap: wrap; }
 }
+
+/* ============================================================
+   Ajustes de uso no celular (Fase 2, 2026-08)
+   Bloco único e no fim do arquivo de propósito: são correções transversais
+   (zoom do iOS, área de toque, modal em bottom sheet) que precisam vencer as
+   regras de componente declaradas acima.
+   ============================================================ */
+@media (max-width: 768px) {
+  /* --- Zoom automático do iOS ---
+     O Safari dá zoom na página ao focar um campo com fonte < 16px, e depois não
+     volta sozinho — a tela fica deslocada. 16px é o limiar exato; não é
+     preferência tipográfica, é o que desarma o comportamento. Só no celular:
+     no desktop a escala menor continua valendo. */
+  .form-group input,
+  .form-group select,
+  .form-group textarea,
+  .central-config-grid select,
+  .roteiro-lote-controles select,
+  .roteiro-copiar select,
+  .roteiro-edicao-horas input,
+  .autocomplete-wrap input,
+  .filtro-busca input,
+  input[type="text"],
+  input[type="search"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* --- Área de toque ---
+     44px é o mínimo recomendado para alvo tocável (WCAG 2.5.5 / HIG). Vale para
+     o botão inteiro, não só para o ícone dentro dele. */
+  .btn { min-height: 44px; }
+  .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* Nas tabelas-card as ações ficam lado a lado numa linha estreita; sem o wrap
+     os botões de 44px se espremem e voltam a ficar difíceis de acertar. */
+  .acoes-linha { flex-wrap: wrap; gap: var(--space-2); }
+
+  /* --- Modal como bottom sheet ---
+     Modal centrado no celular deixa o conteúdo alto (ModalOperacao com o bloco
+     de recorrência é o pior caso) sem rolagem própria e com o rodapé de botões
+     fora da tela. Colado à base: o polegar alcança as ações e a caixa rola por
+     dentro. */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-box {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100dvh;
+    overflow-y: auto;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    /* env() só resolve por causa do viewport-fit=cover no index.html. */
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  }
+  /* O cabeçalho precisa continuar visível enquanto a caixa rola: é onde fica o
+     botão de fechar. */
+  .modal-box .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-panel);
+  }
+}
