@@ -5,6 +5,7 @@ import { useToast } from '../../../context/useToast';
 import { ROTULOS_RECORRENCIA } from '../../../lib/tiposOperacao';
 import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarExclusaoForte';
 import { useOperacaoDrawer, type ResultadoAcao } from './useOperacaoDrawer';
+import { useGrupoRecorrencia } from './useGrupoRecorrencia';
 import { BadgeSituacao } from './BadgeSituacao';
 import { FormEscalarMilitar } from './FormEscalarMilitar';
 import { EscalasList } from './EscalasList';
@@ -35,7 +36,12 @@ export function DrawerOperacao({
   onAlterado,
 }: DrawerOperacaoProps) {
   const { toast } = useToast();
-  const { operacao, escalas, atualizarOperacao, marcarExecutada, excluirOperacao, adicionarEscala, removerEscala } = useOperacaoDrawer(operacaoId);
+  const {
+    operacao, escalas, atualizarOperacao, marcarExecutada, excluirOperacao,
+    removerEscala, escalarEmLote, removerEmLote,
+  } = useOperacaoDrawer(operacaoId);
+  // Só busca o grupo quando a operação pertence a um: operação avulsa não faz a chamada.
+  const { grupo, recarregar: recarregarGrupo } = useGrupoRecorrencia(operacao?.grupo_recorrencia_id || null);
 
   const [formEscalaAberto, setFormEscalaAberto] = useState(false);
   const [modalEditarAberto, setModalEditarAberto] = useState(false);
@@ -62,7 +68,23 @@ export function DrawerOperacao({
 
   async function handleRemoverEscala(escala: Tables<'escalas'>) {
     if (!window.confirm(`Remover ${escala.militar_nome} da escala desta operação?`)) return;
-    await acaoComAlerta(() => removerEscala(escala.id), 'Militar removido da escala.');
+    const resultado = await acaoComAlerta(() => removerEscala(escala.id), 'Militar removido da escala.');
+    if (resultado.ok) void recarregarGrupo();
+  }
+
+  // Remove o militar de TODAS as ocorrências do grupo de uma vez. Confirmação
+  // explícita com o número: é ação destrutiva sobre N registros, não sobre um.
+  async function handleRemoverDoGrupo(escala: Tables<'escalas'>, ocorrencias: number) {
+    if (!grupo) return;
+    if (!window.confirm(
+      `Remover ${escala.militar_nome} das ${ocorrencias} ocorrências do grupo?\n\n` +
+      'Ocorrências já executadas são preservadas.',
+    )) return;
+    const resultado = await acaoComAlerta(
+      () => removerEmLote(grupo.map((o) => o.id), { militar_id: escala.militar_id || '', militar_nome: escala.militar_nome }),
+      `${escala.militar_nome} removido do grupo.`,
+    );
+    if (resultado.ok) void recarregarGrupo();
   }
 
   async function handleConfirmarExclusao() {
@@ -124,7 +146,7 @@ export function DrawerOperacao({
                 <h4>Efetivo Escalado (Diárias)</h4>
                 {!formEscalaAberto && (
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => setFormEscalaAberto(true)}>
-                    <UserPlus /> Escalar Militar
+                    <UserPlus /> Escalar Efetivo
                   </button>
                 )}
               </div>
@@ -136,16 +158,23 @@ export function DrawerOperacao({
                   operacoesTodas={operacoesTodas}
                   escalasTodas={escalasTodas}
                   cotaMensal={cotaMensal}
-                  onAdicionar={async (payload) => {
-                    const resultado = await adicionarEscala(payload);
-                    if (resultado.ok) onAlterado();
+                  grupo={grupo}
+                  onEscalarLote={async (operacaoIds, militares) => {
+                    const resultado = await escalarEmLote(operacaoIds, militares);
+                    if (resultado.ok) {
+                      onAlterado();
+                      void recarregarGrupo();
+                    }
                     return resultado;
                   }}
                   onFechar={() => setFormEscalaAberto(false)}
                 />
               )}
 
-              <EscalasList escalas={escalasOp} onRemover={handleRemoverEscala} />
+              <EscalasList
+                escalas={escalasOp} grupo={grupo}
+                onRemover={handleRemoverEscala} onRemoverDoGrupo={handleRemoverDoGrupo}
+              />
             </div>
           </div>
 

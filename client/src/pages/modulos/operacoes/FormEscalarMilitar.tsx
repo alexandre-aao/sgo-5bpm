@@ -1,9 +1,21 @@
 import { useState, type FormEvent } from 'react';
-import { Calculator, Wallet } from 'lucide-react';
+import { Calculator, ClipboardPaste, TriangleAlert, Wallet, X } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { useToast } from '../../../context/useToast';
-import { AutocompleteMilitar } from './AutocompleteMilitar';
-import type { EscalaPayload, ResultadoAcao } from './useOperacaoDrawer';
+import { SeletorMilitares } from './SeletorMilitares';
+import type { ResultadoAcao } from './useOperacaoDrawer';
+import {
+  ESCOPOS,
+  TETO_DIARIAS_MILITAR_MES,
+  calcularImpacto,
+  chaveMilitar,
+  operacoesDoEscopo,
+  resolverMatriculasColadas,
+  rotuloMes,
+  type EscopoReplicacao,
+  type MilitarDoLote,
+  type OperacaoDoGrupo,
+} from '../../../lib/escalaLote';
 
 interface FormEscalarMilitarProps {
   operacao: Tables<'operacoes'>;
@@ -11,112 +23,262 @@ interface FormEscalarMilitarProps {
   operacoesTodas: Tables<'operacoes'>[];
   escalasTodas: Tables<'escalas'>[];
   cotaMensal: number;
-  onAdicionar: (payload: EscalaPayload) => Promise<ResultadoAcao>;
+  /** Ocorrências do grupo de recorrência, ou null se a operação é avulsa. */
+  grupo: OperacaoDoGrupo[] | null;
+  onEscalarLote: (operacaoIds: string[], militares: MilitarDoLote[]) => Promise<ResultadoAcao>;
   onFechar: () => void;
 }
 
-const MESES = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-];
-
-// Sub-formulário "Escalar Militar" da gaveta de Operação — nome via autocomplete,
-// matrícula trava se o militar tiver cadastro, preview de diárias e de saldo da
-// cota. Espelha o bloco #form-escala-container + handleCreateEscala() +
-// updateEscalaBudgetPreview() em public/app.js.
+// "Escalar Efetivo": inclusão em LOTE (N militares de uma vez) com replicação para as
+// demais ocorrências do grupo de recorrência. Substituiu o formulário unitário — um
+// militar por confirmação —, que obrigava a repetir o fluxo inteiro por pessoa e por
+// ocorrência: escalar 3 militares num grupo de 26 dias eram 78 confirmações.
 export function FormEscalarMilitar({
   operacao,
   pessoal,
   operacoesTodas,
   escalasTodas,
   cotaMensal,
-  onAdicionar,
+  grupo,
+  onEscalarLote,
   onFechar,
 }: FormEscalarMilitarProps) {
   const { toast } = useToast();
-  const [nome, setNome] = useState('');
-  const [matricula, setMatricula] = useState('');
-  const [matriculaTravada, setMatriculaTravada] = useState(false);
-  const [qtdAparicoes, setQtdAparicoes] = useState('1');
+  const [selecionados, setSelecionados] = useState<MilitarDoLote[]>([]);
+  const [aparicoesPadrao, setAparicoesPadrao] = useState('1');
+  const [escopo, setEscopo] = useState<EscopoReplicacao>('somente_esta');
+  const [colarAberto, setColarAberto] = useState(false);
+  const [textoColado, setTextoColado] = useState('');
+  const [naoEncontradas, setNaoEncontradas] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
 
-  const qtd = parseInt(qtdAparicoes, 10) || 1;
-  const novasDiarias = qtd * 2;
+  const padrao = Math.max(1, parseInt(aparicoesPadrao, 10) || 1);
+  const temGrupo = !!grupo && grupo.length > 1;
+  const operacoesAlvo = operacoesDoEscopo(temGrupo ? grupo : null, operacao, escopo);
+  const impacto = calcularImpacto(operacoesAlvo, selecionados, escalasTodas, operacoesTodas, cotaMensal);
 
-  const prefixoMes = operacao.data_inicio.slice(0, 7);
-  const idsOperacoesMes = new Set(
-    operacoesTodas.filter((o) => o.data_inicio.startsWith(prefixoMes)).map((o) => o.id),
-  );
-  const consumidoMes = escalasTodas
-    .filter((s) => idsOperacoesMes.has(s.operacao_id))
-    .reduce((soma, s) => soma + (s.total_diarias || 0), 0);
-  const saldoApos = cotaMensal - consumidoMes - novasDiarias;
-  const [anoEvt, mesEvt] = operacao.data_inicio.split('-');
-  const nomeMesEvt = MESES[parseInt(mesEvt, 10) - 1] || mesEvt;
+  function adicionar(militar: MilitarDoLote) {
+    setSelecionados((atual) => (atual.some((m) => m.chave === militar.chave) ? atual : [...atual, militar]));
+  }
+
+  function adicionarPessoa(p: Tables<'pessoal'>) {
+    adicionar({
+      chave: chaveMilitar(p.matricula, p.nome),
+      militar_id: (p.matricula || '').trim(),
+      militar_nome: p.nome,
+      qtd_aparicoes: padrao,
+    });
+  }
+
+  function adicionarLivre(nome: string) {
+    adicionar({ chave: chaveMilitar('', nome), militar_id: '', militar_nome: nome, qtd_aparicoes: padrao });
+  }
+
+  function remover(chave: string) {
+    setSelecionados((atual) => atual.filter((m) => m.chave !== chave));
+  }
+
+  function mudarAparicoes(chave: string, valor: string) {
+    const qtd = Math.max(1, parseInt(valor, 10) || 1);
+    setSelecionados((atual) => atual.map((m) => (m.chave === chave ? { ...m, qtd_aparicoes: qtd } : m)));
+  }
+
+  function handleResolverColados() {
+    const { encontrados, naoEncontradas: faltantes } = resolverMatriculasColadas(textoColado, pessoal);
+    encontrados.forEach(adicionarPessoa);
+    setNaoEncontradas(faltantes);
+    if (encontrados.length > 0) {
+      toast(`${encontrados.length} militar(es) adicionado(s) da lista colada.`, 'success');
+      setTextoColado('');
+    } else {
+      toast('Nenhuma matrícula da lista foi encontrada no cadastro.', 'warning');
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (selecionados.length === 0) {
+      toast('Adicione ao menos um militar.', 'danger');
+      return;
+    }
+    if (operacoesAlvo.length === 0) {
+      toast('Nenhuma ocorrência a escalar: as do escopo escolhido já estão executadas.', 'danger');
+      return;
+    }
     setEnviando(true);
-    const resultado = await onAdicionar({ militar_nome: nome.trim(), militar_id: matricula.trim(), qtd_aparicoes: qtd });
+    const resultado = await onEscalarLote(operacoesAlvo.map((o) => o.id), selecionados);
     setEnviando(false);
     if (resultado.ok) {
-      toast('Policial militar escalado com sucesso!', 'success');
+      toast(
+        operacoesAlvo.length === 1
+          ? `${selecionados.length} militar(es) escalado(s).`
+          : `${selecionados.length} militar(es) escalado(s) em ${operacoesAlvo.length} ocorrências.`,
+        'success',
+      );
       onFechar();
     } else {
       toast(resultado.mensagem, 'danger');
     }
   }
 
+  // Executadas ficam de fora da replicação (o servidor as ignora), então mostrar o
+  // número aqui evita a tela prometer mais ocorrências do que grava.
+  const executadasNoGrupo = temGrupo ? grupo!.filter((o) => o.situacao === 'Executada').length : 0;
+
   return (
     <div className="sub-form-panel">
       <form onSubmit={handleSubmit}>
         <div className="form-row">
-          <AutocompleteMilitar
+          <SeletorMilitares
             pessoal={pessoal}
-            valor={nome}
-            onChange={(v) => { setNome(v); if (!v.trim()) setMatriculaTravada(false); }}
-            onSelecionar={(nomeSel, matriculaSel) => {
-              setNome(nomeSel);
-              setMatricula(matriculaSel);
-              setMatriculaTravada(!!matriculaSel);
-            }}
+            chavesSelecionadas={selecionados.map((m) => m.chave)}
+            onSelecionar={adicionarPessoa}
+            onAdicionarLivre={adicionarLivre}
           />
+        </div>
+
+        <div className="form-row">
           <div className="form-group col-md-4">
-            <label htmlFor="esc_militar_id">Matrícula / ID *</label>
+            <label htmlFor="esc_aparicoes_padrao">Nº Aparições (padrão)</label>
             <input
-              type="text" id="esc_militar_id" placeholder="Ex: 123.456-7" autoComplete="off" required
-              value={matricula} readOnly={matriculaTravada}
-              onChange={(e) => setMatricula(e.target.value)}
+              type="number" id="esc_aparicoes_padrao" min={1}
+              value={aparicoesPadrao} onChange={(e) => setAparicoesPadrao(e.target.value)}
             />
+            <span className="texto-auxiliar">Aplicado a quem for adicionado depois; cada militar é editável abaixo.</span>
           </div>
-          <div className="form-group col-md-3">
-            <label htmlFor="esc_qtd_aparicoes">Nº Aparições *</label>
-            <input
-              type="number" id="esc_qtd_aparicoes" min={1} required
-              value={qtdAparicoes} onChange={(e) => setQtdAparicoes(e.target.value)}
-            />
+          <div className="form-group col-md-8">
+            <label htmlFor="esc_colar">Colar matrículas</label>
+            {!colarAberto ? (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setColarAberto(true)}>
+                <ClipboardPaste /> Colar lista de matrículas
+              </button>
+            ) : (
+              <>
+                <textarea
+                  id="esc_colar" rows={2} placeholder="Ex: 2066181, 2105241, 2271214"
+                  value={textoColado} onChange={(e) => setTextoColado(e.target.value)}
+                />
+                <div className="escala-colar-acoes">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleResolverColados} disabled={!textoColado.trim()}>
+                    Resolver matrículas
+                  </button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setColarAberto(false); setTextoColado(''); setNaoEncontradas([]); }}>
+                    Fechar
+                  </button>
+                </div>
+                {naoEncontradas.length > 0 && (
+                  <span className="escala-nao-encontradas">
+                    <TriangleAlert /> Não encontradas no cadastro: {naoEncontradas.join(', ')}
+                  </span>
+                )}
+              </>
+            )}
           </div>
         </div>
+
+        {selecionados.length > 0 && (
+          <div className="escala-chips">
+            {selecionados.map((m) => (
+              <div className="escala-chip" key={m.chave}>
+                <div className="escala-chip-nome">
+                  <strong>{m.militar_nome}</strong>
+                  <span>{m.militar_id || 'sem matrícula'}</span>
+                </div>
+                <label className="escala-chip-aparicoes">
+                  <span>Aparições</span>
+                  <input
+                    type="number" min={1} value={m.qtd_aparicoes}
+                    aria-label={`Aparições de ${m.militar_nome}`}
+                    onChange={(e) => mudarAparicoes(m.chave, e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button" className="btn-icon btn-danger btn-sm"
+                  aria-label={`Remover ${m.militar_nome} do lote`} title="Remover do lote"
+                  onClick={() => remover(m.chave)}
+                >
+                  <X />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {temGrupo && (
+          <div className="escala-escopo">
+            <span className="escala-escopo-rotulo" id="rot-escopo-escala">Aplicar este efetivo a</span>
+            <div className="escala-escopo-opcoes" role="radiogroup" aria-labelledby="rot-escopo-escala">
+              {ESCOPOS.map((opcao) => (
+                <label className={`escala-escopo-opcao${escopo === opcao.valor ? ' ativo' : ''}`} key={opcao.valor}>
+                  {/* aria-label explícito: sem ele o leitor anuncia o VALUE
+                      ("esta_e_futuras") em vez do rótulo visível. */}
+                  <input
+                    type="radio" name="escopo-escala" value={opcao.valor}
+                    aria-label={`Aplicar a: ${opcao.rotulo}`}
+                    checked={escopo === opcao.valor} onChange={() => setEscopo(opcao.valor)}
+                  />
+                  <span>{opcao.rotulo}</span>
+                </label>
+              ))}
+            </div>
+            {executadasNoGrupo > 0 && (
+              <span className="texto-auxiliar">
+                {executadasNoGrupo} ocorrência(s) já executada(s) do grupo ficam de fora — não são alteradas.
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="calculation-preview">
           <Calculator />
-          <span>Cálculo automático de diárias: <strong>{novasDiarias}</strong> diárias operacionais.</span>
-        </div>
-        <div className={`calculation-preview budget${saldoApos < 0 ? ' exceeded' : ''}`}>
-          <Wallet />
           <span>
-            {cotaMensal <= 0 ? (
-              <>Nenhuma cota mensal definida. Configure no <strong>Planejador de Diárias</strong>.</>
-            ) : saldoApos < 0 ? (
-              <>Atenção: esta escala <strong>excede a cota de {nomeMesEvt}/{anoEvt} em {Math.abs(saldoApos)} diária(s)</strong>.</>
+            {selecionados.length === 0 ? (
+              <>Adicione militares para ver o impacto em diárias.</>
             ) : (
-              <>Saldo da cota de {nomeMesEvt}/{anoEvt} após esta escala: <strong>{saldoApos}</strong> diária(s) disponível(is).</>
+              <>
+                Aplicará a <strong>{impacto.totalOperacoes} operação(ões)</strong> ·{' '}
+                <strong>{impacto.totalDiarias} diária(s)</strong> ({selecionados.length} militar(es), 2 diárias por aparição).
+              </>
             )}
           </span>
         </div>
+
+        {selecionados.length > 0 && impacto.porMes.map((m) => (
+          <div className={`calculation-preview budget${m.saldoApos < 0 ? ' exceeded' : ''}`} key={m.mes}>
+            <Wallet />
+            <span>
+              {cotaMensal <= 0 ? (
+                <>Nenhuma cota mensal definida. Configure no <strong>Planejador de Diárias</strong>.</>
+              ) : m.saldoApos < 0 ? (
+                <>Atenção: excede a cota de <strong>{rotuloMes(m.mes)}</strong> em <strong>{Math.abs(m.saldoApos)} diária(s)</strong>.</>
+              ) : (
+                <>Saldo da cota de <strong>{rotuloMes(m.mes)}</strong> após esta escala: <strong>{m.saldoApos}</strong> diária(s).</>
+              )}
+            </span>
+          </div>
+        ))}
+
+        {/* Teto por militar: ALERTA, nunca bloqueio — quem decide escalar além disso
+            é a P3, e o botão de confirmar segue habilitado. */}
+        {impacto.acimaDoTeto.length > 0 && (
+          <div className="escala-alerta-teto">
+            <TriangleAlert />
+            <span>
+              Acima de {TETO_DIARIAS_MILITAR_MES} diárias no mês:{' '}
+              {impacto.acimaDoTeto.map((m) => `${m.militar_nome} (${m.total_diarias} em ${rotuloMes(m.mes)})`).join('; ')}.
+              Isso não impede a confirmação.
+            </span>
+          </div>
+        )}
+
         <div className="form-actions">
           <button type="button" className="btn btn-secondary btn-sm" onClick={onFechar}>Cancelar</button>
-          <button type="submit" className={`btn btn-primary btn-sm${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
+          <button
+            type="submit" className={`btn btn-primary btn-sm${enviando ? ' btn-carregando' : ''}`}
+            disabled={enviando || selecionados.length === 0 || operacoesAlvo.length === 0}
+          >
             Confirmar Escala
+            {selecionados.length > 0 && operacoesAlvo.length > 1 ? ` em ${operacoesAlvo.length} Ocorrências` : ''}
           </button>
         </div>
       </form>
