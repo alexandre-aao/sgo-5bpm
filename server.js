@@ -8,6 +8,18 @@ const { createClient } = require('@supabase/supabase-js');
 // Motor de recorrência: módulo puro, sem I/O, para ser testável isoladamente
 // (`npm test`). Ver lib/recorrencia.js.
 const { LIMITES: LIMITES_RECORRENCIA, validarRegraRecorrencia } = require('./lib/recorrencia');
+// Regras puras do domínio (Fase 7). Vivem em lib/ para poderem ser testadas sem
+// subir o Express e o cliente Supabase — ver test/dominio.test.js.
+const {
+  FUSO_BATALHAO,
+  validarCampos,
+  proximoDiaISO,
+  formatarDataBr,
+  dentroDaJanelaExclusaoAdjunto,
+  diariaDaOperacao,
+  ordenarPorTurno,
+  chaveMilitar,
+} = require('./lib/dominio');
 
 const app = express();
 // Na Vercel (e atrás de qualquer proxy reverso) o IP real do cliente chega em X-Forwarded-For;
@@ -245,44 +257,6 @@ async function buscarRow(tabela, id) {
   return data || null;
 }
 
-// Valida e normaliza um payload contra um schema simples, sem biblioteca externa.
-// schema: { campo: { obrigatorio, tipo: 'string'|'number'|'boolean', max, valores: [...], label } }
-// Campo ausente/vazio e não obrigatório recebe `padrao` (ou fica undefined). Strings já
-// voltam com trim aplicado. Campo ausente e sem `padrao` não entra em `valores` (permite
-// espalhar o resultado sobre um registro existente sem apagar campos não enviados — updates
-// parciais em PUT). Retorna { ok:true, valores } ou { ok:false, erro }.
-function validarCampos(body, schema) {
-  const valores = {};
-  for (const [campo, regra] of Object.entries(schema)) {
-    let valor = body[campo];
-    if (valor === undefined || valor === null || valor === '') {
-      if (regra.obrigatorio) {
-        return { ok: false, erro: `O campo "${regra.label || campo}" é obrigatório.` };
-      }
-      if (regra.padrao !== undefined) valores[campo] = regra.padrao;
-      continue;
-    }
-    if (regra.tipo === 'string') {
-      valor = String(valor).trim();
-      if (regra.max && valor.length > regra.max) {
-        return { ok: false, erro: `O campo "${regra.label || campo}" deve ter no máximo ${regra.max} caracteres.` };
-      }
-    } else if (regra.tipo === 'number') {
-      valor = Number(valor);
-      if (isNaN(valor)) {
-        return { ok: false, erro: `O campo "${regra.label || campo}" deve ser um número válido.` };
-      }
-    } else if (regra.tipo === 'boolean') {
-      valor = !!valor;
-    }
-    if (regra.valores && !regra.valores.includes(valor)) {
-      return { ok: false, erro: `Valor inválido para "${regra.label || campo}".` };
-    }
-    valores[campo] = valor;
-  }
-  return { ok: true, valores };
-}
-
 // Indexa uma lista num Map<valorDaChave, item[]>. Usado nas rotas de agregação para evitar
 // varrer db.alocacoes/db.escalas inteiras dentro de um forEach de eventos/operações (O(n×m)):
 // o índice é construído UMA vez e cada grupo é lido em O(1). Não altera nenhum total — só
@@ -405,29 +379,6 @@ function generateId(prefix = 'id') {
   return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Fuso do batalhão. America/Fortaleza é UTC-3 FIXO — o Brasil aboliu o horário
-// de verão em 2019 —, então o offset pode ser literal e não precisa de lib de
-// fuso. Importa porque a Vercel roda a função serverless em UTC: sem isso, o
-// prazo das 07h seria calculado 3 horas adiantado.
-const FUSO_BATALHAO = '-03:00';
-
-function proximoDiaISO(dataISO) {
-  const [ano, mes, dia] = String(dataISO).split('-').map(Number);
-  // Date.UTC normaliza virada de mês/ano sozinho (31 + 1 -> dia 1 do mês seguinte).
-  return new Date(Date.UTC(ano, mes - 1, dia + 1)).toISOString().slice(0, 10);
-}
-
-function formatarDataBr(dataISO) {
-  return dataISO ? String(dataISO).split('-').reverse().join('/') : '';
-}
-
-/** O Adjunto pode excluir o cartão de um dia até as 07h00 do dia seguinte à
- *  data do serviço (horário do batalhão). Depois disso, só o P3. */
-function dentroDaJanelaExclusaoAdjunto(dataServico, agora = new Date()) {
-  if (!dataServico) return false;
-  const limite = new Date(`${proximoDiaISO(dataServico)}T07:00:00${FUSO_BATALHAO}`);
-  return agora.getTime() <= limite.getTime();
-}
 
 // Normaliza texto para comparação (minúsculas, sem acentos) — usado para evitar bairros duplicados por grafia
 function normalizarTextoServer(texto) {
@@ -993,16 +944,6 @@ app.delete('/api/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
 // não no evento. `operacoes` e `escalas` são de alta escrita concorrente -> writeRow/deleteRow.
 const TIPOS_OPERACAO = ['Ostensiva', 'Saturação', 'Cerco', 'Blitz', 'Cumprimento de Mandado', 'Reforço', 'Outras'];
 
-// Diária de uma operação: se já tem escala nominal lançada, vale a soma real das escalas;
-// senão, vale a estimativa (reserva de cota). Evita contar a mesma diária duas vezes ao somar
-// "planejado" (só operações sem escala) + "consumido" (operações com escala) no planejador.
-function diariaDaOperacao(op, escalasDaOp) {
-  if (escalasDaOp.length > 0) {
-    return escalasDaOp.reduce((sum, s) => sum + (s.total_diarias || 0), 0);
-  }
-  return op.qtd_diarias_estimada || 0;
-}
-
 app.get('/api/operacoes', exigirP3, asyncRoute(async (req, res) => {
   res.json(await readTabela('operacoes'));
 }));
@@ -1419,16 +1360,6 @@ const TETO_DIARIAS_MILITAR_MES = 20;
 
 function mesDe(dataIso) {
   return String(dataIso || '').slice(0, 7);
-}
-
-// Chave de identidade do militar dentro de uma operação. `escalas.militar_id` guarda a
-// MATRÍCULA (RE) em texto livre, não o `pessoal.id`, e pode vir vazia — o autocomplete
-// permite escalar quem não está no cadastro, digitando o nome. Por isso a chave cai no
-// nome normalizado quando não há matrícula; sem isso, dois militares sem matrícula
-// colidiriam numa chave vazia e um sobrescreveria o outro.
-function chaveMilitar(matricula, nome) {
-  const mat = String(matricula || '').trim();
-  return mat ? `re:${mat}` : `nome:${String(nome || '').trim().toLowerCase()}`;
 }
 
 // Normaliza a lista de militares dos endpoints de lote. Aceita `militar_id` ou
@@ -2539,22 +2470,6 @@ function duracaoHoras(inicio, fim) {
   let minutos = (hf * 60 + mf) - (hi * 60 + mi);
   if (minutos < 0) minutos += 24 * 60; // roteiro que atravessa a meia-noite
   return minutos / 60;
-}
-
-// Ordena os itens de roteiro de uma viatura pela distância circular do horário de início do
-// turno (07h por padrão), não em ordem alfabética simples — itens como "Alvorada" às 05h30
-// pertencem ao fim do turno (do dia anterior), não ao início.
-function ordenarPorTurno(itens, inicioTurno = '07:00') {
-  const minutos = (hhmm) => {
-    const [h, m] = String(hhmm || '00:00').split(':').map(Number);
-    return (h || 0) * 60 + (m || 0);
-  };
-  const refMin = minutos(inicioTurno);
-  return itens.slice().sort((a, b) => {
-    const diffA = ((minutos(a.inicio) - refMin) + 1440) % 1440;
-    const diffB = ((minutos(b.inicio) - refMin) + 1440) % 1440;
-    return diffA - diffB;
-  });
 }
 
 // -------------------------------------------------------------

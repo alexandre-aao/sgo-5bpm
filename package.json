@@ -8,6 +8,10 @@
     "dev": "node server.js",
     "test": "node --test test/*.test.js"
   },
+  "//engines": "22.18+ não é preferência: test/paridade.test.js importa os .ts do cliente pelo type stripping nativo (22.18+) e usa module.registerHooks (22.15+). Em Node mais antigo esses testes falham ao carregar, não por divergência real.",
+  "engines": {
+    "node": ">=22.18"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "compression": "^1.8.1",

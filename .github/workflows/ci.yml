@@ -1,0 +1,59 @@
+name: CI
+
+# Todo push em `main` vai direto para produção na Vercel (integração Git), então
+# este workflow é a única rede antes do deploy. Ele NÃO bloqueia a Vercel — os
+# dois disparam em paralelo. Para o CI virar gate de verdade é preciso ligar
+# "Wait for CI" / branch protection no GitHub; sem isso ele apenas denuncia.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Um push logo após o outro cancela o anterior: o que importa é o estado final.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Testes do backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22.18+ é requisito real, não preferência: test/paridade.test.js
+      # importa os .ts do cliente usando o type stripping nativo, e o hook de
+      # resolução usa module.registerHooks.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - run: npm ci
+
+      # Não precisa de Supabase nem de servidor no ar: lib/ é tudo função pura.
+      - run: npm test
+
+  frontend:
+    name: Lint e build do cliente
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+        working-directory: client
+
+      - run: npm run lint
+        working-directory: client
+
+      # O build faz o typecheck (tsc -b) junto — é o que pega erro de tipo que o
+      # lint não vê.
+      - run: npm run build
+        working-directory: client
