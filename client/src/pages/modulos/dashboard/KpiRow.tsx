@@ -27,6 +27,20 @@ function Tendencia({ atual, anterior }: { atual: number; anterior: number }) {
   );
 }
 
+/** Recorte de 7 dias a partir de hoje, o mesmo que o KPI conta — o filtro de
+ *  Listar Eventos usa data local, não UTC, porque compara com `data_inicio`
+ *  (DATE) do jeito que o usuário enxerga o calendário. */
+function hojeIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function daquiASeteDias(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 interface KpiRowProps {
   stats: DashboardStats;
   conflitosHoje: number;
@@ -39,7 +53,9 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
 
   return (
     <div className="kpi-row">
-      <div className="kpi-card">
+      {/* Cada KPI leva ao lugar onde o número pode ser investigado — antes eram
+          leitura pura e obrigavam a navegação manual até o dado. */}
+      <Link to={`/eventos?de=${hojeIso()}&ate=${daquiASeteDias()}`} className="kpi-card kpi-card-clicavel" title="Ver estes eventos na lista">
         <div className="kpi-topo">
           <span className="kpi-label" style={{ color: 'var(--primary)' }}>Eventos (7 dias)</span>
           <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
@@ -52,9 +68,9 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
         <div className="kpi-rodape">
           <Tendencia atual={stats.eventosSemana} anterior={stats.eventosSemanaAnterior} />
         </div>
-      </div>
+      </Link>
 
-      <div className="kpi-card">
+      <Link to="/operacoes" className="kpi-card kpi-card-clicavel" title="Ver as operações do período">
         <div className="kpi-topo">
           {/* Contagem de operações não é situação nem prioridade — sai do verde
               e volta pro azul institucional (Etapa 1, item 3). */}
@@ -73,9 +89,9 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
               : 'nenhuma no mês'}
           </span>
         </div>
-      </div>
+      </Link>
 
-      <div className="kpi-card">
+      <Link to="/planejador" className="kpi-card kpi-card-clicavel" title="Abrir o Planejador de Diárias">
         <div className="kpi-topo">
           {/* O amarelo daqui era decorativo; o estouro de cota continua sinalizado
               em vermelho no próprio número, logo abaixo. */}
@@ -96,7 +112,7 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
           </div>
           <span className="kpi-pct">{pctCota}%</span>
         </div>
-      </div>
+      </Link>
 
       <Link
         to="/cartao"

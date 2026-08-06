@@ -7,12 +7,18 @@ function getLocalDateStr(date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+export interface AlertaEventoUrgente {
+  /** Permite ao Dashboard levar direto à gaveta daquele evento. */
+  eventoId: string;
+  mensagem: string;
+}
+
 /** Eventos em andamento ou que começam nos próximos 3 dias e ainda não têm Número
- * da OS e/ou Número SEI — espelha calcularAlertasEventosUrgentes() em public/app.js. */
-export function calcularAlertasEventosUrgentes(eventos: Tables<'eventos'>[]): string[] {
+ * da OS e/ou Número SEI. */
+export function calcularAlertasEventosUrgentes(eventos: Tables<'eventos'>[]): AlertaEventoUrgente[] {
   const hojeStr = getLocalDateStr();
   const hoje = new Date(hojeStr + 'T00:00:00');
-  const alertas: string[] = [];
+  const alertas: AlertaEventoUrgente[] = [];
 
   eventos.forEach((evt) => {
     const faltando: string[] = [];
@@ -34,9 +40,10 @@ export function calcularAlertasEventosUrgentes(eventos: Tables<'eventos'>[]): st
     else if (diffDias === 1) quando = 'ocorre amanhã';
     else quando = `ocorre em ${diffDias} dias`;
 
-    alertas.push(
-      `Evento "${evt.nome_evento}" ${quando} (${dataBr}) e ainda está sem ${faltando.join(' e sem ')} informado.`,
-    );
+    alertas.push({
+      eventoId: evt.id,
+      mensagem: `Evento "${evt.nome_evento}" ${quando} (${dataBr}) e ainda está sem ${faltando.join(' e sem ')} informado.`,
+    });
   });
 
   return alertas;

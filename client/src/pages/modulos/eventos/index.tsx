@@ -32,6 +32,10 @@ export default function EventosPage() {
   // Destino da paleta de comandos: /eventos?evento=<id> abre a gaveta daquele
   // evento. O parâmetro é consumido uma vez e some da URL.
   useParametroInicial('evento', setEventoAbertoId);
+  // Destino do KPI "Eventos (7 dias)" do Dashboard: chega com o mesmo recorte
+  // que o card contou, senão o número clicado não bateria com a lista aberta.
+  useParametroInicial('de', (valor) => setFiltros((f) => ({ ...f, dataInicio: valor })));
+  useParametroInicial('ate', (valor) => setFiltros((f) => ({ ...f, dataFim: valor })));
 
   const eventosFiltrados = getEventosFiltrados(dados.eventos, filtros);
 

@@ -30,6 +30,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const { usuario } = useAuth();
   const [dados, setDados] = useState<AppData>(DADOS_VAZIOS);
   const [carregandoNucleo, setCarregandoNucleo] = useState(true);
+  const [carregandoSecundario, setCarregandoSecundario] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
   const recarregar = useCallback(async () => {
@@ -72,6 +73,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         pessoal: usarLista(pessoalResp, atual.pessoal),
         viaturas: usarLista(viaturasResp, atual.viaturas),
       }));
+      setCarregandoSecundario(false);
       setErro(null);
     } catch (falha) {
       // Falha total (ex.: Promise.all rejeitado por erro de rede/parse) — mantém o
@@ -81,6 +83,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       console.error('Erro ao buscar dados do servidor:', falha);
       setErro(falha instanceof Error ? falha.message : 'Falha na comunicação com o servidor.');
       setCarregandoNucleo(false);
+      // Também desliga o secundário: se a 2ª onda foi quem falhou, deixar a flag
+      // ligada prenderia a tabela de Pessoal num esqueleto eterno, escondendo o
+      // erro que a faixa acima já está mostrando.
+      setCarregandoSecundario(false);
     }
   }, [usuario]);
 
@@ -98,7 +104,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useAutoRefresh(recarregar, !!usuario);
 
   return (
-    <AppDataContext.Provider value={{ dados, carregandoNucleo, erro, recarregar }}>
+    <AppDataContext.Provider value={{ dados, carregandoNucleo, carregandoSecundario, erro, recarregar }}>
       {children}
     </AppDataContext.Provider>
   );

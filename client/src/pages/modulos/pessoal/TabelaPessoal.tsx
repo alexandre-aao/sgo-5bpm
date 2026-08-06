@@ -1,6 +1,7 @@
 import { Pencil, Trash2, SearchX, UserPlus } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { SemDados } from '../../../components/estado/SemDados';
+import { EsqueletoLinhasTabela } from '../../../components/estado/Esqueleto';
 import { MenuOpcoes } from '../../../components/MenuOpcoes';
 import { categoriaPessoalBadgeClass } from '../../../lib/categoriaPessoalBadge';
 import { ThOrdenavel } from '../../../components/tabela/ThOrdenavel';
@@ -19,6 +20,9 @@ const ACESSORES: Acessores<Tables<'pessoal'>, ColunaPessoal> = {
 };
 
 interface TabelaPessoalProps {
+  /** 2ª onda do AppData ainda em voo: mostra esqueleto em vez do estado vazio,
+   *  que diria "nenhuma pessoa cadastrada" para 244 militares que ainda vêm. */
+  carregando?: boolean;
   pessoal: Tables<'pessoal'>[];
   filtroAtivo: boolean;
   onEditar: (pessoa: Tables<'pessoal'>) => void;
@@ -29,7 +33,7 @@ interface TabelaPessoalProps {
 // Tabela do Cadastro de Pessoal: ordenação por coluna, cabeçalho fixo e
 // paginação (Etapa 1, item 6) — são 244 militares cadastrados, a lista inteira
 // numa página só era a pior rolagem do sistema no celular.
-export function TabelaPessoal({ pessoal, filtroAtivo, onEditar, onExcluir, onLimparFiltros }: TabelaPessoalProps) {
+export function TabelaPessoal({ carregando = false, pessoal, filtroAtivo, onEditar, onExcluir, onLimparFiltros }: TabelaPessoalProps) {
   const { ordenacao, alternar } = useOrdenacao<ColunaPessoal>({ coluna: 'nome', direcao: 'asc' });
   const { pagina, setPagina } = usePaginaLista(pessoal.length);
 
@@ -52,7 +56,9 @@ export function TabelaPessoal({ pessoal, filtroAtivo, onEditar, onExcluir, onLim
             </tr>
           </thead>
           <tbody>
-            {itens.length === 0 ? (
+            {carregando ? (
+              <EsqueletoLinhasTabela linhas={6} colunas={7} />
+            ) : itens.length === 0 ? (
               <tr>
                 <td colSpan={7}>
                   {filtroAtivo ? (

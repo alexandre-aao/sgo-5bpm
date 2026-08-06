@@ -15,6 +15,11 @@ export interface AppDataContextValue {
   dados: AppData;
   /** true enquanto a 1ª onda (núcleo) ainda não terminou a primeira carga */
   carregandoNucleo: boolean;
+  /** true enquanto a 2ª onda (pessoal + viaturas) ainda não chegou na 1ª carga.
+   *  As telas que dependem desses dois já estão pintadas nessa hora, então sem
+   *  este sinal a tabela de Pessoal aparece VAZIA — indistinguível de "nada
+   *  cadastrado" — até o payload mais pesado responder. */
+  carregandoSecundario: boolean;
   /** Falha na última busca. O estado anterior é preservado (ver usarLista), então
    *  isto sinaliza "dados possivelmente desatualizados", não "sem dados". */
   erro: string | null;

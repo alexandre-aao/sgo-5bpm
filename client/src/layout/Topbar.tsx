@@ -1,4 +1,4 @@
-import { Menu, Sun, Moon, CalendarDays } from 'lucide-react';
+import { Menu, Sun, Moon, MonitorSmartphone, CalendarDays } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import { SECTION_TITLES } from './navConfig';
@@ -58,6 +58,19 @@ export function Topbar({ onAbrirDrawer }: TopbarProps) {
             onClick={() => definirTema('escuro')}
           >
             <Moon /> <span>Escuro</span>
+          </button>
+          {/* "Auto" segue o prefers-color-scheme e continua seguindo: trocar o
+              tema do sistema reflete na hora. Escolher Claro ou Escuro é uma
+              decisão manual e passa a valer sobre o sistema. */}
+          <button
+            type="button"
+            className={`tema-opcao${tema === 'auto' ? ' ativo' : ''}`}
+            role="radio"
+            aria-checked={tema === 'auto'}
+            title="Seguir o tema do sistema"
+            onClick={() => definirTema('auto')}
+          >
+            <MonitorSmartphone /> <span>Auto</span>
           </button>
         </div>
 

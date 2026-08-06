@@ -30,8 +30,14 @@ export function useParametroInicial(nome: string, aoReceber: (valor: string) => 
     if (!valor || jaTratou.current) return;
     jaTratou.current = true;
     callbackRef.current(valor);
-    const restante = new URLSearchParams(params);
-    restante.delete(nome);
-    setParams(restante, { replace: true });
-  }, [valor, nome, params, setParams]);
+    // Forma funcional, não `new URLSearchParams(params)`: com dois parâmetros na
+    // mesma tela (ex.: ?de=&ate=), os dois efeitos rodam no MESMO render e o
+    // segundo escreveria por cima com uma cópia que ainda continha o primeiro —
+    // devolvendo à URL o parâmetro que o outro acabara de remover.
+    setParams((atuais) => {
+      const restante = new URLSearchParams(atuais);
+      restante.delete(nome);
+      return restante;
+    }, { replace: true });
+  }, [valor, nome, setParams]);
 }

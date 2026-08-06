@@ -13,13 +13,14 @@ import { DonutDiarias, DonutTipo } from './Donuts';
 import { OperacoesRecentes } from './OperacoesRecentes';
 import { TopMilitares } from './TopMilitares';
 import { DashRail } from './DashRail';
+import { EsqueletoKpis } from '../../../components/estado/Esqueleto';
 
 export default function DashboardPage() {
   const { dados } = useAppData();
   const { cartaoHoje, carregando: carregandoCartao } = useCartaoDeHoje();
   const stats = useDashboardStats(dados);
   const [{ mes, ano }, setPeriodo] = useState(periodoInicial);
-  const { resumo } = useDashboardResumo(mes, ano);
+  const { resumo, carregando: carregandoResumo } = useDashboardResumo(mes, ano);
 
   const conflitosHoje = cartaoHoje ? calcularAlertasCartao(cartaoHoje, dados.pessoal).length : 0;
   const cartaoHojeResumo = carregandoCartao
@@ -42,7 +43,12 @@ export default function DashboardPage() {
 
       <div className="dash-layout">
         <div className="dash-main">
-          <KpiRow stats={stats} conflitosHoje={conflitosHoje} cartaoHojeResumo={cartaoHojeResumo} />
+          {/* dashboard-resumo é a rota agregadora mais lenta da tela: sem o
+              esqueleto, os KPIs entravam com zeros e o bloco saltava quando os
+              números reais chegavam. */}
+          {carregandoResumo
+            ? <EsqueletoKpis />
+            : <KpiRow stats={stats} conflitosHoje={conflitosHoje} cartaoHojeResumo={cartaoHojeResumo} />}
           <AlertasEPatrulhamento
             cartaoHoje={cartaoHoje}
             carregandoCartao={carregandoCartao}

@@ -7,6 +7,9 @@ import { calcularAlertasEventosUrgentes } from '../../../lib/alertasEventos';
 interface AlertaExibicao {
   mensagem: string;
   deCartao: boolean;
+  /** Para onde a pendência leva. Conflito vai ao Cartão de hoje; evento sem OS/SEI
+   *  abre a gaveta daquele evento em Listar Eventos. */
+  destino: string;
 }
 
 interface AlertasEPatrulhamentoProps {
@@ -18,11 +21,12 @@ interface AlertasEPatrulhamentoProps {
 
 export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, pessoal }: AlertasEPatrulhamentoProps) {
   const alertasCartao: AlertaExibicao[] = cartaoHoje
-    ? calcularAlertasCartao(cartaoHoje, pessoal).map((a) => ({ mensagem: a.mensagem, deCartao: true }))
+    ? calcularAlertasCartao(cartaoHoje, pessoal).map((a) => ({ mensagem: a.mensagem, deCartao: true, destino: '/cartao' }))
     : [];
-  const alertasEventos: AlertaExibicao[] = calcularAlertasEventosUrgentes(eventos).map((mensagem) => ({
-    mensagem,
+  const alertasEventos: AlertaExibicao[] = calcularAlertasEventosUrgentes(eventos).map((a) => ({
+    mensagem: a.mensagem,
     deCartao: false,
+    destino: `/eventos?evento=${encodeURIComponent(a.eventoId)}`,
   }));
   const todosAlertas = [...alertasCartao, ...alertasEventos];
 
@@ -53,7 +57,9 @@ export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, p
               const Icone = a.deCartao ? AlertTriangle : AlertCircle;
               const titulo = a.deCartao ? 'Conflito no Cartão Programa de hoje' : 'Evento próximo com pendência';
               return (
-                <div className="dash-alerta-item" key={i}>
+                // A pendência leva ao lugar de resolvê-la: antes era leitura pura
+                // e obrigava o usuário a navegar até o dado por conta própria.
+                <Link className="dash-alerta-item dash-alerta-clicavel" to={a.destino} key={i}>
                   <span className="dash-alerta-icone" style={{ background: bg, color: cor }}>
                     <Icone />
                   </span>
@@ -61,7 +67,7 @@ export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, p
                     <div className="dash-alerta-titulo">{titulo}</div>
                     <div className="dash-alerta-sub">{a.mensagem}</div>
                   </div>
-                </div>
+                </Link>
               );
             })
           )}

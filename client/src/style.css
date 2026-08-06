@@ -1505,7 +1505,32 @@ body.sgo-sincronizando .topbar::before {
 
 .kpi-card:hover { box-shadow: var(--shadow-lg); }
 
-.kpi-card-clicavel { cursor: pointer; }
+/* KPI que leva a algum lugar. O card já é um <Link>, então herda o foco visível
+   do tema; o que falta é dizer que é clicável antes do clique. */
+.kpi-card-clicavel {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.kpi-card-clicavel:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+/* Pendência do Dashboard: mesma ideia, mas a linha é a área clicável inteira. */
+.dash-alerta-clicavel {
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-sm);
+  transition: background-color .15s ease;
+}
+.dash-alerta-clicavel:hover { background-color: var(--surface-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-card-clicavel { transition: none; }
+  .kpi-card-clicavel:hover { transform: none; }
+}
 
 .kpi-topo {
   display: flex;
@@ -5011,6 +5036,35 @@ body.sgo-sincronizando .topbar::before {
 .doc-cartao-roteiro td { padding: 1mm 1.5mm; border-bottom: .35pt solid #ccd2d8; vertical-align: top; }
 .doc-cartao-roteiro th:first-child, .doc-cartao-roteiro td:first-child { width: 28mm; white-space: nowrap; }
 .doc-cartao-roteiro th:last-child, .doc-cartao-roteiro td:last-child { width: 37mm; }
+/* ============================================================
+   Esqueletos de carregamento — Fase 2B, 2026-08
+   Placeholder com as dimensões do conteúdo real, para os dados chegarem sem
+   empurrar o layout. Ver components/estado/Esqueleto.tsx.
+   ============================================================ */
+.esqueleto {
+  display: block;
+  border-radius: var(--radius-xs);
+  /* Duas paradas da MESMA cor nas pontas e uma clara no meio: o brilho atravessa
+     sem escurecer as bordas, e funciona nos dois temas porque sai de --surface-3. */
+  background: linear-gradient(90deg, var(--surface-3) 25%, var(--surface-2) 50%, var(--surface-3) 75%);
+  background-size: 200% 100%;
+  animation: esqueleto-brilho 1.4s ease-in-out infinite;
+}
+
+@keyframes esqueleto-brilho {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Movimento é decoração aqui: quem pediu menos animação recebe o bloco parado,
+   que continua comunicando "ainda carregando" pela forma. */
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto { animation: none; }
+}
+
+.esqueleto-painel { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); }
+.kpi-card .esqueleto + .esqueleto { margin-top: var(--space-3); }
+
 /* ============================================================
    Paleta de comandos (Ctrl+K) e atalhos de teclado — Fase 2B, 2026-08
    ============================================================ */

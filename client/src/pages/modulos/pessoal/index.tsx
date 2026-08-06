@@ -16,7 +16,7 @@ import { normalizarTexto } from '../../../lib/cartaoConflitos';
 // renderPessoalTab() em public/app.js. A leitura vem de dados.pessoal
 // (useAppData, já carregado globalmente) — filtrada aqui, sem nova chamada.
 export default function PessoalPage() {
-  const { dados, recarregar } = useAppData();
+  const { dados, carregandoSecundario, recarregar } = useAppData();
   const { toast } = useToast();
   const { criarPessoa, atualizarPessoa, excluirPessoa } = usePessoalCrud(recarregar);
   const [categoria, setCategoria] = useState('');
@@ -105,6 +105,7 @@ export default function PessoalPage() {
         <FiltrosAtivos filtros={filtrosAtivos} onLimparTudo={handleLimparFiltros} />
 
         <TabelaPessoal
+          carregando={carregandoSecundario && dados.pessoal.length === 0}
           pessoal={pessoalFiltrado} filtroAtivo={!!categoria || !!termo}
           onEditar={handleEditar} onExcluir={handleExcluir}
           onLimparFiltros={handleLimparFiltros}
