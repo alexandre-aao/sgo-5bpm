@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "lint": "eslint server.js lib test eslint.config.js"
   },
   "//engines": "22.18+ não é preferência: test/paridade.test.js importa os .ts do cliente pelo type stripping nativo (22.18+) e usa module.registerHooks (22.15+). Em Node mais antigo esses testes falham ao carregar, não por divergência real.",
   "engines": {
@@ -19,5 +20,8 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5"
   }
 }

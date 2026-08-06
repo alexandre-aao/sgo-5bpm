@@ -32,6 +32,11 @@ jobs:
 
       - run: npm ci
 
+      # `no-undef` é o que protege a divisão do server.js em routers: um helper
+      # que deixe de ser importado vira ReferenceError só quando a rota é
+      # chamada — invisível no boot e no `node --check`.
+      - run: npm run lint
+
       # Não precisa de Supabase nem de servidor no ar: lib/ é tudo função pura.
       - run: npm test
 

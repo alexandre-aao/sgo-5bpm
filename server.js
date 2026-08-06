@@ -11,7 +11,6 @@ const { LIMITES: LIMITES_RECORRENCIA, validarRegraRecorrencia } = require('./lib
 // Regras puras do domínio (Fase 7). Vivem em lib/ para poderem ser testadas sem
 // subir o Express e o cliente Supabase — ver test/dominio.test.js.
 const {
-  FUSO_BATALHAO,
   validarCampos,
   proximoDiaISO,
   formatarDataBr,
@@ -3030,9 +3029,6 @@ app.delete('/api/cartoes/:id', asyncRoute(async (req, res) => {
   }
 
   await deleteRow('cartoes', req.params.id);
-  const descricaoAlvo = cartaoAlvo && cartaoAlvo.is_template
-    ? `Template "${cartaoAlvo.nome_template}" excluído.`
-    : `Cartão Programa de ${cartaoAlvo ? cartaoAlvo.data : req.params.id} excluído, com viaturas e itens de roteiro associados.`;
   res.json({ message: 'Cartão Programa excluído' });
 }));
 
