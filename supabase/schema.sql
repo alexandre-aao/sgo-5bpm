@@ -52,8 +52,16 @@ create table if not exists operacoes (
   qtd_diarias_estimada int not null default 0,
   tipo_recorrencia text
     check (tipo_recorrencia is null or tipo_recorrencia in ('diaria','fim_de_semana','dia_unico')),
+  -- Recorrência (migration 004): as ocorrências de um mesmo lote compartilham o
+  -- grupo_recorrencia_id (TEXT, generateId('grp'); null = operação avulsa) e gravam
+  -- a mesma recorrencia_regra. Com recorrência ativa cada ocorrência é de UM dia
+  -- (data_inicio = data_termino) e o "fim" da regra vive em recorrencia_regra.data_fim.
+  -- tipo_recorrencia acima é OUTRO campo — rótulo descritivo anterior, mantido.
+  grupo_recorrencia_id text,
+  recorrencia_regra jsonb,
   created_at timestamptz default now()
 );
+create index if not exists idx_operacoes_grupo_recorrencia on operacoes(grupo_recorrencia_id);
 
 -- Uma alocação pertence a UM evento OU a UMA operação — nunca aos dois, nunca a
 -- nenhum (constraint alocacoes_um_vinculo). Por isso evento_id agora é nullable.
@@ -80,9 +88,14 @@ create table if not exists escalas (
   militar_nome text not null,
   militar_id text default '',
   qtd_aparicoes int not null default 1,
-  total_diarias int not null default 2
+  total_diarias int not null default 2,
+  -- Data da escala (migration 004). Denormalização deliberada: antes a escala era
+  -- datada só pela data_inicio da operação. Nullable e sem backfill — escala antiga
+  -- fica null e o leitor cai no fallback operacao.data_inicio.
+  data date
 );
 create index if not exists idx_escalas_operacao on escalas(operacao_id);
+create index if not exists idx_escalas_operacao_data on escalas(operacao_id, data);
 
 -- (A antiga tabela `missoes_planejadas` foi migrada para `operacoes` — situacao='Planejada'
 --  com qtd_diarias_estimada — e removida do banco via DROP TABLE. Sem tabela separada.)

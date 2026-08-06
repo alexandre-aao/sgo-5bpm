@@ -277,6 +277,7 @@ export type Database = {
       }
       escalas: {
         Row: {
+          data: string | null
           id: string
           militar_id: string | null
           militar_nome: string
@@ -285,6 +286,7 @@ export type Database = {
           total_diarias: number
         }
         Insert: {
+          data?: string | null
           id: string
           militar_id?: string | null
           militar_nome: string
@@ -293,6 +295,7 @@ export type Database = {
           total_diarias?: number
         }
         Update: {
+          data?: string | null
           id?: string
           militar_id?: string | null
           militar_nome?: string
@@ -409,6 +412,7 @@ export type Database = {
           data_inicio: string
           data_termino: string | null
           demandante: string | null
+          grupo_recorrencia_id: string | null
           horario_inicio: string | null
           id: string
           local_itinerario: string | null
@@ -417,6 +421,7 @@ export type Database = {
           num_os_manual: string | null
           num_sei: string | null
           qtd_diarias_estimada: number
+          recorrencia_regra: Json | null
           situacao: string
           tipo_operacao: string
           tipo_recorrencia: string | null
@@ -427,6 +432,7 @@ export type Database = {
           data_inicio: string
           data_termino?: string | null
           demandante?: string | null
+          grupo_recorrencia_id?: string | null
           horario_inicio?: string | null
           id: string
           local_itinerario?: string | null
@@ -435,6 +441,7 @@ export type Database = {
           num_os_manual?: string | null
           num_sei?: string | null
           qtd_diarias_estimada?: number
+          recorrencia_regra?: Json | null
           situacao?: string
           tipo_operacao?: string
           tipo_recorrencia?: string | null
@@ -445,6 +452,7 @@ export type Database = {
           data_inicio?: string
           data_termino?: string | null
           demandante?: string | null
+          grupo_recorrencia_id?: string | null
           horario_inicio?: string | null
           id?: string
           local_itinerario?: string | null
@@ -453,6 +461,7 @@ export type Database = {
           num_os_manual?: string | null
           num_sei?: string | null
           qtd_diarias_estimada?: number
+          recorrencia_regra?: Json | null
           situacao?: string
           tipo_operacao?: string
           tipo_recorrencia?: string | null
