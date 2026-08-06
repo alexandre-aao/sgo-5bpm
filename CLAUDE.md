@@ -203,9 +203,11 @@ Repositório Git local, remoto `alexandre-aao/sgo-5bpm` no GitHub, conectado à 
 
 ## Pendências em aberto 
 
-**⚠️ Recorrência de Operações + escala em lote: commitado localmente, NÃO publicado (2026-08-06).** Os commits `8e0967f`, `ddc4711`, `85a4215` e `33706c2` estão em `main` **sem push** — a produção na Vercel ainda roda o código anterior. Duas consequências:
-- **A migration `004` JÁ FOI APLICADA no Supabase de produção** (foi preciso para testar). Banco e código estão temporariamente dessincronizados. É aditiva e nullable, então o código publicado hoje não quebra: as colunas existem e nada as usa.
-- **A homologação visual não foi feita.** A verificação usou árvore de acessibilidade, geometria, *computed styles* e conferência no banco — o painel do navegador não pôde ser exibido na sessão, então **nada foi conferido por imagem**. Abrir a aba Operações e olhar o bloco de recorrência e o formulário de escala antes de publicar.
+**Recorrência de Operações + escala em lote: PUBLICADO (2026-08-06).** Os commits `8e0967f`, `ddc4711`, `85a4215` e `33706c2` estão em `origin/main`, o deploy de produção `c05ccd1` está `READY` na Vercel e a migration `004` está aplicada no Supabase — **banco e código sincronizados**. A nota anterior deste bloco dizia "sem push / dessincronizados" e estava errada: o push tinha sido feito, apenas não registrado aqui. Ao retomar, conferir com `git log origin/main..main` antes de confiar no que este arquivo afirma sobre publicação.
+
+A **homologação visual foi feita e aprovada pelo usuário em 2026-08-06** (bloco de recorrência do modal Nova Operação e formulário de escala em lote), encerrando a pendência que este bloco registrava. Ela precisou ser manual: em duas sessões seguidas o painel do navegador não pôde ser exibido, então a verificação automatizada cobriu só árvore de acessibilidade, geometria, *computed styles* e conferência no banco — **nada foi conferido por imagem pelo assistente**.
+
+Fica o registro de que, até 2026-08-06, **a recorrência nunca foi exercitada com dado real em produção**: as 45 operações do banco têm `grupo_recorrencia_id` nulo e não existe nenhum grupo. O primeiro uso real do lote ainda vai acontecer.
 
 **Escalar em operação Executada não tem mais caminho na UI (2026-08):** toda inclusão de efetivo passa pelo lote, que protege ocorrências Executadas. A rota `POST /api/escalas` unitária continua no servidor e aceita — falta só um botão. Se a P3 faz isso na prática, é correção pequena.
 
