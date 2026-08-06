@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useParametroInicial } from '../../../hooks/useParametroInicial';
 import { Contact, UserPlus } from 'lucide-react';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
@@ -21,6 +22,9 @@ export default function PessoalPage() {
   const [categoria, setCategoria] = useState('');
   const [busca, setBusca] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
+
+  // Destino da paleta de comandos: /pessoal?busca=<nome> já chega filtrado.
+  useParametroInicial('busca', setBusca);
   const [pessoaEditando, setPessoaEditando] = useState<Tables<'pessoal'> | null>(null);
 
   const porCategoria =

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Megaphone, Plus, Pencil, Trash2, RefreshCw, CalendarClock, Ban } from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
+import { useAtalhoNovo } from '../../../hooks/useAtalhosGlobais';
 import { useToast } from '../../../context/useToast';
 import { useBairros } from '../../../hooks/useBairros';
 import { useAvisos, type AvisoPayload } from '../../../hooks/useAvisos';
@@ -39,6 +40,12 @@ export default function AvisosPage() {
   const [soVigentes, setSoVigentes] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [avisoEmEdicao, setAvisoEmEdicao] = useState<Tables<'avisos'> | null>(null);
+
+  // Tecla N: novo alerta. Só P3 cria — mesma condição do botão da tela.
+  useAtalhoNovo(
+    useCallback(() => { setAvisoEmEdicao(null); setModalAberto(true); }, []),
+    ehP3 && !modalAberto,
+  );
 
   const filtrados = useMemo(() => {
     const lista = avisos.filter((a) => {

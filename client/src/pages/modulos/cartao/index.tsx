@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAtalhoSetasDia } from '../../../hooks/useAtalhosGlobais';
 import { Link, useNavigate } from 'react-router-dom';
 import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, Maximize2, BookmarkPlus, TriangleAlert } from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
@@ -87,6 +88,14 @@ export default function CartaoProgramaPage() {
   const [modalSalvarPadraoAberto, setModalSalvarPadraoAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Setas ← → trocam o dia. Só esta tela registra — é a única com navegação por
+  // data. Suspenso com modal aberto: ali o teclado é do modal.
+  useAtalhoSetasDia(
+    useCallback(() => deslocarDia(-1), [deslocarDia]),
+    useCallback(() => deslocarDia(1), [deslocarDia]),
+    modalNovoTemplateAberto || modalSalvarPadraoAberto || modalExcluirAberto || !!vtrEmEdicao,
+  );
 
   useEffect(() => {
     if (!menuAberto) return;

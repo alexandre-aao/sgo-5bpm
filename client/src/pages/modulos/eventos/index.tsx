@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CalendarSearch } from 'lucide-react';
 import { useAppData } from '../../../context/useAppData';
+import { useParametroInicial } from '../../../hooks/useParametroInicial';
 import { useAuth } from '../../../context/useAuth';
 import { useToast } from '../../../context/useToast';
 import { ModalRelatorioPdf } from '../../../components/relatorioPdf/ModalRelatorioPdf';
@@ -27,6 +28,10 @@ export default function EventosPage() {
   const [pagina, setPagina] = useState(1);
   const [eventoAbertoId, setEventoAbertoId] = useState<string | null>(null);
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
+
+  // Destino da paleta de comandos: /eventos?evento=<id> abre a gaveta daquele
+  // evento. O parâmetro é consumido uma vez e some da URL.
+  useParametroInicial('evento', setEventoAbertoId);
 
   const eventosFiltrados = getEventosFiltrados(dados.eventos, filtros);
 

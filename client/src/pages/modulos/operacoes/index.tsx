@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
+import { useAtalhoNovo } from '../../../hooks/useAtalhosGlobais';
 import { useAppData } from '../../../context/useAppData';
+import { useParametroInicial } from '../../../hooks/useParametroInicial';
 import { apiFetch } from '../../../lib/api';
 import { FiltrosOperacoesBar } from './FiltrosOperacoesBar';
 import { TabelaOperacoes } from './TabelaOperacoes';
@@ -19,6 +21,16 @@ export default function OperacoesPage() {
   const [filtros, setFiltros] = useState<FiltrosOperacoes>(filtrosVazios);
   const [operacaoAbertaId, setOperacaoAbertaId] = useState<string | null>(null);
   const [modalNovaAberto, setModalNovaAberto] = useState(false);
+
+  // Destino da paleta de comandos: /operacoes?operacao=<id> abre a gaveta.
+  useParametroInicial('operacao', setOperacaoAbertaId);
+
+  // Tecla N: abre a Nova Operação. Ignorada com o modal já aberto ou com a
+  // gaveta de detalhes em foco — ali o N pertence ao que está na frente.
+  useAtalhoNovo(
+    useCallback(() => setModalNovaAberto(true), []),
+    !modalNovaAberto && !operacaoAbertaId,
+  );
 
   const operacoesFiltradas = getOperacoesFiltradas(dados.operacoes, dados.escalas, filtros);
 

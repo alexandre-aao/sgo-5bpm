@@ -5,12 +5,17 @@ import { Topbar } from './Topbar';
 import { BottomTabs } from './BottomTabs';
 import { AppRoutes } from '../routes/AppRoutes';
 import { useSidebarRecolhida } from '../hooks/useSidebarRecolhida';
+import { useAtalhosGlobais } from '../hooks/useAtalhosGlobais';
 import { useAppData } from '../context/useAppData';
 import { Carregando } from '../components/estado/Carregando';
 import { ErroAoCarregar } from '../components/estado/ErroAoCarregar';
+import { PaletaComandos } from '../components/paleta/PaletaComandos';
+import { ModalAtalhos } from '../components/paleta/ModalAtalhos';
 
 export function AppLayout() {
   const [drawerAberto, setDrawerAberto] = useState(false);
+  const [paletaAberta, setPaletaAberta] = useState(false);
+  const [ajudaAberta, setAjudaAberta] = useState(false);
   const { recolhida, alternar } = useSidebarRecolhida();
   const { carregandoNucleo, erro, recarregar } = useAppData();
   const { pathname } = useLocation();
@@ -33,6 +38,14 @@ export function AppLayout() {
   // o estado vazio — que diria "Nenhum usuário cadastrado" quando o que houve
   // foi erro de rede. Trocar a `key` do AppRoutes é o jeito de forçar isso.
   const [tentativa, setTentativa] = useState(0);
+
+  // Com paleta ou ajuda abertas os atalhos simples ficam suspensos: quem manda
+  // no teclado é o modal (setas navegam a lista, Esc fecha).
+  useAtalhosGlobais({
+    onAbrirPaleta: () => { setAjudaAberta(false); setPaletaAberta(true); },
+    onAbrirAjuda: () => setAjudaAberta(true),
+    suspenso: paletaAberta || ajudaAberta,
+  });
 
   function handleTentarDeNovo() {
     setTentativa((n) => n + 1);
@@ -68,6 +81,9 @@ export function AppLayout() {
       </main>
 
       <BottomTabs onAbrirDrawer={() => setDrawerAberto(true)} />
+
+      {paletaAberta && <PaletaComandos onFechar={() => setPaletaAberta(false)} />}
+      {ajudaAberta && <ModalAtalhos onFechar={() => setAjudaAberta(false)} />}
     </div>
   );
 }
