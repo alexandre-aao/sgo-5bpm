@@ -5037,6 +5037,84 @@ body.sgo-sincronizando .topbar::before {
 .doc-cartao-roteiro th:first-child, .doc-cartao-roteiro td:first-child { width: 28mm; white-space: nowrap; }
 .doc-cartao-roteiro th:last-child, .doc-cartao-roteiro td:last-child { width: 37mm; }
 /* ============================================================
+   Formulário longo como painel lateral no desktop — Fase 2B, 2026-08
+   ModalOperacao (com o bloco de recorrência) e ModalAviso são altos demais para
+   uma caixa centrada: a lista sob eles some e o rodapé de botões cai fora da
+   dobra. Como painel à direita, a lista continua visível ao fundo — mesma leitura
+   dos drawers de detalhe que já existem.
+   Só a partir de 1024px: abaixo disso a tela é estreita e o bottom sheet do
+   celular (bloco mobile no fim do arquivo) continua sendo o formato certo.
+   ============================================================ */
+@media (min-width: 1024px) {
+  .modal-overlay.overlay-painel {
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0;
+  }
+
+  .modal-box.modal-box-painel {
+    width: 560px;
+    max-width: 92vw;
+    /* Anula o max-height/width das variantes: o painel ocupa a altura toda. */
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    border-right: 0;
+    border-top: 0;
+    border-bottom: 0;
+    overflow-y: auto;
+    animation: painel-entra .18s ease-out;
+  }
+
+  /* O cabeçalho segue visível na rolagem — é onde está o fechar. */
+  .modal-box.modal-box-painel .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-panel);
+  }
+
+  @keyframes painel-entra {
+    from { transform: translateX(24px); opacity: .6; }
+    to { transform: none; opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .modal-box.modal-box-painel { animation: none; }
+  }
+}
+
+/* Indicador de frescor dos dados (topbar) — Fase 2B, 2026-08 */
+.indicador-frescor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.indicador-frescor:hover:not(:disabled) { border-color: var(--border-controle); color: var(--text-main); }
+.indicador-frescor svg { width: var(--icone-sm); height: var(--icone-sm); }
+.indicador-frescor .girando { animation: girar 1s linear infinite; }
+
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .indicador-frescor .girando { animation: none; }
+}
+
+/* No celular a topbar é a faixa azul com o título — não cabe o horário junto,
+   mesma razão de .topbar-data e .profile-texto sumirem ali. */
+@media (max-width: 768px) {
+  .indicador-frescor span { display: none; }
+}
+
+/* ============================================================
    Esqueletos de carregamento — Fase 2B, 2026-08
    Placeholder com as dimensões do conteúdo real, para os dados chegarem sem
    empurrar o layout. Ver components/estado/Esqueleto.tsx.

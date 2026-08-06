@@ -160,8 +160,8 @@ export function ModalOperacao({ operacao, onFechar, onSalvar }: ModalOperacaoPro
   }
 
   return (
-    <div className="modal-overlay" {...propsOverlay}>
-      <div className="modal-box modal-box-lg" ref={refCaixa}>
+    <div className="modal-overlay overlay-painel" {...propsOverlay}>
+      <div className="modal-box modal-box-lg modal-box-painel" ref={refCaixa}>
         <div className="modal-header">
           <h3 id={idTitulo}>{modoEdicao ? <Pencil /> : <ShieldAlert />} {modoEdicao ? 'Editar Operação' : 'Nova Operação'}</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>

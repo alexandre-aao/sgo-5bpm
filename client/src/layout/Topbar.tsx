@@ -2,6 +2,7 @@ import { Menu, Sun, Moon, MonitorSmartphone, CalendarDays } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import { SECTION_TITLES } from './navConfig';
+import { IndicadorFrescor } from './IndicadorFrescor';
 import { useActiveSection } from '../routes/useActiveSection';
 
 const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -40,6 +41,8 @@ export function Topbar({ onAbrirDrawer }: TopbarProps) {
         </div>
       </div>
       <div className="header-actions">
+        <IndicadorFrescor />
+
         <div className="tema-toggle" role="radiogroup" aria-label="Tema de cor">
           <button
             type="button"

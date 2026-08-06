@@ -195,7 +195,10 @@ create table if not exists cartoes (
   fiscal_exibicao text,
   adjunto_exibicao text,
   delta07_viatura text,
-  padrao_ativo boolean not null default false
+  padrao_ativo boolean not null default false,
+  -- Carimbo mantido por trigger (migration 007), para detectar edição concorrente
+  -- entre P3 e Adjunto. Nenhum código lê ainda.
+  atualizado_em timestamptz
 );
 
 -- Numeração 000123/2026: única por ano. Templates (sem data) e cartões

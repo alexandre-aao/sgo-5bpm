@@ -31,6 +31,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [dados, setDados] = useState<AppData>(DADOS_VAZIOS);
   const [carregandoNucleo, setCarregandoNucleo] = useState(true);
   const [carregandoSecundario, setCarregandoSecundario] = useState(true);
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const recarregar = useCallback(async () => {
@@ -38,6 +40,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     // Adjunto/Oficial usa esses dados, então nem pede (evita 403 a cada refresh).
     const ehP3 = usuario?.role === 'P3';
 
+    setAtualizando(true);
     try {
       // 1ª onda (núcleo): mesmo recorte de fetchData() no app antigo — eventos,
       // operações, alocações, escalas, config. pessoal/viaturas ficam pra 2ª onda,
@@ -62,6 +65,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             : atual.config,
       }));
       setCarregandoNucleo(false);
+      // Marca o frescor já na 1ª onda: é o núcleo que alimenta os números das
+      // telas de entrada, e esperar a 2ª onda diria "desatualizado" sem ser.
+      setAtualizadoEm(new Date());
 
       // 2ª onda: pessoal (244 linhas, o payload mais pesado) + viaturas.
       const [pessoalResp, viaturasResp] = await Promise.all([
@@ -87,6 +93,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // ligada prenderia a tabela de Pessoal num esqueleto eterno, escondendo o
       // erro que a faixa acima já está mostrando.
       setCarregandoSecundario(false);
+    } finally {
+      setAtualizando(false);
     }
   }, [usuario]);
 
@@ -104,7 +112,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useAutoRefresh(recarregar, !!usuario);
 
   return (
-    <AppDataContext.Provider value={{ dados, carregandoNucleo, carregandoSecundario, erro, recarregar }}>
+    <AppDataContext.Provider value={{ dados, carregandoNucleo, carregandoSecundario, atualizadoEm, atualizando, erro, recarregar }}>
       {children}
     </AppDataContext.Provider>
   );

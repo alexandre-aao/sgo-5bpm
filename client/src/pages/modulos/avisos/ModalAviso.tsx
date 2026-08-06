@@ -49,8 +49,8 @@ export function ModalAviso({ aviso, bairros, onFechar, onSalvar }: ModalAvisoPro
   }
 
   return (
-    <div className="modal-overlay" {...propsOverlay}>
-      <div className="modal-box" ref={refCaixa}>
+    <div className="modal-overlay overlay-painel" {...propsOverlay}>
+      <div className="modal-box modal-box-painel" ref={refCaixa}>
         <div className="modal-header">
           <h3 id={idTitulo}><Megaphone /> {aviso ? 'Editar Alerta' : 'Novo Alerta'}</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>

@@ -23,6 +23,12 @@ export interface AppDataContextValue {
   /** Falha na última busca. O estado anterior é preservado (ver usarLista), então
    *  isto sinaliza "dados possivelmente desatualizados", não "sem dados". */
   erro: string | null;
+  /** Instante da última carga bem-sucedida do núcleo. O polling de 60s é
+   *  invisível hoje: sem isto, não há como saber se o número na tela é de agora
+   *  ou de meia hora atrás. `null` antes da primeira carga. */
+  atualizadoEm: Date | null;
+  /** true enquanto um refresh está em voo — para o botão manual dar retorno. */
+  atualizando: boolean;
   /** dispara as duas ondas de novo — mesmo papel do fetchData() do app antigo */
   recarregar: () => Promise<void>;
 }
