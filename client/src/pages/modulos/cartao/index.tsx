@@ -265,7 +265,11 @@ export default function CartaoProgramaPage() {
           <p>O cartão do dia nasce a partir do cartão padrão ativo — as viaturas e o roteiro base já vêm preenchidos.</p>
           {/* key força um novo fetch ao fechar "Cartões Padrão" — o P3 pode ter trocado o
               padrão ativo ali, e este bloco só busca no mount. */}
-          <CriarDoPadrao key={String(mostrarTemplatesPanel)} onCriar={() => void handleCriarCartao()} />
+          <CriarDoPadrao
+            key={String(mostrarTemplatesPanel)}
+            data={dataSelecionada}
+            onCriar={() => void handleCriarCartao()}
+          />
         </div>
       )}
 

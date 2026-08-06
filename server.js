@@ -323,15 +323,44 @@ async function buscarCartaoPorId(id) {
 
 // O padrão ativo é a fonte de todo cartão do dia novo (POST /api/cartoes) — busca pontual
 // em vez de filtrar em JS depois de trazer todos os templates.
-async function buscarPadraoAtivo() {
+/** Sábado e domingo. Sexta-feira NÃO entra — decisão de produto registrada:
+ *  o pedido especificava sáb/dom, e incluir sexta é mudar aqui uma linha. */
+function ehFimDeSemana(dataIso) {
+  if (!dataIso) return false;
+  // UTC pela mesma razão do motor de recorrência: a Vercel roda em UTC e a
+  // máquina do batalhão em America/Fortaleza; `new Date('2026-08-08').getDay()`
+  // daria o dia anterior em todo fuso a oeste de Greenwich.
+  const dia = new Date(`${dataIso}T00:00:00Z`).getUTCDay();
+  return dia === 0 || dia === 6;
+}
+
+function tipoPeriodoDaData(dataIso) {
+  return ehFimDeSemana(dataIso) ? 'fim_de_semana' : 'semana';
+}
+
+/** Padrões ativos. Depois da migration 006 pode haver um por tipo de período;
+ *  antes dela o índice global garante no máximo um. A função lida com os dois
+ *  casos — por isso devolve LISTA, e não `maybeSingle()`, que passaria a estourar
+ *  assim que existisse o segundo padrão ativo. */
+async function buscarPadroesAtivos() {
   const { data, error } = await supabase
     .from('cartoes')
     .select('*')
     .eq('is_template', true)
-    .eq('padrao_ativo', true)
-    .maybeSingle();
+    .eq('padrao_ativo', true);
   if (error) throw new Error(`Falha ao buscar cartão padrão: ${error.message}`);
-  return data;
+  return data || [];
+}
+
+/** O padrão que deve originar o cartão de uma data. Com `data` ausente ou sem
+ *  padrão do tipo certo, cai no que houver — criar o cartão com o padrão do
+ *  outro período é melhor que travar o Adjunto às 07h de um domingo. */
+async function buscarPadraoAtivo(dataCartao = null) {
+  const padroes = await buscarPadroesAtivos();
+  if (padroes.length === 0) return null;
+  if (!dataCartao) return padroes[0];
+  const tipo = tipoPeriodoDaData(dataCartao);
+  return padroes.find(p => p.tipo_periodo === tipo) || padroes[0];
 }
 
 async function buscarCartoesFiltrados({ data: dataFiltro, ano, mes }) {
@@ -2858,10 +2887,12 @@ app.post('/api/cartoes/:id/salvar-como-padrao', exigirP3, asyncRoute(async (req,
   res.status(201).json(novoPadrao);
 }));
 
-// Padrão único ativo (fonte de todo cartão do dia novo) — precisa vir antes de
-// /api/cartoes/:id pelo mesmo motivo de /api/cartoes/templates acima.
+// Padrão ativo que originaria o cartão de uma data (fonte de todo cartão do dia
+// novo) — precisa vir antes de /api/cartoes/:id pelo mesmo motivo de /templates.
+// `?data=` faz a rota devolver o MESMO padrão que o POST usaria naquele dia, para
+// a tela poder dizer de qual padrão o cartão vai nascer antes do clique.
 app.get('/api/cartoes/padrao-ativo', asyncRoute(async (req, res) => {
-  const padrao = await buscarPadraoAtivo();
+  const padrao = await buscarPadraoAtivo(req.query.data || null);
   if (!padrao) return res.json({ padrao: null });
 
   res.json({
@@ -2933,7 +2964,9 @@ app.post('/api/cartoes', asyncRoute(async (req, res) => {
     return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
   }
 
-  const padrao = await buscarPadraoAtivo();
+  // Escolhe pelo dia da semana da data (sáb/dom = fim de semana), com fallback
+  // para o padrão do outro período quando não houver do tipo certo.
+  const padrao = await buscarPadraoAtivo(dataCartao);
   if (!padrao) {
     return res.status(409).json({
       error: 'Nenhum cartão padrão ativo. Peça ao P3 para definir o padrão antes de criar o cartão do dia.'
