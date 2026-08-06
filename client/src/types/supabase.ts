@@ -191,6 +191,7 @@ export type Database = {
           numero: number | null
           oficial_sobreaviso: string | null
           origem_template_id: string | null
+          padrao_ativo: boolean | null
           qtd_viaturas_base: number | null
           tipo_periodo: string | null
           viaturas: Json
@@ -211,6 +212,7 @@ export type Database = {
           numero?: number | null
           oficial_sobreaviso?: string | null
           origem_template_id?: string | null
+          padrao_ativo?: boolean | null
           qtd_viaturas_base?: number | null
           tipo_periodo?: string | null
           viaturas?: Json
@@ -231,6 +233,7 @@ export type Database = {
           numero?: number | null
           oficial_sobreaviso?: string | null
           origem_template_id?: string | null
+          padrao_ativo?: boolean | null
           qtd_viaturas_base?: number | null
           tipo_periodo?: string | null
           viaturas?: Json

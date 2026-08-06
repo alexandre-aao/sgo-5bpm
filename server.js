@@ -2735,6 +2735,129 @@ app.get('/api/cartoes/templates', asyncRoute(async (req, res) => {
   })));
 }));
 
+// Clona um template inteiro (viaturas + itens) como NOVO template. Não mexe no
+// padrão ativo: a cópia nasce inativa e o padrão em vigor continua o mesmo.
+// Registrada antes de /api/cartoes/:id pela mesma razão de /templates acima —
+// aqui o caminho tem 3 segmentos e não colidiria, mas manter as rotas literais
+// juntas e à frente é o que evita a armadilha quando alguém cria a próxima.
+app.post('/api/cartoes/templates/:id/duplicar', exigirP3, asyncRoute(async (req, res) => {
+  const origem = await buscarCartaoPorId(req.params.id);
+  if (!origem || !origem.is_template) {
+    return res.status(404).json({ error: 'Cartão padrão não encontrado.' });
+  }
+
+  const nomeInformado = String(req.body.nome_template || '').trim();
+  const nome = (nomeInformado || `Cópia de ${origem.nome_template || 'cartão padrão'}`).slice(0, 120);
+
+  const copia = {
+    id: generateId('cp'),
+    data: null,
+    fiscal: '',
+    adjunto: '',
+    oficial_sobreaviso: '',
+    is_template: true,
+    nome_template: nome,
+    tipo_periodo: origem.tipo_periodo,
+    qtd_viaturas_base: origem.qtd_viaturas_base,
+    // Não é um cartão do dia clonado de um padrão: é outro padrão. `origem_template_id`
+    // rastreia "de qual padrão veio o cartão do DIA" e ficaria mentindo aqui.
+    origem_template_id: null,
+    padrao_ativo: false,
+    // A estrutura (prefixo/setor/companhia/categoria/observação/bairro) é o que se
+    // reaproveita; comandante e controle de envio não pertencem a um padrão.
+    viaturas: (origem.viaturas || []).map(v => ({
+      id: generateId('cpv'),
+      prefixo: v.prefixo,
+      setor: v.setor,
+      companhia: v.companhia || '',
+      categoria: v.categoria || 'Ordinária',
+      comandante: '',
+      observacao: v.observacao || '',
+      ...camposEnvioIniciais(),
+      bairro_id: v.bairro_id || '',
+      itens: ordenarPorTurno((v.itens || []).map(i => ({
+        id: generateId('cpi'),
+        inicio: i.inicio,
+        fim: i.fim,
+        local: i.local,
+        atividade: i.atividade
+      })))
+    }))
+  };
+
+  await writeRow('cartoes', copia);
+  res.status(201).json(copia);
+}));
+
+// Transforma o cartão de UM DIA em um novo cartão padrão. O inverso de
+// POST /api/cartoes, que clona o padrão para criar o dia.
+app.post('/api/cartoes/:id/salvar-como-padrao', exigirP3, asyncRoute(async (req, res) => {
+  const origem = await buscarCartaoPorId(req.params.id);
+  if (!origem) return res.status(404).json({ error: 'Cartão Programa não encontrado.' });
+  if (origem.is_template) {
+    return res.status(400).json({ error: 'Este cartão já é um padrão. Use "Duplicar" para criar outro a partir dele.' });
+  }
+
+  const nome = String(req.body.nome_template || '').trim();
+  if (!nome) return res.status(400).json({ error: 'Informe o nome do novo cartão padrão.' });
+
+  // tipo_periodo é obrigatório no template (o padrão é escolhido por período) e o
+  // cartão do dia pode estar sem ele — nesse caso o P3 informa junto.
+  const tipoPeriodo = ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo)
+    ? req.body.tipo_periodo
+    : origem.tipo_periodo;
+  if (!['semana', 'fim_de_semana'].includes(tipoPeriodo)) {
+    return res.status(400).json({ error: "Informe o tipo de período ('semana' ou 'fim_de_semana')." });
+  }
+
+  const qtdViaturas = (origem.viaturas || []).length;
+  const novoPadrao = {
+    id: generateId('cp'),
+    // Tudo que é do DIA é descartado: data, numeração oficial, comandantes
+    // escalados e o controle de envio daquele serviço.
+    data: null,
+    ano: null,
+    numero: null,
+    fiscal: '',
+    adjunto: '',
+    oficial_sobreaviso: '',
+    fiscal_pessoal_id: '',
+    adjunto_pessoal_id: '',
+    fiscal_exibicao: '',
+    adjunto_exibicao: '',
+    delta07_viatura: '',
+    is_template: true,
+    nome_template: nome.slice(0, 120),
+    tipo_periodo: tipoPeriodo,
+    qtd_viaturas_base: [5, 6, 7].includes(qtdViaturas) ? qtdViaturas : (origem.qtd_viaturas_base || 5),
+    origem_template_id: null,
+    // Nasce inativo de propósito: virar padrão em vigor é um segundo ato,
+    // explícito, em "Definir como padrão".
+    padrao_ativo: false,
+    viaturas: (origem.viaturas || []).map(v => ({
+      id: generateId('cpv'),
+      prefixo: v.prefixo,
+      setor: v.setor,
+      companhia: v.companhia || '',
+      categoria: v.categoria || 'Ordinária',
+      comandante: '',
+      observacao: v.observacao || '',
+      ...camposEnvioIniciais(),
+      bairro_id: v.bairro_id || '',
+      itens: ordenarPorTurno((v.itens || []).map(i => ({
+        id: generateId('cpi'),
+        inicio: i.inicio,
+        fim: i.fim,
+        local: i.local,
+        atividade: i.atividade
+      })))
+    }))
+  };
+
+  await writeRow('cartoes', novoPadrao);
+  res.status(201).json(novoPadrao);
+}));
+
 // Padrão único ativo (fonte de todo cartão do dia novo) — precisa vir antes de
 // /api/cartoes/:id pelo mesmo motivo de /api/cartoes/templates acima.
 app.get('/api/cartoes/padrao-ativo', asyncRoute(async (req, res) => {
@@ -2932,8 +3055,16 @@ app.put('/api/cartoes/:id', exigirEdicaoCartao, asyncRoute(async (req, res) => {
 // estrutura reaproveitada por todos os cartões futuros.
 // Oficial não exclui nada (só tem leitura no Cartão Programa).
 app.delete('/api/cartoes/:id', asyncRoute(async (req, res) => {
-  const { data: cartaoAlvo } = await supabase.from('cartoes').select('data, is_template, nome_template').eq('id', req.params.id).maybeSingle();
+  const { data: cartaoAlvo } = await supabase.from('cartoes').select('data, is_template, nome_template, padrao_ativo').eq('id', req.params.id).maybeSingle();
   if (!cartaoAlvo) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+
+  // Excluir o padrão ATIVO deixaria o sistema sem nenhum, e o Adjunto tomaria 409
+  // ao criar o cartão do dia seguinte. Vale inclusive para o P3: ative outro antes.
+  if (cartaoAlvo.padrao_ativo) {
+    return res.status(409).json({
+      error: 'Este é o cartão padrão ativo e não pode ser excluído. Defina outro padrão como ativo antes de excluí-lo.'
+    });
+  }
 
   const ehP3 = req.user && req.user.role === 'P3';
   if (!ehP3) {

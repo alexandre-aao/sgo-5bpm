@@ -5011,6 +5011,57 @@ body.sgo-sincronizando .topbar::before {
 .doc-cartao-roteiro td { padding: 1mm 1.5mm; border-bottom: .35pt solid #ccd2d8; vertical-align: top; }
 .doc-cartao-roteiro th:first-child, .doc-cartao-roteiro td:first-child { width: 28mm; white-space: nowrap; }
 .doc-cartao-roteiro th:last-child, .doc-cartao-roteiro td:last-child { width: 37mm; }
+/* Gestão de Cartões Padrão (2026-08): aviso ao editar o padrão em vigor, prévia
+   expansível na lista e o botão que abre a linha. */
+.cartao-padrao-ativo-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--warning-fg);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  color: var(--text-main);
+  font-size: var(--text-sm);
+}
+.cartao-padrao-ativo-banner svg {
+  flex-shrink: 0;
+  width: var(--icone-lg);
+  height: var(--icone-lg);
+  color: var(--warning-fg);
+}
+
+.btn-expandir-linha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.btn-expandir-linha svg { width: var(--icone-md); height: var(--icone-md); color: var(--text-muted); }
+.btn-expandir-linha:hover strong { color: var(--primary); }
+
+.styled-table tr.linha-previa td { background: var(--surface-2); }
+.template-previa { display: flex; flex-direction: column; gap: var(--space-2); }
+.template-previa-vtr {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--primary);
+  background: var(--bg-panel);
+  border-radius: var(--radius-xs);
+}
+.template-previa-vtr-cabecalho { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.template-previa-vtr-cabecalho span:not(.badge) { color: var(--text-muted); font-size: var(--text-sm); }
+
 /* Quadro Resumo (folha única de conferência). Mesmo desenho do roteiro, mas com
    as seis colunas distribuídas: aqui nenhuma domina, então não se fixa largura
    por posição como no roteiro — só o setor pode quebrar em duas linhas. */

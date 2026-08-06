@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, Maximize2 } from 'lucide-react';
+import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, Maximize2, BookmarkPlus, TriangleAlert } from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
@@ -22,6 +22,7 @@ import { ConflitoBanner } from './ConflitoBanner';
 import { TrilhoCartao } from './TrilhoCartao';
 import { TemplatesPanel } from './TemplatesPanel';
 import { ModalNovoTemplate } from './ModalNovoTemplate';
+import { ModalSalvarComoPadrao } from './ModalSalvarComoPadrao';
 import { CriarDoPadrao } from './CriarDoPadrao';
 import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarExclusaoForte';
 import { podeExcluirCartao, proximoDiaISO, dataBr } from '../../../lib/janelaCartao';
@@ -83,6 +84,7 @@ export default function CartaoProgramaPage() {
   const [menuAberto, setMenuAberto] = useState(false);
   const [mostrarTemplatesPanel, setMostrarTemplatesPanel] = useState(false);
   const [modalNovoTemplateAberto, setModalNovoTemplateAberto] = useState(false);
+  const [modalSalvarPadraoAberto, setModalSalvarPadraoAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -229,6 +231,15 @@ export default function CartaoProgramaPage() {
                   >
                     <FilePlus2 /> Novo Cartão Padrão
                   </button>
+                  {/* Só faz sentido com o cartão de um DIA aberto: é ele que vira padrão. */}
+                  {cartaoEditando && !cartaoEditando.is_template && (
+                    <button
+                      type="button" className="dropdown-item"
+                      onClick={() => { setModalSalvarPadraoAberto(true); setMenuAberto(false); }}
+                    >
+                      <BookmarkPlus /> Salvar como Cartão Padrão
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -260,6 +271,17 @@ export default function CartaoProgramaPage() {
 
       {cartaoEditando && (
         <>
+          {/* Editar o padrão em vigor não afeta cartões já criados, mas muda todos os
+              próximos — o P3 precisa saber disso antes de mexer, não depois. */}
+          {cartaoEditando.is_template && cartaoEditando.padrao_ativo && (
+            <div className="cartao-padrao-ativo-banner" role="status">
+              <TriangleAlert aria-hidden="true" />
+              <span>
+                Você está editando o <strong>cartão padrão ativo</strong>. As mudanças valem para
+                todos os próximos cartões do dia criados a partir dele. Os cartões já criados não mudam.
+              </span>
+            </div>
+          )}
           <ConflitoBanner alertas={calcularAlertasCartao(cartaoEditando, dados.pessoal)} />
           <div className="dash-layout">
           <div className="dash-main">
@@ -350,6 +372,14 @@ export default function CartaoProgramaPage() {
         <ModalNovoTemplate
           onFechar={() => setModalNovoTemplateAberto(false)}
           onCriado={(t) => { setModalNovoTemplateAberto(false); setTemplateAberto(t); }}
+        />
+      )}
+
+      {modalSalvarPadraoAberto && cartaoEditando && !cartaoEditando.is_template && (
+        <ModalSalvarComoPadrao
+          cartao={cartaoEditando}
+          onFechar={() => setModalSalvarPadraoAberto(false)}
+          onCriado={(t) => { setModalSalvarPadraoAberto(false); setTemplateAberto(t); }}
         />
       )}
 

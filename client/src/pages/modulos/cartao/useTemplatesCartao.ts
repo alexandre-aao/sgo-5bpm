@@ -77,6 +77,47 @@ export function useTemplatesCartao() {
     }
   }, [recarregar]);
 
+  /** Clona o padrão inteiro (viaturas + roteiro) como um NOVO padrão inativo.
+   *  O padrão em vigor não é tocado. */
+  const duplicarTemplate = useCallback(async (id: string, nome?: string): Promise<ResultadoAcao & { template?: CartaoDetalhado }> => {
+    try {
+      const res = await apiFetch(`/api/cartoes/templates/${id}/duplicar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nome ? { nome_template: nome } : {}),
+      });
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao duplicar o cartão padrão.') };
+      const criado = (await res.json()) as CartaoDetalhado;
+      await recarregar();
+      return { ok: true, template: criado };
+    } catch (erro) {
+      console.error('Erro ao duplicar cartão padrão:', erro);
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [recarregar]);
+
+  /** Transforma o cartão de um DIA em novo padrão (inverso de POST /api/cartoes). */
+  const salvarComoPadrao = useCallback(async (
+    cartaoId: string,
+    nome: string,
+    tipoPeriodo?: string,
+  ): Promise<ResultadoAcao & { template?: CartaoDetalhado }> => {
+    try {
+      const res = await apiFetch(`/api/cartoes/${cartaoId}/salvar-como-padrao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome_template: nome, ...(tipoPeriodo ? { tipo_periodo: tipoPeriodo } : {}) }),
+      });
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao salvar como cartão padrão.') };
+      const criado = (await res.json()) as CartaoDetalhado;
+      await recarregar();
+      return { ok: true, template: criado };
+    } catch (erro) {
+      console.error('Erro ao salvar cartão como padrão:', erro);
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [recarregar]);
+
   // Único padrão ativo no sistema: a troca é atômica no servidor (ativar_cartao_padrao).
   const definirPadraoAtivo = useCallback(async (id: string): Promise<ResultadoAcao> => {
     try {
@@ -90,5 +131,8 @@ export function useTemplatesCartao() {
     }
   }, [recarregar]);
 
-  return { templates, carregando, recarregar, criarTemplate, excluirTemplate, definirPadraoAtivo };
+  return {
+    templates, carregando, recarregar, criarTemplate, excluirTemplate,
+    definirPadraoAtivo, duplicarTemplate, salvarComoPadrao,
+  };
 }
