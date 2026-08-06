@@ -5084,6 +5084,45 @@ body.sgo-sincronizando .topbar::before {
   }
 }
 
+/* ============================================================
+   Mapa: contagem de eventos, halo de alerta e legenda — Fase 2C, 2026-08
+   ============================================================ */
+/* Bolha com a contagem quando o bairro tem mais de um evento. Com um só, o
+   marcador continua sendo o pino padrão do Leaflet (ver criarIconeEventos). */
+.mapa-icone-eventos { background: none; border: 0; }
+.mapa-badge-eventos {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  /* Literal, não var(): o Leaflet injeta este HTML fora da cascata do
+     componente e as custom properties do :root não chegam até aqui. */
+  background: #2563eb;
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+}
+
+.mapa-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+}
+.mapa-legenda-grupo { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.mapa-legenda-titulo { color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.mapa-legenda-item { display: inline-flex; align-items: center; gap: 6px; color: var(--text-main); }
+.mapa-legenda-quadrado { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #fff; }
+.mapa-legenda-circulo { width: 12px; height: 12px; border-radius: 50%; border: 2px solid; }
+
 /* Indicador de frescor dos dados (topbar) — Fase 2B, 2026-08 */
 .indicador-frescor {
   display: inline-flex;

@@ -3,6 +3,8 @@ import { Map as MapIcon, AlertTriangle, MapPinPlus } from 'lucide-react';
 import { useAppData } from '../../../context/useAppData';
 import { useAuth } from '../../../context/useAuth';
 import { useBairros } from '../../../hooks/useBairros';
+import { useAvisos } from '../../../hooks/useAvisos';
+import { avisoVigente } from '../../../lib/avisos';
 import { useCartaoDeHoje } from '../../../hooks/useCartaoDeHoje';
 import { normalizarTexto } from '../../../lib/cartaoConflitos';
 import { temCoordenada } from '../../../lib/bairros';
@@ -11,21 +13,10 @@ import { MapaLeaflet, type MapaLeafletHandle } from './MapaLeaflet';
 import { OcorrenciasPanel } from './OcorrenciasPanel';
 import { GerenciarBairrosPanel } from './GerenciarBairrosPanel';
 import { useMapaPrefs } from './useMapaPrefs';
+import { LegendaMapa } from './LegendaMapa';
+import { eventosDoPeriodo, OPCOES_PERIODO } from './periodoMapa';
 import type { Tables } from '../../../types/supabase';
 
-function calcularEventosDaSemana(eventos: Tables<'eventos'>[]): Tables<'eventos'>[] {
-  const hoje = new Date();
-  const primeiroDiaSemana = new Date(hoje);
-  primeiroDiaSemana.setDate(hoje.getDate() - hoje.getDay() + (hoje.getDay() === 0 ? -6 : 1));
-  primeiroDiaSemana.setHours(0, 0, 0, 0);
-  const ultimoDiaSemana = new Date(primeiroDiaSemana);
-  ultimoDiaSemana.setDate(primeiroDiaSemana.getDate() + 6);
-  ultimoDiaSemana.setHours(23, 59, 59, 999);
-  return eventos.filter((e) => {
-    const dataEvt = new Date(e.data_inicio + 'T00:00:00');
-    return dataEvt >= primeiroDiaSemana && dataEvt <= ultimoDiaSemana;
-  });
-}
 
 // Aba Mapa — mapa de eventos da semana (Leaflet) + camada de viaturas do
 // Cartão Programa de hoje + painel lateral de ocorrências. Espelha
@@ -34,6 +25,7 @@ export default function MapaPage() {
   const { usuario } = useAuth();
   const { dados, recarregar } = useAppData();
   const { bairros, criarBairro, atualizarBairro, excluirBairro } = useBairros();
+  const { avisos } = useAvisos();
   const { cartaoHoje } = useCartaoDeHoje();
   const { prefs, setPrefs } = useMapaPrefs();
   const mapaRef = useRef<MapaLeafletHandle>(null);
@@ -41,7 +33,12 @@ export default function MapaPage() {
   const [gerenciarBairrosAberto, setGerenciarBairrosAberto] = useState(false);
   const podeGerenciarBairros = usuario?.role === 'P3';
 
-  const eventosSemana = calcularEventosDaSemana(dados.eventos);
+  // Recorte escolhido pelo usuário (Hoje/Semana/Mês). Antes era fixo na semana.
+  const eventosSemana = eventosDoPeriodo(dados.eventos, prefs.periodo);
+  // Só alerta vigente entra no mapa. `avisoVigente` (e não só `ativo`) porque a
+  // vigência também tem data: um alerta ativo mas com data_fim vencida não
+  // orienta mais ninguém, e é a mesma regra que a aba Alertas aplica.
+  const avisosVigentes = avisos.filter((a) => avisoVigente(a));
 
   // "Sem coordenada" cobre os dois casos que impedem plotar: bairro não
   // cadastrado e bairro cadastrado sem lat/lng.
@@ -97,6 +94,27 @@ export default function MapaPage() {
             />
             <span>Viaturas (Cartão Programa de hoje)</span>
           </label>
+          <label className="mapa-toggle">
+            <input
+              type="checkbox" checked={prefs.mostrarAvisos}
+              onChange={(e) => setPrefs({ ...prefs, mostrarAvisos: e.target.checked })}
+            />
+            <span>Alertas por bairro</span>
+          </label>
+          <div className="dia-switch" role="radiogroup" aria-label="Período dos eventos no mapa">
+            {OPCOES_PERIODO.map((o) => (
+              <button
+                key={o.valor}
+                type="button"
+                role="radio"
+                aria-checked={prefs.periodo === o.valor}
+                className={`dia-opcao${prefs.periodo === o.valor ? ' ativo' : ''}`}
+                onClick={() => setPrefs({ ...prefs, periodo: o.valor })}
+              >
+                {o.rotulo}
+              </button>
+            ))}
+          </div>
           <div className="filter-group" style={{ marginLeft: 'auto' }}>
             <label htmlFor="mapa-select-estilo">Estilo do Mapa</label>
             <select
@@ -120,6 +138,8 @@ export default function MapaPage() {
           </div>
         )}
 
+        <LegendaMapa prefs={prefs} />
+
         <div className="mapa-layout">
           <MapaLeaflet
             ref={mapaRef}
@@ -128,6 +148,7 @@ export default function MapaPage() {
             alocacoes={dados.alocacoes}
             viaturasCadastro={dados.viaturas}
             cartaoHoje={cartaoHoje}
+            avisos={avisosVigentes}
             prefs={prefs}
           />
           <OcorrenciasPanel

@@ -10,6 +10,7 @@ import { esc } from '../../../lib/esc';
 import { bairrosPlotaveis, type BairroComCoordenada } from '../../../lib/bairros';
 import type { MapaPrefs } from './useMapaPrefs';
 import { criarIconeViatura, itemAtivoAgora } from './viaturasNoMapa';
+import { criarIconeEventos, corDaPrioridade, RAIO_AVISO_METROS } from './avisosNoMapa';
 
 // Vite não resolve os ícones-padrão do Leaflet a partir do CSS (caminho relativo
 // quebra no bundle) — precisa apontar manualmente pros assets importados.
@@ -27,6 +28,9 @@ export interface MapaLeafletHandle {
 
 interface MapaLeafletProps {
   bairros: Tables<'bairros_coordenadas'>[];
+  /** Alertas Operacionais VIGENTES. Quem filtra vigência é a página — aqui só se
+   *  desenha o que chega. */
+  avisos: Tables<'avisos'>[];
   eventosSemana: Tables<'eventos'>[];
   alocacoes: Tables<'alocacoes'>[];
   viaturasCadastro: Tables<'viaturas'>[];
@@ -35,11 +39,20 @@ interface MapaLeafletProps {
 }
 
 // Instância única do Leaflet, gerenciada imperativamente (fora do ciclo de
-// render do React, igual ao app antigo) — espelha renderMapaTab() em
-// public/app.js, dividido em efeitos por responsabilidade (tile, marcadores de
-// evento, marcadores de viatura) em vez de uma função só que refaz tudo.
+// render do React), dividida em UM EFEITO POR CAMADA em vez de uma função só que
+// refaz tudo: tile, eventos, viaturas e alertas.
+//
+// PARA ADICIONAR UMA CAMADA NOVA (ex.: densidade de ocorrências do Sinesp CAD),
+// siga o mesmo formato das existentes:
+//   1. uma ref própria com as layers daquela camada;
+//   2. um useEffect que remove as anteriores, sai cedo se a pref estiver
+//      desligada, e redesenha a partir dos dados;
+//   3. uma flag em MapaPrefs + o toggle na página;
+//   4. a cor na legenda (LegendaMapa), com o MESMO literal usado ao desenhar.
+// Cor em camada do Leaflet é sempre literal, nunca var(--…): ele pinta em
+// SVG/canvas fora da cascata do componente e não resolve custom property.
 export const MapaLeaflet = forwardRef<MapaLeafletHandle, MapaLeafletProps>(function MapaLeaflet(
-  { bairros: bairrosProp, eventosSemana, alocacoes, viaturasCadastro, cartaoHoje, prefs },
+  { bairros: bairrosProp, avisos, eventosSemana, alocacoes, viaturasCadastro, cartaoHoje, prefs },
   ref,
 ) {
   // Desde a migration 001 a coordenada do bairro é opcional (bairro pode existir
@@ -53,6 +66,7 @@ export const MapaLeaflet = forwardRef<MapaLeafletHandle, MapaLeafletProps>(funct
   const estiloAtualRef = useRef<string | null>(null);
   const markersEventosRef = useRef<L.Marker[]>([]);
   const markersViaturasRef = useRef<L.Marker[]>([]);
+  const circulosAvisosRef = useRef<L.Circle[]>([]);
 
   useImperativeHandle(ref, () => ({
     focar(lat: number, lng: number) {
@@ -130,7 +144,12 @@ export const MapaLeaflet = forwardRef<MapaLeafletHandle, MapaLeafletProps>(funct
     });
 
     gruposPorCoordenada.forEach((grupo) => {
-      const marker = L.marker([grupo.coordenada.latitude, grupo.coordenada.longitude]).addTo(mapa);
+      // Badge com a contagem: o marcador já era ÚNICO por bairro (os eventos do
+      // mesmo centróide sempre foram agrupados no popup), mas nada na tela dizia
+      // que havia mais de um por trás dele.
+      const marker = L.marker([grupo.coordenada.latitude, grupo.coordenada.longitude], {
+        icon: criarIconeEventos(grupo.eventos.length),
+      }).addTo(mapa);
       const popupHtml = grupo.eventos
         .map((evt) => {
           const alocacoesEvt = alocacoes.filter((a) => a.evento_id === evt.id);
@@ -202,6 +221,48 @@ export const MapaLeaflet = forwardRef<MapaLeafletHandle, MapaLeafletProps>(funct
 
     ajustarEnquadramento();
   }, [cartaoHoje, viaturasCadastro, bairros, prefs.mostrarViaturas]);
+
+  // Camada de Alertas Operacionais: halo no bairro com aviso vigente, na cor da
+  // prioridade. Liga duas funcionalidades que já existiam sem se enxergar — o
+  // aviso sempre teve bairro_id, o mapa nunca mostrou.
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa) return;
+    circulosAvisosRef.current.forEach((c) => mapa.removeLayer(c));
+    circulosAvisosRef.current = [];
+    if (!prefs.mostrarAvisos) return;
+
+    const porBairro = new Map<string, { bairro: BairroComCoordenada; avisos: Tables<'avisos'>[] }>();
+    avisos.forEach((aviso) => {
+      if (!aviso.bairro_id) return; // aviso só de Companhia não tem onde ser plotado
+      const bairro = bairros.find((b) => b.id === aviso.bairro_id);
+      if (!bairro) return;
+      if (!porBairro.has(bairro.id)) porBairro.set(bairro.id, { bairro, avisos: [] });
+      porBairro.get(bairro.id)!.avisos.push(aviso);
+    });
+
+    porBairro.forEach(({ bairro, avisos: doBairro }) => {
+      // A cor é a da MAIOR prioridade do bairro: um halo por aviso ficaria
+      // sobreposto no mesmo centróide e ilegível.
+      const cor = corDaPrioridade(doBairro);
+      const circulo = L.circle([bairro.latitude, bairro.longitude], {
+        radius: RAIO_AVISO_METROS,
+        color: cor,
+        fillColor: cor,
+        fillOpacity: 0.15,
+        weight: 2,
+        // Sem isto o halo fica por cima e rouba o clique dos marcadores.
+        interactive: true,
+      }).addTo(mapa);
+
+      const lista = doBairro
+        .map((a) => `<div class="mapa-popup-evento"><strong>${esc(a.prioridade.toUpperCase())}</strong>${a.categoria ? ' · ' + esc(a.categoria) : ''}<br>${esc(a.texto)}</div>`)
+        .join('<hr>');
+      circulo.bindPopup(`<div class="mapa-popup"><h4>Alertas — ${esc(bairro.nome_bairro)}</h4>${lista}</div>`);
+      circulo.bringToBack();
+      circulosAvisosRef.current.push(circulo);
+    });
+  }, [avisos, bairros, prefs.mostrarAvisos]);
 
   return <div ref={containerRef} id="mapa-eventos-semana" className="mapa-container" />;
 });

@@ -1,8 +1,14 @@
 import { useState } from 'react';
+import type { PeriodoMapa } from './periodoMapa';
 
 export interface MapaPrefs {
   mostrarEventos: boolean;
   mostrarViaturas: boolean;
+  /** Halo dos bairros com Alerta Operacional vigente (2026-08). */
+  mostrarAvisos: boolean;
+  /** Recorte dos eventos plotados. 'semana' mantém o comportamento anterior,
+   *  quando o mapa era fixo na semana corrente. */
+  periodo: PeriodoMapa;
   estilo: 'dark' | 'voyager';
 }
 
@@ -22,10 +28,12 @@ function carregarPrefsMapa(): MapaPrefs {
     return {
       mostrarEventos: salvo.mostrarEventos !== false,
       mostrarViaturas: salvo.mostrarViaturas !== false,
+      mostrarAvisos: salvo.mostrarAvisos !== false,
+      periodo: salvo.periodo === 'hoje' || salvo.periodo === 'mes' ? salvo.periodo : 'semana',
       estilo: salvo.estilo === 'voyager' ? 'voyager' : salvo.estilo === 'dark' ? 'dark' : estiloPadrao,
     };
   } catch {
-    return { mostrarEventos: true, mostrarViaturas: true, estilo: estiloPadrao };
+    return { mostrarEventos: true, mostrarViaturas: true, mostrarAvisos: true, periodo: 'semana', estilo: estiloPadrao };
   }
 }
 
