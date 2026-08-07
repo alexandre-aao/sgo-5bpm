@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { apiFetch, setAuthToken, setOnUnauthorized } from '../lib/api';
+import { apiFetch, setAuthToken, setOnUnauthorized, setSessaoAtiva } from '../lib/api';
 import type { Usuario } from '../types/auth';
 import { AuthContext } from './auth-context';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
@@ -12,9 +12,10 @@ function lerSessaoSalva(): Usuario | null {
 
   try {
     const dados = JSON.parse(bruto) as Partial<Usuario>;
-    // Sessão sem token (formato antigo) ou já expirada: exige novo login — mesma
-    // checagem de checkAuth() em public/app.js.
-    if (!dados.token || !dados.expira || dados.expira <= Date.now()) {
+    // `token` NÃO é mais exigido: desde a Fase 4 a sessão vive no cookie
+    // HttpOnly e o localStorage guarda só a identidade para a UI. Exigi-lo aqui
+    // deslogaria todo mundo no primeiro carregamento depois do deploy.
+    if (!dados.usuario || !dados.expira || dados.expira <= Date.now()) {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -29,7 +30,12 @@ function lerSessaoSalva(): Usuario | null {
 // sessão é síncrona (localStorage), então não precisa de estado de "carregando" nem
 // de useEffect — só inicializa o token do apiFetch antes de qualquer render.
 const sessaoInicial = lerSessaoSalva();
-if (sessaoInicial) setAuthToken(sessaoInicial.token);
+if (sessaoInicial) {
+  // Token só existe em sessão legada; quando existe, continua indo no Bearer
+  // para não derrubar quem já estava logado antes da migração.
+  setAuthToken(sessaoInicial.token ?? null);
+  setSessaoAtiva(true);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(sessaoInicial);
@@ -43,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.removeItem(STORAGE_KEY);
     setAuthToken(null);
+    setSessaoAtiva(false);
     setUsuario(null);
   }, []);
 
@@ -52,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOnUnauthorized(() => {
       localStorage.removeItem(STORAGE_KEY);
       setAuthToken(null);
+      setSessaoAtiva(false);
       setUsuario(null);
     });
   }, []);
@@ -65,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (usuario && usuario.expira <= Date.now()) {
         localStorage.removeItem(STORAGE_KEY);
         setAuthToken(null);
+        setSessaoAtiva(false);
         setUsuario(null);
       }
     }, [usuario]),
@@ -85,9 +94,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const dados = (await res.json()) as Usuario;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(dados));
-    setAuthToken(dados.token);
-    setUsuario(dados);
+    // O token vem na resposta durante a transição, mas NÃO é guardado: quem
+    // autentica agora é o cookie HttpOnly que o servidor acabou de definir.
+    // Persistir aqui recolocaria em localStorage exatamente o que a Fase 4 tirou.
+    const semToken: Usuario = {
+      usuario: dados.usuario, role: dados.role, nome: dados.nome, expira: dados.expira,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(semToken));
+    setAuthToken(null);
+    setSessaoAtiva(true);
+    setUsuario(semToken);
   }, []);
 
   return (

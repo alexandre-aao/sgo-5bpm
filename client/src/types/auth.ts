@@ -6,7 +6,10 @@ export interface Usuario {
   usuario: string;
   role: Role;
   nome: string;
-  token: string;
+  /** OPCIONAL desde a Fase 4: a sessão nova vive num cookie HttpOnly e o token
+   *  não é mais exposto ao JavaScript. Só sessões antigas, criadas antes da
+   *  migração e ainda salvas em localStorage, têm este campo. */
+  token?: string;
   /** epoch ms — sessão dura 12h (SESSAO_DURACAO_MS no server.js) */
   expira: number;
 }

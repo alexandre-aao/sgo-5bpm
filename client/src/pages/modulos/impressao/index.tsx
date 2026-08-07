@@ -378,11 +378,14 @@ export default function CentralEmissaoPage() {
   }
 
   function entregarPdf(disposicao: 'attachment' | 'inline') {
-    if (!cartao || !pdfDisponivel || !usuario?.token) {
+    // Não exige mais `usuario.token`: desde a Fase 4 a sessão vive no cookie
+    // HttpOnly, que o form submit envia sozinho (SameSite=Strict, mesmo site).
+    // O campo do corpo segue preenchido só quando há token legado.
+    if (!cartao || !pdfDisponivel || !usuario) {
       toast('Gere o PDF antes de guardar ou imprimir.', 'warning');
       return;
     }
-    enviarPdfAoNavegador(cartao.id, usuario.token, pdfDisponivel, disposicao);
+    enviarPdfAoNavegador(cartao.id, usuario.token ?? '', pdfDisponivel, disposicao);
     toast(
       disposicao === 'attachment'
         ? 'Download solicitado ao navegador.'

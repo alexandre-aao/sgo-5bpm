@@ -58,9 +58,19 @@ function origemPermitida(origin) {
 }
 app.use(cors({
   origin(origin, callback) {
-    if (origemPermitida(origin)) return callback(null, true);
-    callback(new Error('Origem não permitida pelo CORS.'));
-  }
+    // Nega SEM lançar: lançar aqui virava um 500 do handler de erro do Express
+    // com stack trace no corpo — expunha caminhos do servidor a quem justamente
+    // veio de origem não autorizada. Negando, a resposta simplesmente sai sem os
+    // cabeçalhos CORS e o navegador a bloqueia, que é o comportamento correto.
+    // Quem não é navegador (curl) ignora CORS de qualquer forma; para esses, a
+    // barreira é a checagem de origem em `autenticar` e o token.
+    callback(null, origemPermitida(origin));
+  },
+  // Necessário para o cookie de sessão viajar no fetch do frontend, que roda em
+  // origem diferente da API no desenvolvimento (5173 -> 3005). Só vale porque a
+  // allowlist acima é fechada: `credentials` com origem `*` é proibido e o
+  // navegador recusaria a resposta.
+  credentials: true
 }));
 
 // CSP liberando só os CDNs que o index.html realmente usa
@@ -87,26 +97,67 @@ const loginRateLimiter = rateLimit({
 });
 
 // Bloqueio progressivo por usuário (complementa o rate limit por IP — protege contra tentativas
-// vindas de IPs diferentes contra o mesmo login). Estado em memória: reinicia a cada cold start
-// da função serverless, o que é uma limitação aceita nesta fase (ver plano — sem Redis por ora).
+// vindas de IPs diferentes contra o mesmo login).
+//
+// PERSISTIDO NO POSTGRES desde a Fase 4 (migration 008): o estado morava num Map
+// em memória, e cada cold start da função serverless zerava o contador — bastava
+// esperar o processo reciclar para ganhar tentativas de novo. O Map continua
+// existindo como REDE: se a tabela ainda não foi criada, ou se o banco falhar na
+// hora do login, o comportamento antigo assume em vez de derrubar o acesso.
 const tentativasLoginPorUsuario = new Map();
-function verificarBloqueioProgressivo(usuario) {
-  const chave = String(usuario || '').toLowerCase().trim();
-  const registro = tentativasLoginPorUsuario.get(chave);
-  if (!registro || registro.falhas < 3) return null;
-  const esperaMs = Math.pow(2, registro.falhas - 2) * 1000;
-  const restanteMs = (registro.ultimaFalha + esperaMs) - Date.now();
+
+const chaveLogin = (usuario) => String(usuario || '').toLowerCase().trim();
+
+/** Espera em segundos, ou null se pode tentar. Dobra a cada falha a partir da 3ª. */
+function esperaDe(falhas, ultimaFalha) {
+  if (!falhas || falhas < 3) return null;
+  const esperaMs = Math.pow(2, falhas - 2) * 1000;
+  const restanteMs = (ultimaFalha + esperaMs) - Date.now();
   return restanteMs > 0 ? Math.ceil(restanteMs / 1000) : null;
 }
-function registrarFalhaLogin(usuario) {
-  const chave = String(usuario || '').toLowerCase().trim();
+
+async function verificarBloqueioProgressivo(usuario) {
+  const chave = chaveLogin(usuario);
+  try {
+    const { data, error } = await supabase
+      .from('tentativas_login').select('falhas, ultima_falha').eq('usuario', chave).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (data) return esperaDe(data.falhas, Number(data.ultima_falha));
+    return null;
+  } catch (err) {
+    // Fail-open deliberado: com o banco fora, bloquear todo mundo seria pior que
+    // perder o contador. O rate limit por IP continua de pé nesse cenário.
+    console.error('Bloqueio progressivo indisponível, usando memória:', err.message);
+    const registro = tentativasLoginPorUsuario.get(chave);
+    return registro ? esperaDe(registro.falhas, registro.ultimaFalha) : null;
+  }
+}
+
+async function registrarFalhaLogin(usuario) {
+  const chave = chaveLogin(usuario);
   const registro = tentativasLoginPorUsuario.get(chave) || { falhas: 0, ultimaFalha: 0 };
   registro.falhas += 1;
   registro.ultimaFalha = Date.now();
   tentativasLoginPorUsuario.set(chave, registro);
+  try {
+    // Incremento atômico no banco: dois SELECT+UPDATE concorrentes registrariam
+    // uma falha só e o bloqueio demoraria mais a fechar.
+    const { error } = await supabase.rpc('registrar_falha_login', { p_usuario: chave });
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    console.error('Falha ao registrar tentativa de login no banco:', err.message);
+  }
 }
-function limparFalhasLogin(usuario) {
-  tentativasLoginPorUsuario.delete(String(usuario || '').toLowerCase().trim());
+
+async function limparFalhasLogin(usuario) {
+  const chave = chaveLogin(usuario);
+  tentativasLoginPorUsuario.delete(chave);
+  try {
+    const { error } = await supabase.from('tentativas_login').delete().eq('usuario', chave);
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    console.error('Falha ao limpar tentativas de login:', err.message);
+  }
 }
 
 app.use(compression());
@@ -431,6 +482,63 @@ const SUBUNIDADES_PESSOAL = ['PCS', '1ª Companhia', '2ª Companhia', '3ª Compa
 // -------------------------------------------------------------
 const SESSAO_DURACAO_MS = 12 * 60 * 60 * 1000; // 12 horas
 
+// -------------------------------------------------------------
+// SESSÃO EM COOKIE HttpOnly (Fase 4 — S2)
+// -------------------------------------------------------------
+// O token saiu do localStorage, onde qualquer XSS o leria, para um cookie
+// HttpOnly, invisível ao JavaScript. A transição é COMPATÍVEL: `autenticar`
+// aceita o cookie OU o Bearer antigo, então quem já estava logado não é
+// deslogado no deploy e o app continua funcionando enquanto os dois convivem.
+//
+// Sem `cookie-parser`: é um header simples de ler e o projeto evita dependência
+// nova sem necessidade.
+const NOME_COOKIE_SESSAO = 'sgo_sessao';
+
+function lerCookie(req, nome) {
+  const bruto = req.headers.cookie;
+  if (!bruto) return null;
+  for (const parte of bruto.split(';')) {
+    const sep = parte.indexOf('=');
+    if (sep < 0) continue;
+    if (parte.slice(0, sep).trim() === nome) {
+      return decodeURIComponent(parte.slice(sep + 1).trim());
+    }
+  }
+  return null;
+}
+
+/** `Secure` só em produção: em `http://localhost` o navegador recusa cookie
+ *  Secure e o login local pararia de funcionar. `SameSite=Strict` porque o app
+ *  não é acessado a partir de outro site — é o que dispensa token CSRF no caso
+ *  comum, junto da checagem de origem abaixo. */
+function definirCookieSessao(res, token) {
+  const producao = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+  const partes = [
+    `${NOME_COOKIE_SESSAO}=${encodeURIComponent(token)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Strict',
+    `Max-Age=${Math.floor(SESSAO_DURACAO_MS / 1000)}`
+  ];
+  if (producao) partes.push('Secure');
+  res.append('Set-Cookie', partes.join('; '));
+}
+
+function limparCookieSessao(res) {
+  const producao = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+  const partes = [`${NOME_COOKIE_SESSAO}=`, 'Path=/', 'HttpOnly', 'SameSite=Strict', 'Max-Age=0'];
+  if (producao) partes.push('Secure');
+  res.append('Set-Cookie', partes.join('; '));
+}
+
+/** Token da requisição: cookie primeiro, Bearer como compatibilidade. */
+function tokenDaRequisicao(req) {
+  const doCookie = lerCookie(req, NOME_COOKIE_SESSAO);
+  if (doCookie) return doCookie;
+  const auth = req.headers.authorization || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
 function hashSenha(senha) {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.scryptSync(String(senha), salt, 64).toString('hex');
@@ -497,12 +605,28 @@ function verificarSenha(senha, armazenada) {
 })();
 
 // Middleware: exige token de sessão válido em todas as rotas da API (exceto login)
+const METODOS_SEGUROS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 async function autenticar(req, res, next) {
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  const token = tokenDaRequisicao(req);
 
   if (!token) {
     return res.status(401).json({ error: 'Não autenticado. Faça login para acessar o sistema.' });
+  }
+
+  // CSRF: cookie viaja sozinho, então uma escrita disparada por outro site
+  // chegaria autenticada. `SameSite=Strict` já impede o envio cross-site; esta é
+  // a segunda camada, para o caso de um navegador antigo que ignore o atributo.
+  // Só se aplica a quem se autenticou por COOKIE — o Bearer exige que o
+  // JavaScript leia o token, o que outro site não consegue fazer.
+  const veioDeCookie = !!lerCookie(req, NOME_COOKIE_SESSAO);
+  if (veioDeCookie && !METODOS_SEGUROS.has(req.method)) {
+    const origem = req.headers.origin;
+    // Sem Origin: cliente não-navegador (curl, app nativo), que não sofre CSRF.
+    // Mantém o mesmo critério já adotado em `origemPermitida`.
+    if (origem && !origemPermitida(origem)) {
+      return res.status(403).json({ error: 'Origem não autorizada para esta operação.' });
+    }
   }
 
   try {
@@ -547,7 +671,7 @@ app.post('/api/login', loginRateLimiter, asyncRoute(async (req, res) => {
     return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
   }
 
-  const esperaSegundos = verificarBloqueioProgressivo(usuario);
+  const esperaSegundos = await verificarBloqueioProgressivo(usuario);
   if (esperaSegundos) {
     return res.status(429).json({ error: `Muitas tentativas para este usuário. Tente novamente em ${esperaSegundos} segundo(s).` });
   }
@@ -555,11 +679,11 @@ app.post('/api/login', loginRateLimiter, asyncRoute(async (req, res) => {
   const user = await buscarUsuarioPorLogin(usuario);
 
   if (!user || !verificarSenha(senha, user.senha)) {
-    registrarFalhaLogin(usuario);
+    await registrarFalhaLogin(usuario);
     return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
   }
 
-  limparFalhasLogin(usuario);
+  await limparFalhasLogin(usuario);
 
   // Migra senha em texto puro para scrypt, se for o caso
   if (!String(user.senha).startsWith('scrypt:')) {
@@ -576,6 +700,11 @@ app.post('/api/login', loginRateLimiter, asyncRoute(async (req, res) => {
   const { error } = await supabase.from('sessoes').insert({ token, usuario: user.usuario, role: user.role, nome: user.nome, expira });
   if (error) throw new Error(error.message);
 
+  definirCookieSessao(res, token);
+
+  // `token` continua no corpo durante a transição: o cliente antigo (que guarda
+  // em localStorage e manda Bearer) segue funcionando até todo mundo ter
+  // recarregado a página com o build novo. Remover depois disso.
   res.json({ usuario: user.usuario, role: user.role, nome: user.nome, token, expira });
 }));
 
@@ -594,7 +723,9 @@ const entregaPdfRateLimiter = rateLimit({
 });
 
 app.post('/api/cartoes/:id/arquivo-pdf', entregaPdfRateLimiter, receberFormularioPdf, asyncRoute(async (req, res) => {
-  const token = String(req.body.token || '');
+  // Form submit do próprio site: com SameSite=Strict o cookie viaja, então ele é
+  // a fonte preferida. O campo do corpo continua aceito para o cliente antigo.
+  const token = lerCookie(req, NOME_COOKIE_SESSAO) || String(req.body.token || '');
   const sessao = token ? await buscarSessaoPorToken(token) : null;
   if (!sessao || sessao.expira <= Date.now()) {
     return res.status(401).type('text/plain').send('Sessão expirada. Faça login novamente.');
@@ -633,8 +764,11 @@ app.use('/api', autenticar);
 
 // Encerrar sessão (invalida o token no servidor)
 app.post('/api/logout', asyncRoute(async (req, res) => {
-  const token = (req.headers.authorization || '').slice(7);
-  await supabase.from('sessoes').delete().eq('token', token);
+  // Pega do cookie OU do Bearer: durante a transição a sessão pode ter vindo de
+  // qualquer um dos dois, e sair pela metade deixaria a linha viva em `sessoes`.
+  const token = tokenDaRequisicao(req);
+  if (token) await supabase.from('sessoes').delete().eq('token', token);
+  limparCookieSessao(res);
   res.json({ message: 'Sessão encerrada.' });
 }));
 
