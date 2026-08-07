@@ -19,6 +19,7 @@ import {
 } from './documentoCartao';
 import { DocumentoCartaoView, LoteDocumentosCartao } from './RenderDocumentoCartao';
 import { gerarDocumentosCartaoPdf } from './gerarPdfCartao';
+import { gerarDocumentosCartaoPdfVetorial } from './gerarPdfVetorial';
 import { validarCentralEmissao } from './validacaoEmissao';
 
 interface RegistroEmissao {
@@ -46,6 +47,18 @@ interface PdfPronto {
   base64: string;
   nomeArquivo: string;
   chaveConfiguracao: string;
+}
+
+/** Motor do PDF. 'vetorial' (jsPDF puro) é o padrão desde 2026-08: gera texto
+ *  selecionável e arquivo dezenas de vezes menor que a captura de imagem, o que
+ *  também mantém a entrega abaixo do teto de request body da Vercel.
+ *  'imagem' (html2canvas) fica como fallback enquanto a saída nova não é
+ *  homologada visualmente — a remover depois disso. */
+const CHAVE_MOTOR_PDF = 'sgo_pdf_motor';
+type MotorPdf = 'vetorial' | 'imagem';
+
+function motorPdfSalvo(): MotorPdf {
+  return localStorage.getItem(CHAVE_MOTOR_PDF) === 'imagem' ? 'imagem' : 'vetorial';
 }
 
 function blobParaBase64(blob: Blob): Promise<string> {
@@ -161,6 +174,7 @@ export default function CentralEmissaoPage() {
   const [confirmada, setConfirmada] = useState<EmissaoConfirmada | null>(null);
   const [indicePrevia, setIndicePrevia] = useState(0);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [motorPdf, setMotorPdf] = useState<MotorPdf>(motorPdfSalvo);
   const [pdfPronto, setPdfPronto] = useState<PdfPronto | null>(null);
   const [historico, setHistorico] = useState<RegistroEmissao[]>([]);
   const [historicoAberto, setHistoricoAberto] = useState(false);
@@ -343,7 +357,9 @@ export default function CentralEmissaoPage() {
     if (gerandoPdf) return;
     setGerandoPdf(true);
     try {
-      const blob = await gerarDocumentosCartaoPdf(confirmada.documentos);
+      const blob = motorPdf === 'vetorial'
+        ? await gerarDocumentosCartaoPdfVetorial(confirmada.documentos)
+        : await gerarDocumentosCartaoPdf(confirmada.documentos);
       const base64 = await blobParaBase64(blob);
       const nomeArquivo = `${nomeDoArquivoConfirmado()}.pdf`;
       setPdfPronto({
@@ -502,6 +518,28 @@ export default function CentralEmissaoPage() {
               )}
               <button type="button" className="btn btn-secondary" disabled={!pdfDisponivel || gerandoPdf} onClick={() => entregarPdf('inline')}><Printer /> Abrir / imprimir PDF</button>
             </div>
+
+            {/* Fallback do motor de PDF (2026-08). O vetorial é o padrão; o de
+                imagem fica disponível até a saída nova ser homologada, e sai
+                depois disso. Trocar o motor invalida o PDF já gerado, porque o
+                arquivo em mãos deixa de corresponder à escolha. */}
+            <label className="central-motor-pdf texto-auxiliar">
+              <input
+                type="checkbox"
+                checked={motorPdf === 'imagem'}
+                aria-label="Gerar o PDF pelo motor antigo, em imagem"
+                onChange={(e) => {
+                  const novo: MotorPdf = e.target.checked ? 'imagem' : 'vetorial';
+                  localStorage.setItem(CHAVE_MOTOR_PDF, novo);
+                  setMotorPdf(novo);
+                  setPdfPronto(null);
+                }}
+              />
+              <span>
+                Usar o motor antigo (imagem). O padrão gera <strong>texto selecionável</strong>, em
+                arquivo muito menor.
+              </span>
+            </label>
             <button type="button" className="btn btn-primary" disabled={validacao.erros.length > 0} onClick={confirmarEmissao}><CheckCircle2 /> {estaConfirmada ? 'Emissão confirmada' : 'Confirmar emissão'}</button>
           </div>
 
