@@ -19,6 +19,7 @@ alter table cartoes add column if not exists atualizado_em timestamptz;
 create or replace function cartoes_marcar_atualizacao()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.atualizado_em := now();

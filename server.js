@@ -3008,7 +3008,6 @@ app.delete('/api/cartoes/:id/viaturas/:vid', exigirEdicaoCartao, asyncRoute(asyn
     return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
   }
 
-  const viatura = cartao.viaturas.find(v => v.id === req.params.vid);
   cartao.viaturas = cartao.viaturas.filter(v => v.id !== req.params.vid);
   await writeRow('cartoes', cartao);
   res.json({ message: 'Viatura removida do cartão' });

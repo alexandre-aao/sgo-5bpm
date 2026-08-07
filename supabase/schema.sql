@@ -207,35 +207,65 @@ create unique index if not exists idx_cartoes_numero_ano
   on cartoes (ano, numero)
   where numero is not null;
 
--- Padrão único de Cartão Programa: só um template pode estar com
--- padrao_ativo=true por vez (ver migrations/002_cartao_padrao_unico.sql).
+-- Padrão de Cartão Programa: no máximo um template ativo por tipo de período
+-- (semana/fim de semana; ver migration 006).
 -- O CHECK impede que um cartão do dia carregue a flag fora do índice.
 alter table cartoes
   add constraint cartoes_padrao_so_template check (not padrao_ativo or is_template);
 
-create unique index if not exists ux_cartoes_padrao_unico
-  on cartoes (padrao_ativo)
+alter table cartoes
+  add constraint cartoes_padrao_exige_periodo
+  check (not padrao_ativo or tipo_periodo is not null);
+
+create unique index if not exists ux_cartoes_padrao_unico_periodo
+  on cartoes (tipo_periodo)
   where is_template = true and padrao_ativo = true;
 
--- Troca o padrão ativo numa transação só, para nunca haver um instante
--- sem padrão nenhum (índice único não é deferível).
+-- Troca o padrão ativo do mesmo tipo numa transação só.
 create or replace function ativar_cartao_padrao(p_id text)
 returns void
 language plpgsql
-security invoker
+security definer
 set search_path = public
 as $$
+declare
+  v_tipo text;
 begin
-  if not exists (select 1 from cartoes where id = p_id and is_template) then
+  select tipo_periodo into v_tipo
+    from cartoes where id = p_id and is_template;
+
+  if not found then
     raise exception 'Cartão padrão % não encontrado', p_id;
   end if;
+
+  if v_tipo is null then
+    raise exception 'Cartão padrão % não tem tipo de período definido', p_id;
+  end if;
+
   update cartoes set padrao_ativo = false
-   where is_template and padrao_ativo and id <> p_id;
+   where is_template and padrao_ativo and tipo_periodo = v_tipo and id <> p_id;
+
   update cartoes set padrao_ativo = true
    where id = p_id;
 end; $$;
 revoke execute on function ativar_cartao_padrao(text) from public;
 revoke execute on function ativar_cartao_padrao(text) from anon, authenticated;
+
+-- Carimbo automático usado na futura proteção contra edição concorrente.
+create or replace function cartoes_marcar_atualizacao()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.atualizado_em := now();
+  return new;
+end $$;
+
+drop trigger if exists trg_cartoes_atualizado_em on cartoes;
+create trigger trg_cartoes_atualizado_em
+  before insert or update on cartoes
+  for each row execute function cartoes_marcar_atualizacao();
 
 -- Avisos Operacionais: a P3 cadastra a orientação de um bairro (ou de uma
 -- Companhia) e ela entra automaticamente no Cartão Programa das viaturas
@@ -368,6 +398,31 @@ $$;
 revoke all on function registrar_emissao_cartao(text, jsonb, jsonb, boolean) from public, anon, authenticated;
 grant execute on function registrar_emissao_cartao(text, jsonb, jsonb, boolean) to service_role;
 
+-- Bloqueio progressivo de login persistente (migration 008). O backend usa
+-- service_role; anon/authenticated não recebem acesso direto.
+create table if not exists tentativas_login (
+  usuario text primary key,
+  falhas integer not null default 0,
+  ultima_falha bigint not null default 0
+);
+
+create or replace function registrar_falha_login(p_usuario text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into tentativas_login (usuario, falhas, ultima_falha)
+  values (p_usuario, 1, (extract(epoch from now()) * 1000)::bigint)
+  on conflict (usuario) do update
+    set falhas = tentativas_login.falhas + 1,
+        ultima_falha = (extract(epoch from now()) * 1000)::bigint;
+end $$;
+
+revoke execute on function registrar_falha_login(text) from public;
+revoke execute on function registrar_falha_login(text) from anon, authenticated;
+
 
 -- =================================================================
 -- ÍNDICES DE PERFORMANCE (fase de performance, 2026-07). Idempotentes.
@@ -407,3 +462,4 @@ alter table if exists viaturas            enable row level security;
 alter table if exists avisos              enable row level security;
 alter table if exists contador_cartoes    enable row level security;
 alter table if exists emissoes_cartao     enable row level security;
+alter table if exists tentativas_login    enable row level security;
