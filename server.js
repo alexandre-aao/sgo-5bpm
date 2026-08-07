@@ -2138,7 +2138,12 @@ app.put('/api/config', exigirP3, asyncRoute(async (req, res) => {
 // ROTA DO PLANEJADOR MENSAL DE DIÁRIAS (COTA x CONSUMO)
 // -------------------------------------------------------------
 app.get('/api/planejador-diarias', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
+  // Só as 3 tabelas que este agregador usa, em vez das 11 do readDB(). O objeto
+  // `db` parcial mantém o corpo abaixo intacto — a lógica segue em JS puro.
+  const [tabOperacoes, tabEscalas, tabConfig] = await Promise.all([
+    readTabela('operacoes'), readTabela('escalas'), buscarConfig(),
+  ]);
+  const db = { operacoes: tabOperacoes, escalas: tabEscalas, config: tabConfig };
   const mesFiltro = req.query.mes; // Formato "MM" (ex: "07")
   const anoFiltro = req.query.ano || String(new Date().getFullYear());
 
@@ -2307,7 +2312,10 @@ app.get('/api/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
 // ROTA DO RELATÓRIO DE DIÁRIAS (AGREGADO NO MÊS)
 // -------------------------------------------------------------
 app.get('/api/relatorio-diarias', asyncRoute(async (req, res) => {
-  const db = await readDB();
+  const [tabOperacoes, tabEscalas, tabPessoal] = await Promise.all([
+    readTabela('operacoes'), readTabela('escalas'), readTabela('pessoal'),
+  ]);
+  const db = { operacoes: tabOperacoes, escalas: tabEscalas, pessoal: tabPessoal };
   const mesFiltro = req.query.mes; // Formato "MM" (ex: "07")
   const anoFiltro = req.query.ano || String(new Date().getFullYear());
 
@@ -2354,7 +2362,14 @@ app.get('/api/relatorio-diarias', asyncRoute(async (req, res) => {
 // RELATÓRIO DIÁRIO DE DIÁRIAS (por data ou por operação) — fonte: operacoes + escalas
 // -------------------------------------------------------------
 app.get('/api/relatorio-diario', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
+  const [tabOperacoes, tabEscalas, tabPessoal, tabEventos, tabAlocacoes] = await Promise.all([
+    readTabela('operacoes'), readTabela('escalas'), readTabela('pessoal'),
+    readTabela('eventos'), readTabela('alocacoes'),
+  ]);
+  const db = {
+    operacoes: tabOperacoes, escalas: tabEscalas, pessoal: tabPessoal,
+    eventos: tabEventos, alocacoes: tabAlocacoes,
+  };
   const mes = req.query.mes;
   const ano = req.query.ano || String(new Date().getFullYear());
   const agrupar = req.query.agrupar === 'operacao' ? 'operacao' : 'data';
@@ -2432,7 +2447,12 @@ app.get('/api/relatorio-diario', exigirP3, asyncRoute(async (req, res) => {
 // ROTA DO CALENDÁRIO DE DIÁRIAS (TOTAL POR DIA NO MÊS)
 // -------------------------------------------------------------
 app.get('/api/diarias-calendario', exigirP3, asyncRoute(async (req, res) => {
-  const db = await readDB();
+  const [tabOperacoes, tabEscalas, tabEventos, tabAlocacoes] = await Promise.all([
+    readTabela('operacoes'), readTabela('escalas'), readTabela('eventos'), readTabela('alocacoes'),
+  ]);
+  const db = {
+    operacoes: tabOperacoes, escalas: tabEscalas, eventos: tabEventos, alocacoes: tabAlocacoes,
+  };
   const mesFiltro = req.query.mes;
   const anoFiltro = req.query.ano || String(new Date().getFullYear());
 
@@ -2473,7 +2493,12 @@ app.get('/api/diarias-calendario', exigirP3, asyncRoute(async (req, res) => {
 // ROTA DE ESTATÍSTICAS (PAINEL ANALÍTICO PARA PLANEJAMENTO)
 // -------------------------------------------------------------
 app.get('/api/estatisticas', asyncRoute(async (req, res) => {
-  const db = await readDB();
+  const [tabOperacoes, tabEscalas, tabEventos, tabAlocacoes] = await Promise.all([
+    readTabela('operacoes'), readTabela('escalas'), readTabela('eventos'), readTabela('alocacoes'),
+  ]);
+  const db = {
+    operacoes: tabOperacoes, escalas: tabEscalas, eventos: tabEventos, alocacoes: tabAlocacoes,
+  };
   const anoFiltro = req.query.ano || String(new Date().getFullYear());
 
   const eventosDoAno = db.eventos.filter(e => e.data_inicio.startsWith(anoFiltro));
@@ -2609,7 +2634,9 @@ function duracaoHoras(inicio, fim) {
 // ROTA DE ESTATÍSTICAS DO CARTÃO PROGRAMA (PATRULHAMENTO)
 // -------------------------------------------------------------
 app.get('/api/estatisticas-cartao', asyncRoute(async (req, res) => {
-  const db = await readDB();
+  // Usava só `cartoes` e baixava as 11 tabelas — o pior caso do readDB(), ainda
+  // por cima trazendo o JSONB pesado de viaturas/itens junto com o resto.
+  const db = { cartoes: await readTabela('cartoes') };
   const anoFiltro = req.query.ano || String(new Date().getFullYear());
 
   const cartoesDoAno = (db.cartoes || []).filter(c => !c.is_template && c.data && c.data.startsWith(anoFiltro));
@@ -3087,8 +3114,7 @@ app.put('/api/cartoes/:id/padrao-ativo', exigirP3, asyncRoute(async (req, res) =
 
 // Atualizar cabeçalho do cartão (fiscal / adjunto / oficial de sobreaviso)
 app.put('/api/cartoes/:id', exigirEdicaoCartao, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
   if (cartao.is_template && req.user.role !== 'P3') {
     return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
@@ -3168,8 +3194,7 @@ app.delete('/api/cartoes/:id', asyncRoute(async (req, res) => {
 
 // Adicionar viatura ao cartão
 app.post('/api/cartoes/:id/viaturas', exigirEdicaoCartao, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
   if (cartao.is_template && req.user.role !== 'P3') {
     return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
@@ -3221,8 +3246,7 @@ app.post('/api/cartoes/:id/viaturas', exigirEdicaoCartao, asyncRoute(async (req,
 
 // Atualizar viatura
 app.put('/api/cartoes/:id/viaturas/:vid', exigirEdicaoCartao, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
   if (cartao.is_template && req.user.role !== 'P3') {
     return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
@@ -3274,8 +3298,7 @@ app.put('/api/cartoes/:id/viaturas/:vid', exigirEdicaoCartao, asyncRoute(async (
 
 // Remover viatura do cartão
 app.delete('/api/cartoes/:id/viaturas/:vid', exigirEdicaoCartao, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
   if (cartao.is_template && req.user.role !== 'P3') {
     return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
@@ -3413,8 +3436,7 @@ app.post('/api/cartoes/:id/emissoes', asyncRoute(async (req, res) => {
 
 // Adicionar item de roteiro à viatura
 app.post('/api/cartoes/:id/viaturas/:vid/itens', exigirEdicaoCartao, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
   if (cartao.is_template && req.user.role !== 'P3') {
     return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
@@ -3526,8 +3548,7 @@ app.put('/api/cartoes/:id/roteiro/atividade', exigirEdicaoCartao, asyncRoute(asy
 
 // Remover item de roteiro
 app.delete('/api/cartoes/:id/viaturas/:vid/itens/:iid', exigirEdicaoCartao, asyncRoute(async (req, res) => {
-  const db = await readDB();
-  const cartao = (db.cartoes || []).find(c => c.id === req.params.id);
+  const cartao = await buscarCartaoPorId(req.params.id);
   if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
   if (cartao.is_template && req.user.role !== 'P3') {
     return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
