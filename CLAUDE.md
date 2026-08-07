@@ -221,6 +221,16 @@ Os três injetam HTML em `#relatorio-pdf-area` (dentro do modal único `#modal-r
 - **`npm run lint`** (raiz) — ESLint do backend (`eslint.config.js`), separado do `client/eslint.config.js`. Existe principalmente por **`no-undef`**: com 80 rotas, 49 helpers e 23 constantes num único escopo de módulo, um helper não importado vira `ReferenceError` que só aparece quando aquela rota é chamada — invisível no boot e no `node --check`. É o que torna a divisão do `server.js` em routers verificável.
 - **`.github/workflows/ci.yml`** roda `npm run lint` + `npm test` na raiz e `lint` + `build` (que faz o `tsc -b`) no cliente. **O CI não bloqueia a Vercel** — os dois disparam em paralelo no push; para virar gate de verdade é preciso ligar branch protection no GitHub.
 
+## Arquivamento de dados antigos (Fase 6, 2026-08)
+
+Fluxo P3-only em Administração (painel colapsável na aba Usuários) para recortar histórico consolidado — o banco só cresce.
+
+- **Entram:** `eventos`, `operacoes` (histórico com data própria) e `escalas`/`alocacoes` (entram pelo **vínculo**, não por data — escala tem `data` nullable e pertence à operação de qualquer forma).
+- **NÃO entram:** `cartoes` — é o roteiro operacional **cumprido**, documento do serviço de cada dia; sair dali é decisão explícita, não efeito colateral de um fluxo genérico. E nada de cadastro (`pessoal`, `viaturas`, `bairros_coordenadas`, `usuarios`, `config`, `avisos`): não crescem com o tempo e apagá-los quebraria registros vivos.
+- **"Nunca excluir sem baixar" é garantido pelo SERVIDOR, não pela tela.** `POST /api/arquivamento/exportar` devolve um **comprovante** (HMAC de corte + contagens com a chave `service_role`) e `POST /api/arquivamento/executar` só aceita com ele. Como as contagens entram no HMAC, qualquer cadastro feito entre o export e a confirmação invalida o comprovante e o servidor manda exportar de novo — nunca se apaga o que ninguém baixou.
+- **Data de corte anterior a 6 meses**, validado no servidor: arquivamento é para histórico consolidado, e a trava protege de uma data recente digitada por engano.
+- Exclusão em **lotes de 100 ids** (um `.in()` com centenas estoura o limite de URL do PostgREST) e na ordem **dependentes primeiro** (`escalas`, `alocacoes`, depois `eventos`, `operacoes`), senão sobram órfãs.
+
 ## Fluxo de trabalho recomendado ao editar
 
 1. Ler o trecho relevante antes de editar (arquivos grandes — usar Grep para localizar, não abrir tudo).
@@ -291,7 +301,7 @@ Regra prática: **antes de trocar um `style` de ícone por classe, verifique a c
 - **S1 — CORS sem `Origin`:** `origemPermitida` devolve `true` quando não há header `Origin` (curl/apps nativos). Comportamento mantido de propósito; a autorização real é por token, não por CORS.
 - ~~**S2 — token em `localStorage`**~~ — **FEITO na Fase 4 (2026-08)**, ver "Segurança". Resta apenas remover a compatibilidade Bearer depois que todos tiverem recarregado a página.
 - **S4 — `'unsafe-inline'` no `style-src`:** só sai depois de migrar dezenas de `style=` inline para classes (junto da fase de design/Plano 3).
-- **P2 — aposentar `writeDB` de vez:** as rotas de escrita de tabela única já usam `writeRow`/`readTabela`, mas as agregadoras e as demais ainda usam o shim `readDB()`/`writeDB()`. Substituição total fica para a fase de performance.
+- ~~**P2 — `readDB()` nas agregadoras**~~ — **FEITO na Fase 6 (2026-08).** As 6 agregadoras e as 7 rotas de cartão deixaram de baixar as 11 tabelas: 143 → 27 SELECTs somando uma chamada de cada (−81%). Restam **dois** `readDB()`, ambos legítimos: `/api/backup` (precisa de tudo) e `/api/config`. Equivalência verificada byte a byte nas 9 respostas antes/depois.
 - **P5 — índices/paginação no Supabase:** sem índices dedicados nem paginação nas listagens grandes; fase de performance.
 - **S10 — confirmar RLS em produção:** verificar via `get_advisors` (Supabase MCP) que o `rls_disabled_in_public` está fechado — exige aprovação manual do tool call, apenas reportar, sem alterar nada.
 
