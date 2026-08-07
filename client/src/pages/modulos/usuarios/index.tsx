@@ -3,6 +3,7 @@ import { UsersRound, UserPlus, Download } from 'lucide-react';
 import { apiFetch } from '../../../lib/api';
 import { useToast } from '../../../context/useToast';
 import { TabelaUsuarios } from './TabelaUsuarios';
+import { PainelArquivamento } from './PainelArquivamento';
 import { ModalUsuario } from './ModalUsuario';
 import { ModalResetSenha } from './ModalResetSenha';
 import { useUsuariosCrud, type NovoUsuarioPayload, type UsuarioPublico } from './useUsuariosCrud';
@@ -86,6 +87,10 @@ export default function UsuariosPage() {
           usuarios={usuarios} onEditar={handleEditar} onResetarSenha={setUsuarioParaReset} onExcluir={handleExcluir}
         />
       </div>
+
+      {/* Manutenção do banco: fica em Administração, junto de Usuários, porque é
+          P3-only e não pertence a nenhum módulo operacional. */}
+      <PainelArquivamento />
 
       {modalAberto && (
         <ModalUsuario
