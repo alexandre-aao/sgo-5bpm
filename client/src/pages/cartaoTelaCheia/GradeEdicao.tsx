@@ -124,10 +124,10 @@ export function GradeEdicao({ cartao, podeEditar, recarregar }: GradeEdicaoProps
                             {emEdicao ? (
                               <>
                                 <button className="btn-icon btn-sm" title="Salvar missão" aria-label="Salvar missão" onClick={() => handleSalvarMissao(vtr.id, item.id)}>
-                                  <Check style={{ width: 14, height: 14 }} />
+                                  <Check />
                                 </button>
                                 <button className="btn-icon btn-sm" title="Cancelar" aria-label="Cancelar" onClick={() => setEditando(null)}>
-                                  <X style={{ width: 14, height: 14 }} />
+                                  <X />
                                 </button>
                               </>
                             ) : (
@@ -136,10 +136,10 @@ export function GradeEdicao({ cartao, podeEditar, recarregar }: GradeEdicaoProps
                                   className="btn-icon btn-sm" title="Mudar missão" aria-label="Mudar missão"
                                   onClick={() => { setMissaoEmEdicao(item.atividade); setEditando({ vtrId: vtr.id, itemId: item.id }); }}
                                 >
-                                  <Pencil style={{ width: 14, height: 14 }} />
+                                  <Pencil />
                                 </button>
                                 <button className="btn-icon btn-sm" title="Remover item" aria-label="Remover item" onClick={() => handleRemover(vtr.id, item.id)}>
-                                  <Trash2 style={{ width: 14, height: 14 }} />
+                                  <Trash2 />
                                 </button>
                               </>
                             )}

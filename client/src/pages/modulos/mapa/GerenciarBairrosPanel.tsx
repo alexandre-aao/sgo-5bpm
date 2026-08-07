@@ -134,13 +134,13 @@ export function GerenciarBairrosPanel({ bairros, criarBairro, atualizarBairro, e
                         type="button" className="btn-icon btn-sm" title="Editar" aria-label="Editar"
                         onClick={() => iniciarEdicao(b)}
                       >
-                        <Pencil style={{ width: 14, height: 14 }} />
+                        <Pencil />
                       </button>
                       <button
                         type="button" className="btn-icon btn-danger btn-sm" title="Excluir" aria-label="Excluir"
                         onClick={() => void handleExcluir(b)}
                       >
-                        <Trash2 style={{ width: 14, height: 14 }} />
+                        <Trash2 />
                       </button>
                     </div>
                   </td>
