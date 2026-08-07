@@ -1,12 +1,11 @@
 // ESLint do BACKEND (server.js, lib/, test/). O frontend tem a config própria em
 // client/eslint.config.js — os dois não se cruzam.
 //
-// O motivo de existir é `no-undef`. O server.js é um arquivo único de ~3.400
-// linhas onde 80 rotas compartilham 49 helpers e 23 constantes de topo, todos no
-// mesmo escopo de módulo. Ao dividi-lo em routers (Fase 8), um helper que deixe
-// de ser importado vira ReferenceError que só aparece quando aquela rota é
-// chamada — silencioso no boot e no `node --check`. `no-undef` transforma isso
-// em erro estático, antes do deploy.
+// O motivo de existir é `no-undef`. Desde a Fase 8, as rotas vivem em fábricas
+// dentro de routes/ e recebem explicitamente seus helpers e constantes. Se uma
+// dependência deixar de ser passada/importada, ela viraria ReferenceError só ao
+// chamar aquela rota — silencioso no boot e no `node --check`. `no-undef`
+// transforma isso em erro estático, antes do deploy.
 
 const globaisNode = {
   require: 'readonly',
