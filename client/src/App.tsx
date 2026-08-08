@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth';
 import { AppDataProvider } from './context/AppDataContext';
 import { ToastProvider } from './context/ToastContext';
+import { ConflitoCartaoProvider } from './context/ConflitoCartaoContext';
 import { Login } from './pages/Login';
 import { AppLayout } from './layout/AppLayout';
 import { RotaCartaoTelaCheia } from './routes/RotaCartaoTelaCheia';
@@ -30,7 +31,9 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <Shell />
+        <ConflitoCartaoProvider>
+          <Shell />
+        </ConflitoCartaoProvider>
       </AuthProvider>
     </ToastProvider>
   );

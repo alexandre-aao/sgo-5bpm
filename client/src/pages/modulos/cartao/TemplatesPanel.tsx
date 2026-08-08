@@ -77,7 +77,7 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
 
   async function handleExcluir() {
     if (!aExcluir) return;
-    const resultado = await excluirTemplate(aExcluir.id);
+    const resultado = await excluirTemplate(aExcluir);
     if (resultado.ok) {
       toast('Cartão padrão excluído.', 'info');
       onExcluido(aExcluir.id);

@@ -21,6 +21,8 @@ import { DocumentoCartaoView, LoteDocumentosCartao } from './RenderDocumentoCart
 import { gerarDocumentosCartaoPdf } from './gerarPdfCartao';
 import { gerarDocumentosCartaoPdfVetorial } from './gerarPdfVetorial';
 import { validarCentralEmissao } from './validacaoEmissao';
+import { cabecalhosVersaoCartao, extrairErroCartao } from '../../../lib/concorrenciaCartao';
+import { useConflitoCartao } from '../../../context/useConflitoCartao';
 
 interface RegistroEmissao {
   id: string;
@@ -154,6 +156,7 @@ function compartilharTextoNativo(titulo: string, texto: string): Promise<'compar
 }
 
 export default function CentralEmissaoPage() {
+  const { avisarConflito } = useConflitoCartao();
   const [searchParams] = useSearchParams();
   const cartaoIdInicial = searchParams.get('cartao');
   const viaturaInicial = searchParams.get('viatura');
@@ -322,7 +325,7 @@ export default function CentralEmissaoPage() {
     if (!cartao) return false;
     const res = await apiFetch(`/api/cartoes/${cartao.id}/emissoes`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...cabecalhosVersaoCartao(cartao) },
       body: JSON.stringify({
         acao,
         modalidade: configuracao.modalidade,
@@ -334,9 +337,17 @@ export default function CentralEmissaoPage() {
       }),
     });
     if (!res.ok) {
-      const corpo = (await res.json().catch(() => ({}))) as { error?: string };
-      toast(corpo.error || 'O documento saiu, mas não foi possível registrar a emissão.', 'danger');
+      const mensagem = await extrairErroCartao(
+        res,
+        'O documento saiu, mas não foi possível registrar a emissão.',
+        (erro) => avisarConflito(() => carregarPorId(cartao.id), erro),
+      );
+      toast(mensagem, 'danger');
       return false;
+    }
+    const corpo = (await res.json()) as { atualizado_em?: string | null };
+    if (corpo.atualizado_em) {
+      setCartao((atual) => atual ? { ...atual, atualizado_em: corpo.atualizado_em ?? null } : atual);
     }
     await carregarHistorico(cartao.id);
     return true;

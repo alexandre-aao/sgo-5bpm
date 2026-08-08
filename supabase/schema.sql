@@ -354,10 +354,11 @@ create or replace function registrar_emissao_cartao(
   p_cartao_id text,
   p_viaturas jsonb,
   p_emissao jsonb,
-  p_retificacao boolean
+  p_retificacao boolean,
+  p_atualizado_em timestamptz
 ) returns void
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -365,8 +366,13 @@ declare
     select jsonb_array_elements_text(coalesce(p_emissao -> 'viaturas_ids', '[]'::jsonb))
   );
 begin
-  update cartoes set viaturas = p_viaturas where id = p_cartao_id;
-  if not found then raise exception 'Cartão Programa não encontrado.'; end if;
+  update cartoes
+     set viaturas = p_viaturas
+   where id = p_cartao_id
+     and atualizado_em = p_atualizado_em;
+  if not found then
+    raise exception using errcode = 'P0001', message = 'CARTAO_DESATUALIZADO';
+  end if;
 
   if p_retificacao then
     update emissoes_cartao
@@ -395,8 +401,8 @@ begin
 end;
 $$;
 
-revoke all on function registrar_emissao_cartao(text, jsonb, jsonb, boolean) from public, anon, authenticated;
-grant execute on function registrar_emissao_cartao(text, jsonb, jsonb, boolean) to service_role;
+revoke all on function registrar_emissao_cartao(text, jsonb, jsonb, boolean, timestamptz) from public, anon, authenticated;
+grant execute on function registrar_emissao_cartao(text, jsonb, jsonb, boolean, timestamptz) to service_role;
 
 -- Bloqueio progressivo de login persistente (migration 008). O backend usa
 -- service_role; anon/authenticated não recebem acesso direto.

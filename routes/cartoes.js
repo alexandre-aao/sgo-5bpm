@@ -9,7 +9,7 @@ module.exports = function criarRouterCartoes({
   buscarCartaoPorId,
   buscarCartoesFiltrados,
   buscarPadraoAtivo,
-  deleteRow,
+  deleteRowSeVersao,
   dentroDaJanelaExclusaoAdjunto,
   exigirEdicaoCartao,
   exigirP3,
@@ -21,8 +21,40 @@ module.exports = function criarRouterCartoes({
   supabase,
   validarCampos,
   writeRow,
+  writeRowSeVersao,
 }) {
   const router = express.Router();
+  const CABECALHO_VERSAO_CARTAO = 'x-cartao-atualizado-em';
+  const CODIGO_CARTAO_DESATUALIZADO = 'CARTAO_DESATUALIZADO';
+
+  function versaoCarregada(req) {
+    return String(req.get(CABECALHO_VERSAO_CARTAO) || '').trim();
+  }
+
+  function exigirVersaoCarregada(req, res) {
+    const versao = versaoCarregada(req);
+    if (versao) return versao;
+    res.status(428).json({
+      code: 'VERSAO_CARTAO_OBRIGATORIA',
+      error: 'Recarregue o Cartão Programa antes de salvar. A versão carregada não foi informada.'
+    });
+    return null;
+  }
+
+  function responderConflito(res) {
+    return res.status(409).json({
+      code: CODIGO_CARTAO_DESATUALIZADO,
+      error: 'Este Cartão Programa foi alterado por outro usuário. Suas alterações não foram salvas; recarregue o cartão para continuar.'
+    });
+  }
+
+  async function gravarCartaoSeAtual(req, res, cartao) {
+    const versao = exigirVersaoCarregada(req, res);
+    if (!versao) return null;
+    const atualizado = await writeRowSeVersao('cartoes', cartao, versao);
+    if (!atualizado) responderConflito(res);
+    return atualizado;
+  }
 
   // -------------------------------------------------------------
   // ROTAS DO CARTÃO PROGRAMA (PATRULHAMENTO DIÁRIO POR VIATURA)
@@ -91,7 +123,7 @@ module.exports = function criarRouterCartoes({
    *
    * A versão sobe só na TRANSIÇÃO (gerado|enviado -> alterado): sem isso, cada
    * ajuste seguinte viraria v3, v4, v5 antes mesmo de o cartão ser reenviado.
-   * Muta o objeto `cartao` recebido; quem chama grava com writeRow.
+   * Muta o objeto `cartao` recebido; quem chama grava com a pré-condição de versão.
    */
   function reavaliarStatusEnvio(cartao) {
     (cartao.viaturas || []).forEach(viatura => {
@@ -140,7 +172,8 @@ module.exports = function criarRouterCartoes({
       tipo_periodo: c.tipo_periodo,
       qtd_viaturas_base: c.qtd_viaturas_base,
       qtd_viaturas: (c.viaturas || []).length,
-      padrao_ativo: !!c.padrao_ativo
+      padrao_ativo: !!c.padrao_ativo,
+      atualizado_em: c.atualizado_em
     })));
   }));
 
@@ -456,8 +489,8 @@ module.exports = function criarRouterCartoes({
       cartao.tipo_periodo = ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo) ? req.body.tipo_periodo : null;
     }
 
-    await writeRow('cartoes', cartao);
-    res.json(cartao);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json(atualizado);
   }));
 
   // Excluir cartão. P3 exclui qualquer um, sem prazo. O Adjunto pode excluir o
@@ -493,7 +526,10 @@ module.exports = function criarRouterCartoes({
       }
     }
 
-    await deleteRow('cartoes', req.params.id);
+    const versao = exigirVersaoCarregada(req, res);
+    if (!versao) return;
+    const apagou = await deleteRowSeVersao('cartoes', req.params.id, versao);
+    if (!apagou) return responderConflito(res);
     res.json({ message: 'Cartão Programa excluído' });
   }));
 
@@ -545,8 +581,8 @@ module.exports = function criarRouterCartoes({
     };
 
     cartao.viaturas.push(novaViatura);
-    await writeRow('cartoes', cartao);
-    res.status(201).json(novaViatura);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.status(201).json(novaViatura);
   }));
 
   // Atualizar viatura
@@ -597,8 +633,8 @@ module.exports = function criarRouterCartoes({
 
     reavaliarStatusEnvio(cartao);
 
-    await writeRow('cartoes', cartao);
-    res.json(viatura);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json(viatura);
   }));
 
   // Remover viatura do cartão
@@ -610,8 +646,8 @@ module.exports = function criarRouterCartoes({
     }
 
     cartao.viaturas = cartao.viaturas.filter(v => v.id !== req.params.vid);
-    await writeRow('cartoes', cartao);
-    res.json({ message: 'Viatura removida do cartão' });
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json({ message: 'Viatura removida do cartão' });
   }));
 
   // Marcar o cartão de uma viatura como gerado ou enviado. É aqui que o retrato
@@ -637,8 +673,8 @@ module.exports = function criarRouterCartoes({
     viatura.gerado_em = new Date().toISOString();
     viatura.hash_conteudo = hashConteudoCartaoViatura(cartao, viatura);
 
-    await writeRow('cartoes', cartao);
-    res.json(viatura);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json(viatura);
   }));
 
   // Histórico da Central de Emissão. É leitura operacional, disponível a todos
@@ -658,6 +694,8 @@ module.exports = function criarRouterCartoes({
   // calculado no servidor e as viaturas selecionadas recebem o mesmo status;
   // assim não existe caminho de emissão que deixe o Cartão como pendente.
   router.post('/cartoes/:id/emissoes', asyncRoute(async (req, res) => {
+    const versaoCarregadaCartao = exigirVersaoCarregada(req, res);
+    if (!versaoCarregadaCartao) return;
     const cartao = await buscarCartaoPorId(req.params.id);
     if (!cartao || cartao.is_template) {
       return res.status(404).json({ error: 'Cartão Programa do dia não encontrado.' });
@@ -730,12 +768,21 @@ module.exports = function criarRouterCartoes({
       p_cartao_id: cartao.id,
       p_viaturas: cartao.viaturas || [],
       p_emissao: registro,
-      p_retificacao: eraRetificacao
+      p_retificacao: eraRetificacao,
+      p_atualizado_em: versaoCarregadaCartao
     });
     if (erroRegistro) {
+      if (erroRegistro.code === 'P0001' || erroRegistro.message.includes(CODIGO_CARTAO_DESATUALIZADO)) {
+        return responderConflito(res);
+      }
       throw new Error(`Falha ao registrar emissão do Cartão Programa: ${erroRegistro.message}`);
     }
-    res.status(201).json({ emissao: registro, viaturas: selecionadas });
+    const cartaoAtualizado = await buscarCartaoPorId(cartao.id);
+    res.status(201).json({
+      emissao: registro,
+      viaturas: selecionadas,
+      atualizado_em: cartaoAtualizado?.atualizado_em || null
+    });
   }));
 
   // Adicionar item de roteiro à viatura
@@ -768,8 +815,8 @@ module.exports = function criarRouterCartoes({
     viatura.itens.push(novoItem);
     viatura.itens = ordenarPorTurno(viatura.itens);
     reavaliarStatusEnvio(cartao);
-    await writeRow('cartoes', cartao);
-    res.status(201).json(novoItem);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.status(201).json(novoItem);
   }));
 
   // Atualizar item de roteiro
@@ -803,8 +850,8 @@ module.exports = function criarRouterCartoes({
 
     viatura.itens = ordenarPorTurno(viatura.itens);
     reavaliarStatusEnvio(cartao);
-    await writeRow('cartoes', cartao);
-    res.json(item);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json(item);
   }));
 
   // Copia o roteiro de outra viatura para a viatura-alvo. Os itens recebem ids
@@ -823,8 +870,8 @@ module.exports = function criarRouterCartoes({
     const copiados = (origem.itens || []).map(item => ({ ...item, id: generateId('cpi') }));
     alvo.itens = ordenarPorTurno(req.body.substituir ? copiados : [...(alvo.itens || []), ...copiados]);
     reavaliarStatusEnvio(cartao);
-    await writeRow('cartoes', cartao);
-    res.json({ itens: alvo.itens, copiados: copiados.length });
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json({ itens: alvo.itens, copiados: copiados.length });
   }));
 
   // Aplica uma atividade a todos os itens das viaturas selecionadas em uma única
@@ -846,8 +893,8 @@ module.exports = function criarRouterCartoes({
       (viatura.itens || []).forEach(item => { item.atividade = atividade; alterados += 1; });
     });
     reavaliarStatusEnvio(cartao);
-    await writeRow('cartoes', cartao);
-    res.json({ alterados });
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json({ alterados });
   }));
 
   // Remover item de roteiro
@@ -863,8 +910,8 @@ module.exports = function criarRouterCartoes({
 
     viatura.itens = viatura.itens.filter(i => i.id !== req.params.iid);
     reavaliarStatusEnvio(cartao);
-    await writeRow('cartoes', cartao);
-    res.json({ message: 'Item de roteiro removido' });
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json({ message: 'Item de roteiro removido' });
   }));
 
   return router;

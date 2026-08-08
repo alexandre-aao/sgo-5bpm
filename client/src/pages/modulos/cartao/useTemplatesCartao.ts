@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import type { ResultadoAcao } from './useCartaoPrograma';
+import { cabecalhosVersaoCartao, extrairErroCartao } from '../../../lib/concorrenciaCartao';
+import { useConflitoCartao } from '../../../context/useConflitoCartao';
 
 export interface TemplateResumo {
   id: string;
@@ -10,6 +12,7 @@ export interface TemplateResumo {
   qtd_viaturas_base: number;
   qtd_viaturas: number;
   padrao_ativo: boolean;
+  atualizado_em: string | null;
 }
 
 export interface NovoTemplatePayload {
@@ -26,6 +29,7 @@ async function extrairErro(res: Response, padrao: string): Promise<string> {
 /** Gestão de Cartões Padrão (templates) — espelha renderTemplatesTab(),
  * handleCriarTemplate() e handleExcluirTemplate() em public/app.js. */
 export function useTemplatesCartao() {
+  const { avisarConflito } = useConflitoCartao();
   const [templates, setTemplates] = useState<TemplateResumo[]>([]);
   const [carregando, setCarregando] = useState(true);
 
@@ -65,17 +69,26 @@ export function useTemplatesCartao() {
     }
   }, [recarregar]);
 
-  const excluirTemplate = useCallback(async (id: string): Promise<ResultadoAcao> => {
+  const excluirTemplate = useCallback(async (template: TemplateResumo): Promise<ResultadoAcao> => {
     try {
-      const res = await apiFetch(`/api/cartoes/${id}`, { method: 'DELETE' });
-      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao excluir o cartão padrão.') };
+      const res = await apiFetch(`/api/cartoes/${template.id}`, {
+        method: 'DELETE', headers: cabecalhosVersaoCartao(template),
+      });
+      if (!res.ok) {
+        const mensagem = await extrairErroCartao(
+          res,
+          'Falha ao excluir o cartão padrão.',
+          (erro) => avisarConflito(recarregar, erro),
+        );
+        return { ok: false, mensagem };
+      }
       await recarregar();
       return { ok: true };
     } catch (erro) {
       console.error('Erro ao excluir cartão padrão:', erro);
       return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
     }
-  }, [recarregar]);
+  }, [avisarConflito, recarregar]);
 
   /** Clona o padrão inteiro (viaturas + roteiro) como um NOVO padrão inativo.
    *  O padrão em vigor não é tocado. */

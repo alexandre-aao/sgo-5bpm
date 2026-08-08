@@ -25,7 +25,7 @@ const ITEM_VAZIO: ItemPayload = { inicio: '', fim: '', local: '', atividade: ATI
  */
 export function GradeEdicao({ cartao, podeEditar, recarregar }: GradeEdicaoProps) {
   const { toast } = useToast();
-  const { adicionarItem, removerItem, atualizarAtividade } = useItensRoteiro(cartao.id, recarregar);
+  const { adicionarItem, removerItem, atualizarAtividade } = useItensRoteiro(cartao, recarregar);
 
   const [editando, setEditando] = useState<{ vtrId: string; itemId: string } | null>(null);
   const [missaoEmEdicao, setMissaoEmEdicao] = useState('');

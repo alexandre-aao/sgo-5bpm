@@ -180,6 +180,7 @@ export type Database = {
           adjunto_exibicao: string | null
           adjunto_pessoal_id: string | null
           ano: number | null
+          atualizado_em: string | null
           data: string | null
           delta07_viatura: string | null
           fiscal: string | null
@@ -201,6 +202,7 @@ export type Database = {
           adjunto_exibicao?: string | null
           adjunto_pessoal_id?: string | null
           ano?: number | null
+          atualizado_em?: string | null
           data?: string | null
           delta07_viatura?: string | null
           fiscal?: string | null
@@ -222,6 +224,7 @@ export type Database = {
           adjunto_exibicao?: string | null
           adjunto_pessoal_id?: string | null
           ano?: number | null
+          atualizado_em?: string | null
           data?: string | null
           delta07_viatura?: string | null
           fiscal?: string | null

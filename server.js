@@ -29,8 +29,8 @@ const {
   POSTOS_GRADUACAO, STATUS_VIATURA, SUBUNIDADES_PESSOAL,
   asyncRoute, buscarCartaoPorId, buscarCartoesFiltrados, buscarConfig,
   buscarPadraoAtivo, buscarRow, buscarSessaoPorToken, buscarUsuarioPorLogin,
-  deleteRow, deleteRows, generateId, getLocalDateStrServer, indexarPor,
-  normalizarTextoServer, readDB, readTabela, readTabelaIn, writeDB, writeRow, writeRows,
+  deleteRow, deleteRowSeVersao, deleteRows, generateId, getLocalDateStrServer, indexarPor,
+  normalizarTextoServer, readDB, readTabela, readTabelaIn, writeDB, writeRow, writeRowSeVersao, writeRows,
 } = require('./lib/dados');
 const criarRouterAlocacoes = require('./routes/alocacoes');
 const criarRouterAdministracao = require('./routes/administracao');
@@ -598,7 +598,7 @@ app.use('/api', criarRouterCartoes({
   buscarCartaoPorId,
   buscarCartoesFiltrados,
   buscarPadraoAtivo,
-  deleteRow,
+  deleteRowSeVersao,
   dentroDaJanelaExclusaoAdjunto,
   exigirEdicaoCartao,
   exigirP3,
@@ -610,6 +610,7 @@ app.use('/api', criarRouterCartoes({
   supabase,
   validarCampos,
   writeRow,
+  writeRowSeVersao,
 }));
 
 

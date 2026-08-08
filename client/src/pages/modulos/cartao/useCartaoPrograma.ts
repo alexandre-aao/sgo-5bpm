@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
+import { cabecalhosVersaoCartao, extrairErroCartao } from '../../../lib/concorrenciaCartao';
+import { useConflitoCartao } from '../../../context/useConflitoCartao';
 
 function getLocalDateStr(date = new Date()): string {
   const y = date.getFullYear();
@@ -47,6 +49,7 @@ interface UseCartaoPrograma {
 /** Busca o Cartão Programa da data selecionada — espelha renderCartaoTab() em
  * public/app.js (lista por data + detalhe). */
 export function useCartaoPrograma(): UseCartaoPrograma {
+  const { avisarConflito } = useConflitoCartao();
   const [dataSelecionada, setDataSelecionada] = useState(dataInicialCartao);
   const [cartao, setCartao] = useState<CartaoDetalhado | null>(null);
   const [temCartao, setTemCartao] = useState<boolean | null>(null);
@@ -151,12 +154,16 @@ export function useCartaoPrograma(): UseCartaoPrograma {
       try {
         const res = await apiFetch(`/api/cartoes/${cartao.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...cabecalhosVersaoCartao(cartao) },
           body: JSON.stringify(patch),
         });
         if (!res.ok) {
-          const corpo = (await res.json().catch(() => ({}))) as { error?: string };
-          return { ok: false, mensagem: corpo.error || 'Falha ao atualizar o cabeçalho do cartão.' };
+          const mensagem = await extrairErroCartao(
+            res,
+            'Falha ao atualizar o cabeçalho do cartão.',
+            (erro) => avisarConflito(recarregar, erro),
+          );
+          return { ok: false, mensagem };
         }
         const atualizado = (await res.json()) as CartaoDetalhado;
         setCartao((atual) => (atual ? { ...atual, ...atualizado } : atual));
@@ -166,7 +173,7 @@ export function useCartaoPrograma(): UseCartaoPrograma {
         return { ok: false, mensagem: 'Falha ao atualizar o cabeçalho do cartão.' };
       }
     },
-    [cartao],
+    [avisarConflito, cartao, recarregar],
   );
 
   return {

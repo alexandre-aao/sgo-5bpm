@@ -8,6 +8,8 @@ import { useToast } from '../../../context/useToast';
 import { apiFetch } from '../../../lib/api';
 import type { CartaoViatura, CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { calcularAlertasCartao } from '../../../lib/cartaoConflitos';
+import { cabecalhosVersaoCartao, extrairErroCartao } from '../../../lib/concorrenciaCartao';
+import { useConflitoCartao } from '../../../context/useConflitoCartao';
 import { useCartaoPrograma } from './useCartaoPrograma';
 import { useViaturasCartao } from './useViaturasCartao';
 import { useItensRoteiro } from './useItensRoteiro';
@@ -31,6 +33,7 @@ import { useBairros } from '../../../hooks/useBairros';
 import { useAvisos } from '../../../hooks/useAvisos';
 
 export default function CartaoProgramaPage() {
+  const { avisarConflito } = useConflitoCartao();
   const { usuario } = useAuth();
   const navigate = useNavigate();
   const { dados } = useAppData();
@@ -77,8 +80,8 @@ export default function CartaoProgramaPage() {
     }
   }, [templateAberto, recarregar]);
 
-  const { adicionarViatura, editarViatura, removerViatura } = useViaturasCartao(cartaoEditando?.id, recarregarAtivo);
-  const { adicionarItem, removerItem, atualizarItem, duplicarItem, copiarRoteiro, aplicarAtividade } = useItensRoteiro(cartaoEditando?.id, recarregarAtivo);
+  const { adicionarViatura, editarViatura, removerViatura } = useViaturasCartao(cartaoEditando, recarregarAtivo);
+  const { adicionarItem, removerItem, atualizarItem, duplicarItem, copiarRoteiro, aplicarAtividade } = useItensRoteiro(cartaoEditando, recarregarAtivo);
 
   const [aba, setAba] = useState<'viaturas' | 'roteiro'>('viaturas');
   const [vtrEmEdicao, setVtrEmEdicao] = useState<CartaoViatura | null>(null);
@@ -160,10 +163,16 @@ export default function CartaoProgramaPage() {
   async function handleConfirmarExclusao() {
     if (!cartaoEditando) return;
     try {
-      const res = await apiFetch(`/api/cartoes/${cartaoEditando.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/cartoes/${cartaoEditando.id}`, {
+        method: 'DELETE', headers: cabecalhosVersaoCartao(cartaoEditando),
+      });
       if (!res.ok) {
-        const corpo = (await res.json().catch(() => ({}))) as { error?: string };
-        toast(corpo.error || 'Falha ao excluir o Cartão Programa.', 'danger');
+        const mensagem = await extrairErroCartao(
+          res,
+          'Falha ao excluir o Cartão Programa.',
+          (erro) => avisarConflito(recarregarAtivo, erro),
+        );
+        toast(mensagem, 'danger');
         return;
       }
       setModalExcluirAberto(false);
