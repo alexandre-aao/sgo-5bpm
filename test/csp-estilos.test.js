@@ -23,12 +23,11 @@ test('frontend não cria atributos style próprios', () => {
 
 test("style-src da produção não contém 'unsafe-inline'", () => {
   const config = JSON.parse(fs.readFileSync(path.join(raiz, 'vercel.json'), 'utf8'));
-  const cabecalho = config.headers
-    .flatMap((regra) => regra.headers)
-    .find((header) => header.key.toLowerCase() === 'content-security-policy');
-  assert.ok(cabecalho, 'vercel.json precisa aplicar CSP ao frontend estático');
-  const diretiva = cabecalho.value.split(';').map((item) => item.trim()).find((item) => item.startsWith('style-src '));
+  const regra = config.routes.find((rota) => rota.headers?.['Content-Security-Policy']);
+  assert.ok(regra?.continue, 'a regra CSP precisa continuar até a rota de destino');
+  const csp = regra.headers['Content-Security-Policy'];
+  const diretiva = csp.split(';').map((item) => item.trim()).find((item) => item.startsWith('style-src '));
   assert.ok(diretiva);
   assert.ok(!diretiva.includes("'unsafe-inline'"), `diretiva insegura: ${diretiva}`);
-  assert.match(cabecalho.value, /style-src-attr 'unsafe-inline'/, 'Leaflet ainda precisa da exceção restrita a atributos');
+  assert.match(csp, /style-src-attr 'unsafe-inline'/, 'Leaflet ainda precisa da exceção restrita a atributos');
 });
