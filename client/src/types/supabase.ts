@@ -323,6 +323,7 @@ export type Database = {
           data_inicio: string
           data_termino: string | null
           demandante: string | null
+          endereco: string | null
           horario_inicio: string | null
           id: string
           local_itinerario: string | null
@@ -338,6 +339,7 @@ export type Database = {
           data_inicio: string
           data_termino?: string | null
           demandante?: string | null
+          endereco?: string | null
           horario_inicio?: string | null
           id: string
           local_itinerario?: string | null
@@ -353,6 +355,7 @@ export type Database = {
           data_inicio?: string
           data_termino?: string | null
           demandante?: string | null
+          endereco?: string | null
           horario_inicio?: string | null
           id?: string
           local_itinerario?: string | null

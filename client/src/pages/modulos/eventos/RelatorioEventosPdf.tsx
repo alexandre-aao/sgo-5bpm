@@ -1,6 +1,7 @@
 import type { Tables } from '../../../types/supabase';
 import { CabecalhoRelatorioPdf } from '../../../components/relatorioPdf/CabecalhoRelatorioPdf';
 import type { FiltrosEventos } from './filtros';
+import { enderecoEvento } from '../../../lib/enderecoEvento';
 
 interface RelatorioEventosPdfProps {
   eventos: Tables<'eventos'>[];
@@ -44,7 +45,7 @@ export function RelatorioEventosPdf({ eventos, filtros }: RelatorioEventosPdfPro
               <td>{dataBr(evt.data_inicio)}</td>
               <td>{evt.num_os_manual || '-'}</td>
               <td>{evt.nome_evento}</td>
-              <td>{evt.local_itinerario || evt.bairro || '-'}</td>
+              <td>{enderecoEvento(evt) || '-'}</td>
               <td>{evt.num_sei || '-'}</td>
             </tr>
           ))}

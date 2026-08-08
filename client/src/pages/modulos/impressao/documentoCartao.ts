@@ -4,6 +4,7 @@ import { normalizarTexto } from '../../../lib/cartaoConflitos';
 import { abreviarPosto } from '../../../lib/abrevPosto';
 import { dataBr, janela24h } from '../../../lib/janelaCartao';
 import { horarioDaAtividade, madrugadaSeguraTexto, ordenarViaturasQuadroResumo } from '../../../lib/quadroResumo';
+import { enderecoEvento } from '../../../lib/enderecoEvento';
 
 export type ModalidadeEmissao = 'guarnicao' | 'arquivo_sei' | 'consolidado' | 'quadro_resumo' | 'personalizado';
 export type FormatoDocumento = 'celular' | 'a4';
@@ -156,7 +157,7 @@ function eventosDaViatura(
     nome: evento.nome_evento,
     tipo: evento.tipo_evento,
     horario: evento.horario_inicio || '',
-    local: evento.local_itinerario || '',
+    local: enderecoEvento(evento),
     bairro: evento.bairro || '',
     numeroOs: evento.num_os_manual || '',
   }));

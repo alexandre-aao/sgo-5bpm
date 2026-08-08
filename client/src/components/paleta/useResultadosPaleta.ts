@@ -89,7 +89,7 @@ export function useResultadosPaleta(
     if (permitido('eventos')) {
       for (const evt of dados.eventos) {
         if (resultados.filter((r) => r.grupo === 'Eventos').length >= LIMITE_POR_GRUPO) break;
-        if (!casa(evt.nome_evento, evt.bairro, evt.local_itinerario, evt.num_os_manual, evt.num_sei)) continue;
+        if (!casa(evt.nome_evento, evt.bairro, evt.endereco, evt.local_itinerario, evt.num_os_manual, evt.num_sei)) continue;
         resultados.push({
           id: `evt-${evt.id}`,
           grupo: 'Eventos',

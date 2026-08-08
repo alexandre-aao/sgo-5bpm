@@ -24,6 +24,7 @@ function formularioDoEvento(evento: Tables<'eventos'>): EventoPayload {
     data_inicio: evento.data_inicio || '',
     data_termino: evento.data_termino || '',
     horario_inicio: evento.horario_inicio || '',
+    endereco: evento.endereco || '',
     local_itinerario: evento.local_itinerario || '',
     bairro: evento.bairro || '',
   };
@@ -56,6 +57,7 @@ export function ModalEditarEvento({ evento, onFechar, onSalvar }: ModalEditarEve
       data_inicio: form.data_inicio,
       data_termino: form.data_termino,
       horario_inicio: form.horario_inicio,
+      endereco: form.endereco.trim(),
       local_itinerario: form.local_itinerario.trim(),
       bairro: form.bairro,
     });
@@ -132,13 +134,22 @@ export function ModalEditarEvento({ evento, onFechar, onSalvar }: ModalEditarEve
             </div>
             <div className="form-row">
               <div className="form-group col-md-8">
-                <label htmlFor="edit-local_itinerario">Local / Itinerário *</label>
+                <label htmlFor="edit-endereco">Endereço</label>
                 <input
-                  type="text" id="edit-local_itinerario" required
-                  value={form.local_itinerario} onChange={(e) => atualizar('local_itinerario', e.target.value)}
+                  type="text" id="edit-endereco" maxLength={300}
+                  value={form.endereco} onChange={(e) => atualizar('endereco', e.target.value)}
                 />
               </div>
               <SeletorBairro idPrefix="edit-bairro" value={form.bairro} onChange={(v) => atualizar('bairro', v)} />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="edit-local_itinerario">Local / Itinerário *</label>
+                <input
+                  type="text" id="edit-local_itinerario" required maxLength={300}
+                  value={form.local_itinerario} onChange={(e) => atualizar('local_itinerario', e.target.value)}
+                />
+              </div>
             </div>
           </div>
 

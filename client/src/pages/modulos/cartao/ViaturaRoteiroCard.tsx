@@ -9,6 +9,7 @@ import { ATIVIDADES_CARTAO, atividadeBadgeClass, categoriaBadgeClass } from './c
 import { eventosNoSetorDaVtr } from './eventosNoSetor';
 import type { ItemPayload } from './useItensRoteiro';
 import type { ResultadoAcao } from './useCartaoPrograma';
+import { enderecoEvento } from '../../../lib/enderecoEvento';
 
 interface ViaturaRoteiroCardProps {
   vtr: CartaoViatura;
@@ -114,7 +115,7 @@ export function ViaturaRoteiroCard({
       </div>
 
       <div className="cartao-vtr-body">
-        {eventosSetor.length > 0 && <div className="cartao-evento-alerta"><CalendarCheck /><div><strong>EVENTOS NO SETOR NESTA DATA</strong>{eventosSetor.map((evento) => <div className="cartao-evento-linha" key={evento.id}>• <strong>{evento.nome_evento}</strong> ({evento.tipo_evento}) — {evento.horario_inicio ? `às ${formatHoraCartao(evento.horario_inicio)}` : 'horário não informado'} — {evento.local_itinerario}</div>)}</div></div>}
+        {eventosSetor.length > 0 && <div className="cartao-evento-alerta"><CalendarCheck /><div><strong>EVENTOS NO SETOR NESTA DATA</strong>{eventosSetor.map((evento) => <div className="cartao-evento-linha" key={evento.id}>• <strong>{evento.nome_evento}</strong> ({evento.tipo_evento}) — {evento.horario_inicio ? `às ${formatHoraCartao(evento.horario_inicio)}` : 'horário não informado'} — {enderecoEvento(evento)}</div>)}</div></div>}
 
         {podeEditar && todasViaturas.length > 1 && <div className="roteiro-copiar"><Copy /><span>Copiar roteiro de</span><select value={origemRoteiro} onChange={(e) => setOrigemRoteiro(e.target.value)}><option value="">Selecione...</option>{todasViaturas.filter((item) => item.id !== vtr.id).map((item) => <option key={item.id} value={item.id}>{item.prefixo}</option>)}</select><button type="button" className="btn btn-secondary btn-sm" onClick={() => void copiarRoteiro(false)}>Adicionar</button><button type="button" className="btn btn-secondary btn-sm" onClick={() => void copiarRoteiro(true)}>Substituir</button></div>}
 

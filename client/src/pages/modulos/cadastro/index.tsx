@@ -24,6 +24,7 @@ interface FormularioEvento {
   dataInicio: string;
   dataTermino: string;
   horarioInicio: string;
+  endereco: string;
   localItinerario: string;
   bairro: string;
 }
@@ -33,7 +34,7 @@ function formularioVazio(): FormularioEvento {
     numOficio: '', numOsManual: '', numSei: '',
     tipoEvento: '', nomeEvento: '', demandante: '',
     dataInicio: dataHojeStr(), dataTermino: '', horarioInicio: '',
-    localItinerario: '', bairro: '',
+    endereco: '', localItinerario: '', bairro: '',
   };
 }
 
@@ -70,6 +71,7 @@ export default function CadastroPage() {
       data_inicio: form.dataInicio,
       data_termino: form.dataTermino,
       horario_inicio: form.horarioInicio,
+      endereco: form.endereco.trim(),
       local_itinerario: form.localItinerario.trim(),
       bairro: form.bairro,
     };
@@ -189,13 +191,22 @@ export default function CadastroPage() {
             </div>
             <div className="form-row">
               <div className="form-group col-md-8">
-                <label htmlFor="local_itinerario">Local / Itinerário *</label>
+                <label htmlFor="endereco">Endereço</label>
                 <input
-                  type="text" id="local_itinerario" required placeholder="Ex: Avenida Principal, do número 10 ao 500"
-                  value={form.localItinerario} onChange={(e) => atualizar('localItinerario', e.target.value)}
+                  type="text" id="endereco" maxLength={300} placeholder="Ex: Av. Eng. Roberto Freire, 1234"
+                  value={form.endereco} onChange={(e) => atualizar('endereco', e.target.value)}
                 />
               </div>
               <SeletorBairro idPrefix="bairro" value={form.bairro} onChange={(v) => atualizar('bairro', v)} />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="local_itinerario">Local / Itinerário *</label>
+                <input
+                  type="text" id="local_itinerario" required maxLength={300} placeholder="Ex: Praça do evento ou percurso previsto"
+                  value={form.localItinerario} onChange={(e) => atualizar('localItinerario', e.target.value)}
+                />
+              </div>
             </div>
           </div>
 

@@ -21,6 +21,7 @@ export function getEventosFiltrados(eventos: Tables<'eventos'>[], filtros: Filtr
     lista = lista.filter((e) =>
       (e.nome_evento || '').toLowerCase().includes(termo) ||
       (e.bairro || '').toLowerCase().includes(termo) ||
+      (e.endereco || '').toLowerCase().includes(termo) ||
       (e.local_itinerario || '').toLowerCase().includes(termo) ||
       (e.demandante || '').toLowerCase().includes(termo) ||
       (e.num_os_manual || '').toLowerCase().includes(termo) ||

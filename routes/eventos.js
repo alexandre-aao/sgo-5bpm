@@ -24,6 +24,7 @@ module.exports = function criarRouterEventos({
       nome_evento: { obrigatorio: true, tipo: 'string', max: 200, label: 'Nome do Evento' },
       tipo_evento: { obrigatorio: true, tipo: 'string', max: 50, valores: TIPOS_EVENTO, label: 'Tipo de Evento' },
       local_itinerario: { obrigatorio: true, tipo: 'string', max: 300, label: 'Local/Itinerário' },
+      endereco: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Endereço' },
       data_inicio: { obrigatorio: true, tipo: 'string', max: 10, label: 'Data de Início' },
       data_termino: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Término' },
       horario_inicio: { obrigatorio: false, tipo: 'string', max: 5, padrao: '', label: 'Horário de Início' },
@@ -47,6 +48,7 @@ module.exports = function criarRouterEventos({
       data_termino: v.valores.data_termino || v.valores.data_inicio,
       horario_inicio: v.valores.horario_inicio,
       local_itinerario: v.valores.local_itinerario,
+      endereco: v.valores.endereco,
       bairro: v.valores.bairro
     };
 
@@ -62,6 +64,7 @@ module.exports = function criarRouterEventos({
       nome_evento: { obrigatorio: false, tipo: 'string', max: 200, label: 'Nome do Evento' },
       tipo_evento: { obrigatorio: false, tipo: 'string', max: 50, valores: TIPOS_EVENTO, label: 'Tipo de Evento' },
       local_itinerario: { obrigatorio: false, tipo: 'string', max: 300, label: 'Local/Itinerário' },
+      endereco: { obrigatorio: false, tipo: 'string', max: 300, label: 'Endereço' },
       data_inicio: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Início' },
       data_termino: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Término' },
       horario_inicio: { obrigatorio: false, tipo: 'string', max: 5, label: 'Horário de Início' },

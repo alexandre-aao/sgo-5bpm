@@ -22,6 +22,7 @@ export interface EventoPayload {
   data_inicio: string;
   data_termino: string;
   horario_inicio: string;
+  endereco: string;
   local_itinerario: string;
   bairro: string;
 }
