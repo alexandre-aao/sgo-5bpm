@@ -701,9 +701,9 @@ module.exports = function criarRouterCartoes({
       return res.status(404).json({ error: 'Cartão Programa do dia não encontrado.' });
     }
 
-    const modalidades = ['guarnicao', 'arquivo_sei', 'consolidado', 'personalizado'];
+    const modalidades = ['guarnicao', 'arquivo_sei', 'consolidado', 'quadro_resumo', 'personalizado'];
     const formatos = ['celular', 'a4'];
-    const tipos = ['individual', 'consolidado'];
+    const tipos = ['individual', 'consolidado', 'quadro_resumo'];
     const agrupamentos = ['nenhum', 'companhia', 'categoria'];
     const acao = req.body.acao === 'enviado' ? 'enviado' : 'gerado';
     if (!modalidades.includes(req.body.modalidade) || !formatos.includes(req.body.formato)
