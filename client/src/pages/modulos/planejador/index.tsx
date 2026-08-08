@@ -118,8 +118,8 @@ export default function PlanejadorPage() {
       <div className="kpi-row plan-kpis">
         <div className="kpi-card">
           <div className="kpi-topo">
-            <span className="kpi-label" style={{ color: 'var(--primary)' }}>Cota Mensal</span>
-            <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
+            <span className="kpi-label texto-primary">Cota Mensal</span>
+            <span className="kpi-icone fundo-primary tom-primary">
               <Wallet />
             </span>
           </div>
@@ -130,8 +130,8 @@ export default function PlanejadorPage() {
         <div className="kpi-card">
           <div className="kpi-topo">
             {/* Medida de consumo, não situação — azul institucional. */}
-            <span className="kpi-label" style={{ color: 'var(--primary)' }}>Consumido</span>
-            <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
+            <span className="kpi-label texto-primary">Consumido</span>
+            <span className="kpi-icone fundo-primary tom-primary">
               <CheckCircle />
             </span>
           </div>
@@ -141,8 +141,8 @@ export default function PlanejadorPage() {
 
         <div className="kpi-card">
           <div className="kpi-topo">
-            <span className="kpi-label" style={{ color: 'var(--info-fg)' }}>Planejado</span>
-            <span className="kpi-icone" style={{ background: 'var(--info-bg)', color: 'var(--info-fg)' }}>
+            <span className="kpi-label texto-info">Planejado</span>
+            <span className="kpi-icone fundo-info tom-info">
               <Clock />
             </span>
           </div>
@@ -154,21 +154,15 @@ export default function PlanejadorPage() {
           <div className="kpi-topo">
             {/* Único KPI de situação da tela: cota estourada (vermelho) x saldo
                 positivo (verde). O amarelo do estado normal era decorativo. */}
-            <span className="kpi-label" style={{ color: estourou ? 'var(--danger-fg)' : 'var(--success-fg)' }}>
+            <span className={`kpi-label ${estourou ? 'texto-danger' : 'texto-success'}`}>
               Disponível
             </span>
-            <span
-              className="kpi-icone"
-              style={{
-                background: estourou ? 'var(--danger-bg)' : 'var(--success-bg)',
-                color: estourou ? 'var(--danger-fg)' : 'var(--success-fg)',
-              }}
-            >
+            <span className={`kpi-icone ${estourou ? 'fundo-danger tom-danger' : 'fundo-success tom-success'}`}>
               <PiggyBank />
             </span>
           </div>
           <div className="kpi-valor-linha">
-            <span className="kpi-valor" style={{ color: estourou ? 'var(--danger-fg)' : undefined }}>
+            <span className={`kpi-valor${estourou ? ' texto-danger' : ''}`}>
               {resumo.saldo}
             </span>
             {pctSaldo !== null && <span className="kpi-sufixo">{pctSaldo}% da cota</span>}

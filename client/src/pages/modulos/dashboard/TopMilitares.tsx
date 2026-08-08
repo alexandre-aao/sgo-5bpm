@@ -20,7 +20,7 @@ export function TopMilitares({ topMilitares }: TopMilitaresProps) {
         <table className="styled-table table-cards-mobile">
           <thead>
             <tr>
-              <th style={{ width: 56 }}>#</th>
+              <th className="col-rank">#</th>
               <th>Policial</th>
               <th className="text-center">Escalas</th>
               <th className="text-center">Diárias</th>

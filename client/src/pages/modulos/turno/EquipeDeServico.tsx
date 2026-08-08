@@ -9,9 +9,9 @@ interface EquipeDeServicoProps {
 // cartão do dia. Espelha o trecho de renderTurnoTab() que monta #turno-equipe.
 export function EquipeDeServico({ cartao }: EquipeDeServicoProps) {
   const equipe = [
-    { papel: 'Fiscal de Operações', nome: cartao?.fiscal, Icone: ShieldCheck, cor: 'var(--primary)', bg: 'var(--primary-soft)' },
-    { papel: 'Adjunto', nome: cartao?.adjunto, Icone: UserCheck, cor: 'var(--info-fg)', bg: 'var(--info-bg)' },
-    { papel: 'Oficial de Sobreaviso', nome: cartao?.oficial_sobreaviso, Icone: PhoneCall, cor: 'var(--roxo)', bg: 'var(--roxo-bg)' },
+    { papel: 'Fiscal de Operações', nome: cartao?.fiscal, Icone: ShieldCheck, classes: 'fundo-primary tom-primary' },
+    { papel: 'Adjunto', nome: cartao?.adjunto, Icone: UserCheck, classes: 'fundo-info tom-info' },
+    { papel: 'Oficial de Sobreaviso', nome: cartao?.oficial_sobreaviso, Icone: PhoneCall, classes: 'fundo-roxo tom-roxo' },
   ];
 
   return (
@@ -25,7 +25,7 @@ export function EquipeDeServico({ cartao }: EquipeDeServicoProps) {
       <div className="turno-equipe">
         {equipe.map((p) => (
           <div className="turno-equipe-item" key={p.papel}>
-            <span className="turno-equipe-icone" style={{ background: p.bg, color: p.cor }}><p.Icone /></span>
+            <span className={`turno-equipe-icone ${p.classes}`}><p.Icone /></span>
             <div>
               <div className="turno-equipe-papel">{p.papel}</div>
               <div className={`turno-equipe-nome${p.nome ? '' : ' turno-equipe-vazio'}`}>{p.nome || 'Não designado'}</div>

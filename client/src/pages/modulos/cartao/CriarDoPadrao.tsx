@@ -55,7 +55,7 @@ export function CriarDoPadrao({ onCriar, data }: CriarDoPadraoProps) {
     return (
       <div className="template-sugerido-box nao-encontrado">
         <span>
-          <AlertTriangle style={{ width: 14, height: 14, verticalAlign: 'middle' }} /> Nenhum cartão padrão ativo. Peça
+          <AlertTriangle className="icone-inline-md icone-alinhado" /> Nenhum cartão padrão ativo. Peça
           ao P3 para definir um em &quot;Cartões Padrão&quot;.
         </span>
       </div>
@@ -71,7 +71,7 @@ export function CriarDoPadrao({ onCriar, data }: CriarDoPadraoProps) {
   return (
     <div className="template-sugerido-box encontrado">
       <span>
-        <LayoutTemplate style={{ width: 14, height: 14, verticalAlign: 'middle' }} /> Cartão padrão:{' '}
+        <LayoutTemplate className="icone-inline-md icone-alinhado" /> Cartão padrão:{' '}
         <strong>{padrao.nome_template}</strong> ({padrao.viaturas.length} viatura(s))
         {ehFallback && (
           <>

@@ -175,7 +175,7 @@ export function GradeEdicao({ cartao, podeEditar, recarregar }: GradeEdicaoProps
                 {ATIVIDADES_CARTAO.map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => handleIncluir(vtr)}>
-                <Plus style={{ width: 14, height: 14 }} /> Incluir
+                <Plus className="icone-inline-md" /> Incluir
               </button>
             </div>
           )}

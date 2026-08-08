@@ -93,7 +93,7 @@ export default function OperacoesPage() {
           </div>
           <FiltrosOperacoesBar filtros={filtros} onMudar={setFiltros} onNova={() => setModalNovaAberto(true)} />
         </div>
-        <p style={{ padding: '12px 20px 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+        <p className="texto-auxiliar operacoes-ajuda">
           Operações nascem <strong>Planejadas</strong> (reservam cota via diárias estimadas) e viram{' '}
           <strong>Executadas</strong>. A diária mostrada é a real quando há efetivo escalado, ou a estimativa
           enquanto ainda não há.

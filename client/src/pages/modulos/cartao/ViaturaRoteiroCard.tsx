@@ -140,7 +140,7 @@ export function ViaturaRoteiroCard({
         {podeEditar && <div className="cartao-item-form">
           <div className="form-group"><label>Início *</label><input type="time" value={novoItem.inicio} onChange={(e) => setNovoItem({ ...novoItem, inicio: e.target.value })} /></div>
           <div className="form-group"><label>Fim</label><input type="time" value={novoItem.fim} onChange={(e) => setNovoItem({ ...novoItem, fim: e.target.value })} /></div>
-          <div className="form-group" style={{ flexGrow: 1 }}><label>Local / Itinerário *</label><input type="text" value={novoItem.local} onChange={(e) => setNovoItem({ ...novoItem, local: e.target.value })} /></div>
+          <div className="form-group crescer"><label>Local / Itinerário *</label><input type="text" value={novoItem.local} onChange={(e) => setNovoItem({ ...novoItem, local: e.target.value })} /></div>
           <div className="form-group"><label>Atividade</label><select value={novoItem.atividade} onChange={(e) => setNovoItem({ ...novoItem, atividade: e.target.value })}>{ATIVIDADES_CARTAO.map((atividade) => <option key={atividade}>{atividade}</option>)}</select></div>
           <button className={`btn btn-primary btn-sm${enviando ? ' btn-carregando' : ''}`} disabled={enviando} onClick={() => void incluirItem()}><Plus /> Incluir</button>
         </div>}

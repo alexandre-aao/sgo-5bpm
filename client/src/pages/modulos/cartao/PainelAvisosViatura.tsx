@@ -86,7 +86,7 @@ export function PainelAvisosViatura({ avisos, bairros, viatura, selecionados, on
   return (
     <div className="form-group">
       <span className="form-label-estatico">
-        <Megaphone style={{ width: 13, height: 13, verticalAlign: '-2px' }} />{' '}
+        <Megaphone className="icone-inline-md icone-alinhado-texto" />{' '}
         {aplicaveis.length} alerta(s) para {nomesCobertura.toUpperCase()}
       </span>
       {soPorNome && (

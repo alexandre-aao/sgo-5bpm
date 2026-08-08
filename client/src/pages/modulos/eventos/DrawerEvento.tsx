@@ -91,8 +91,8 @@ export function DrawerEvento({ eventoId, onFechar, onAlterado }: DrawerEventoPro
                 <div className="detail-item"><strong>Término:</strong> <span>{evento.data_termino ? evento.data_termino.split('-').reverse().join('/') : '-'}</span></div>
                 <div className="detail-item"><strong>Hora:</strong> <span>{evento.horario_inicio || 'Não informada'}</span></div>
                 <div className="detail-item"><strong>Bairro:</strong> <span>{evento.bairro || '-'}</span></div>
-                <div className="detail-item" style={{ gridColumn: 'span 2' }}><strong>Endereço:</strong> <span>{enderecoEvento(evento) || '-'}</span></div>
-                <div className="detail-item" style={{ gridColumn: 'span 2' }}><strong>Local/Itinerário:</strong> <span>{evento.local_itinerario || '-'}</span></div>
+                <div className="detail-item detalhe-duplo"><strong>Endereço:</strong> <span>{enderecoEvento(evento) || '-'}</span></div>
+                <div className="detail-item detalhe-duplo"><strong>Local/Itinerário:</strong> <span>{evento.local_itinerario || '-'}</span></div>
               </div>
             </div>
 

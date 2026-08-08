@@ -87,34 +87,28 @@ export default function TurnoPage() {
 
       <div className="kpi-row turno-kpis">
         <div className="kpi-card kpi-card-horizontal">
-          <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><Calendar /></span>
+          <span className="kpi-icone fundo-primary tom-primary"><Calendar /></span>
           <div>
             <div className="kpi-valor">{eventosDoDia.length}</div>
             <div className="kpi-label-sob">Eventos do dia</div>
           </div>
         </div>
         <div className="kpi-card kpi-card-horizontal">
-          <span className="kpi-icone" style={{ background: 'var(--info-bg)', color: 'var(--info-fg)' }}><Car /></span>
+          <span className="kpi-icone fundo-info tom-info"><Car /></span>
           <div>
             <div className="kpi-valor">{viaturas.length}</div>
             <div className="kpi-label-sob">Viaturas no turno</div>
           </div>
         </div>
         <div className="kpi-card kpi-card-horizontal">
-          <span className="kpi-icone" style={{ background: 'var(--roxo-bg)', color: 'var(--roxo)' }}><Users /></span>
+          <span className="kpi-icone fundo-roxo tom-roxo"><Users /></span>
           <div>
             <div className="kpi-valor">{totalEfetivo}</div>
             <div className="kpi-label-sob">Efetivo empregado</div>
           </div>
         </div>
         <div className="kpi-card kpi-card-horizontal">
-          <span
-            className="kpi-icone"
-            style={{
-              background: avisos.length ? 'var(--warning-bg)' : 'var(--success-bg)',
-              color: avisos.length ? 'var(--warning-fg)' : 'var(--success-fg)',
-            }}
-          >
+          <span className={`kpi-icone ${avisos.length ? 'fundo-warning tom-warning' : 'fundo-success tom-success'}`}>
             <AlertTriangle />
           </span>
           <div>

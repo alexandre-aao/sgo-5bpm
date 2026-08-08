@@ -51,10 +51,10 @@ export function FormAdicionarViatura({ viaturasCadastradas, pessoal, bairros, av
 
   return (
     <div className="panel cartao-add-vtr-panel">
-      <div className="section-actions" style={{ padding: '16px 20px 0 20px' }}>
-        <h4><Car style={{ width: 14, height: 14, verticalAlign: 'middle' }} /> Adicionar Viatura ao Cartão</h4>
+      <div className="section-actions cartao-add-vtr-cabecalho">
+        <h4><Car className="icone-inline-md icone-alinhado" /> Adicionar Viatura ao Cartão</h4>
       </div>
-      <form className="styled-form" style={{ paddingTop: 8 }} onSubmit={handleSubmit}>
+      <form className="styled-form cartao-add-vtr-form" onSubmit={handleSubmit}>
         <datalist id="lista-prefixos-viaturas">
           {viaturasCadastradas.map((v) => <option key={v.id} value={v.prefixo} />)}
         </datalist>
@@ -118,7 +118,7 @@ export function FormAdicionarViatura({ viaturasCadastradas, pessoal, bairros, av
           selecionados={form.avisos_ids}
           onChange={(avisos_ids) => setForm((atual) => ({ ...atual, avisos_ids }))}
         />
-        <div className="form-row" style={{ justifyContent: 'flex-end' }}>
+        <div className="form-row flex-fim">
           <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>
             <Plus /> Adicionar Viatura
           </button>

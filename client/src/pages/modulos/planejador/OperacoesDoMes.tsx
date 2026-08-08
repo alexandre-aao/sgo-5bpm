@@ -39,7 +39,7 @@ export function OperacoesDoMes({ operacoes, onAbrir }: OperacoesDoMesProps) {
               <LinhaTabelaVazia colunas={6}>Nenhuma operação para este mês.</LinhaTabelaVazia>
             ) : (
               operacoes.map((op) => (
-                <tr key={op.id} style={{ cursor: 'pointer' }} onClick={() => onAbrir(op.id)}>
+                <tr key={op.id} className="cursor-acao" onClick={() => onAbrir(op.id)}>
                   <td data-label="Data"><strong>{op.data_inicio.split('-').reverse().join('/')}</strong></td>
                   <td className="card-title-cell">{op.nome_operacao}</td>
                   <td data-label="Tipo">{op.tipo_operacao}</td>
@@ -51,10 +51,10 @@ export function OperacoesDoMes({ operacoes, onAbrir }: OperacoesDoMesProps) {
                       <span className="badge-tint badge-tint-alerta">Sem escala</span>
                     )}
                   </td>
-                  <td className="text-right" data-label="Diárias" style={{ color: 'var(--text-main)', fontWeight: 700 }}>
+                  <td className="text-right texto-principal peso-700" data-label="Diárias">
                     {op.total_diarias}
                     {!op.tem_escala && (
-                      <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.72rem' }}> (est.)</span>
+                      <span className="texto-muted peso-400 texto-xs"> (est.)</span>
                     )}
                   </td>
                 </tr>

@@ -39,7 +39,7 @@ export function SeletorBairro({ idPrefix, value, onChange, className }: SeletorB
       </select>
       {modoOutro && (
         <input
-          type="text" id={`${idPrefix}_outro`} placeholder="Digite o nome do bairro" style={{ marginTop: 8 }}
+          type="text" id={`${idPrefix}_outro`} placeholder="Digite o nome do bairro" className="margem-topo-2"
           value={value} onChange={(e) => onChange(e.target.value)}
         />
       )}

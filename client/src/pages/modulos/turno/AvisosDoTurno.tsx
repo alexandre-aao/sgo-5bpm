@@ -26,13 +26,12 @@ export function AvisosDoTurno({ avisos }: AvisosDoTurnoProps) {
           </div>
         ) : (
           avisos.map((a, i) => {
-            const cor = a.deCartao ? 'var(--warning-fg)' : 'var(--danger-fg)';
-            const bg = a.deCartao ? 'var(--warning-bg)' : 'var(--danger-bg)';
+            const classesIcone = a.deCartao ? 'fundo-warning tom-warning' : 'fundo-danger tom-danger';
             const Icone = a.deCartao ? AlertTriangle : AlertCircle;
             const titulo = a.deCartao ? 'Conflito no Cartão Programa' : 'Evento com pendência';
             return (
               <div className="dash-alerta-item" key={i}>
-                <span className="dash-alerta-icone" style={{ background: bg, color: cor }}><Icone /></span>
+                <span className={`dash-alerta-icone ${classesIcone}`}><Icone /></span>
                 <div className="dash-alerta-texto">
                   <div className="dash-alerta-titulo">{titulo}</div>
                   <div className="dash-alerta-sub">{a.mensagem}</div>

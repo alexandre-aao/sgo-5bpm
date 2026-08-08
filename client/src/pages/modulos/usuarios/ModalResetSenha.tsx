@@ -37,7 +37,7 @@ export function ModalResetSenha({ usuario, onFechar, onResetar }: ModalResetSenh
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
         <form onSubmit={handleSubmit}>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+          <p className="texto-auxiliar margem-inferior-1">
             Definindo nova senha para <strong>{usuario.nome}</strong>. O usuário precisará usar esta nova senha no próximo login.
           </p>
           <div className="form-group">

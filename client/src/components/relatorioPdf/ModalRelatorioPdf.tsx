@@ -27,7 +27,7 @@ export function ModalRelatorioPdf({ onFechar, children }: ModalRelatorioPdfProps
             <h3 id={idTitulo}><FileDown /> Relatório (PDF)</h3>
             <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
           </div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 10px' }}>
+          <p className="texto-auxiliar modal-relatorio-ajuda">
             Pré-visualização do relatório. Clique em &quot;Imprimir / Salvar PDF&quot; e escolha &quot;Salvar como PDF&quot;.
           </p>
           <div id="relatorio-pdf-area" className="relatorio-pdf-area">{children}</div>

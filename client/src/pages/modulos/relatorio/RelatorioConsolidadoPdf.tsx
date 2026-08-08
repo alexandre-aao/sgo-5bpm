@@ -20,12 +20,12 @@ export function RelatorioConsolidadoPdf({ lista, mes, ano, busca }: RelatorioCon
       <table className="rel-pdf-tabela">
         <thead>
           <tr>
-            <th style={{ width: 34 }}>Nº</th>
-            <th style={{ width: 110 }}>Matrícula</th>
+            <th className="rel-col-34">Nº</th>
+            <th className="rel-col-110">Matrícula</th>
             <th>Nome do Militar</th>
-            <th style={{ width: 90, textAlign: 'center' }}>Escalas</th>
-            <th style={{ width: 90, textAlign: 'center' }}>Aparições</th>
-            <th style={{ width: 120, textAlign: 'right' }}>Total de Diárias</th>
+            <th className="rel-col-90 texto-centro">Escalas</th>
+            <th className="rel-col-90 texto-centro">Aparições</th>
+            <th className="rel-col-120 texto-direita">Total de Diárias</th>
           </tr>
         </thead>
         <tbody>
@@ -34,9 +34,9 @@ export function RelatorioConsolidadoPdf({ lista, mes, ano, busca }: RelatorioCon
               <td>{String(i + 1).padStart(2, '0')}</td>
               <td>{m.militar_id || '-'}</td>
               <td>{m.militar_nome}</td>
-              <td style={{ textAlign: 'center' }}>{m.escalas_count}</td>
-              <td style={{ textAlign: 'center' }}>{m.qtd_aparicoes}</td>
-              <td style={{ textAlign: 'right' }}>{m.total_diarias}</td>
+              <td className="texto-centro">{m.escalas_count}</td>
+              <td className="texto-centro">{m.qtd_aparicoes}</td>
+              <td className="texto-direita">{m.total_diarias}</td>
             </tr>
           ))}
         </tbody>

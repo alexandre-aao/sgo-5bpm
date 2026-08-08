@@ -149,7 +149,7 @@ export function PainelArquivamento() {
                 onChange={(e) => mudarData(e.target.value)}
               />
             </div>
-            <div className="form-group" style={{ alignSelf: 'flex-end' }}>
+            <div className="form-group alinhar-fim">
               <button type="button" className="btn btn-secondary" disabled={!ate || ocupado} onClick={() => void verPrevia()}>
                 Ver o que será arquivado
               </button>

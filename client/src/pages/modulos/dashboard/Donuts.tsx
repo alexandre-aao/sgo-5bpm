@@ -13,6 +13,11 @@ const CORES_TIPO_EVENTO: Record<string, string> = {
   'Missão Avulsa': 'var(--badge-evento-5)',
   Outros: 'var(--badge-neutro)',
 };
+const CLASSES_TIPO_EVENTO: Record<string, string> = {
+  Show: 'legenda-evento-1', Futebol: 'legenda-evento-2', Religioso: 'legenda-evento-3',
+  'Ato Público': 'legenda-evento-7', Cultural: 'legenda-evento-4',
+  'Evento Junino': 'legenda-evento-6', 'Missão Avulsa': 'legenda-evento-5', Outros: 'legenda-neutro',
+};
 function corTipoEvento(tipo: string): string {
   return CORES_TIPO_EVENTO[tipo] || 'var(--badge-neutro)';
 }
@@ -40,7 +45,7 @@ export function DonutDiarias({ periodo, consumido, planejado, cota }: DonutDiari
       </div>
       <div className="dashboard-donut-wrap">
         {cota <= 0 && usado === 0 ? (
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 24 }}>
+          <p className="vazio-compacto">
             Sem cota nem diárias lançadas neste período.
           </p>
         ) : (
@@ -61,9 +66,9 @@ function DonutDiariasSvg({ consumido, planejado, cota }: { consumido: number; pl
   const fatias = [
     // Consumido/planejado são medida de ocupação, não situação — os dois na
     // família azul; o alerta de cota estourada continua no KPI, em vermelho.
-    { valor: consumido, cor: 'var(--primary-solid)', rotulo: 'Consumido (escalas reais)' },
-    { valor: planejado, cor: 'var(--info)', rotulo: 'Planejado (estimado)' },
-    { valor: disponivel, cor: 'var(--border-color)', rotulo: 'Disponível' },
+    { valor: consumido, cor: 'var(--primary-solid)', classe: 'legenda-primary', rotulo: 'Consumido (escalas reais)' },
+    { valor: planejado, cor: 'var(--info)', classe: 'legenda-info', rotulo: 'Planejado (estimado)' },
+    { valor: disponivel, cor: 'var(--border-color)', classe: 'legenda-disponivel', rotulo: 'Disponível' },
   ].filter((f) => f.valor > 0);
 
   const arcos = fatias.reduce<Array<(typeof fatias)[number] & { comprimento: number; offset: number }>>(
@@ -102,7 +107,7 @@ function DonutDiariasSvg({ consumido, planejado, cota }: { consumido: number; pl
           const pct = base > 0 ? Math.round((a.valor / base) * 100) : 0;
           return (
             <span key={a.rotulo}>
-              <i className="legenda-dot" style={{ background: a.cor }} />
+              <i className={`legenda-dot ${a.classe}`} />
               {a.rotulo} — <strong>{a.valor} ({pct}%)</strong>
             </span>
           );
@@ -141,7 +146,7 @@ export function DonutTipo({ distribuicaoTipo }: DonutTipoProps) {
       </div>
       <div className="dashboard-donut-wrap">
         {total === 0 ? (
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 24 }}>Sem eventos neste período.</p>
+          <p className="vazio-compacto">Sem eventos neste período.</p>
         ) : (
           <>
             <svg viewBox="0 0 100 100" className="dashboard-donut-svg">
@@ -161,7 +166,7 @@ export function DonutTipo({ distribuicaoTipo }: DonutTipoProps) {
             <div className="dashboard-donut-legenda">
               {fatias.map((f) => (
                 <span key={f.tipo_evento}>
-                  <i className="legenda-dot" style={{ background: corTipoEvento(f.tipo_evento) }} />
+                  <i className={`legenda-dot ${CLASSES_TIPO_EVENTO[f.tipo_evento] || 'legenda-neutro'}`} />
                   {' '}{f.tipo_evento} ({f.total_eventos})
                 </span>
               ))}

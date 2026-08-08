@@ -1,5 +1,6 @@
 import { LayoutGrid, BarChart3, AlertTriangle, CheckCircle, Car, Map as MapIcon, Activity } from 'lucide-react';
 import type { CartaoViatura, AlertaConflito } from '../../../lib/cartaoConflitos';
+import { BarraPercentual } from '../../../components/BarraPercentual';
 
 const ROTULO_CONFLITO: Record<AlertaConflito['tipo'], string> = {
   sobreposicao: 'Sobreposição de horário',
@@ -9,10 +10,10 @@ const ROTULO_CONFLITO: Record<AlertaConflito['tipo'], string> = {
 
 // Categoria de viatura é classificação, não situação — por isso saiu do
 // vermelho/amarelo (Etapa 1, item 3) e ficou na família azul/roxo.
-const CORES_CATEGORIA: Record<string, string> = {
-  'Ordinária': 'var(--primary)',
-  'Força Tática': 'var(--roxo)',
-  'Suplementar': 'var(--info-fg)',
+const TONS_CATEGORIA: Record<string, { texto: string; barra: 'primary' | 'roxo' | 'info' }> = {
+  'Ordinária': { texto: 'tom-primary', barra: 'primary' },
+  'Força Tática': { texto: 'tom-roxo', barra: 'roxo' },
+  'Suplementar': { texto: 'tom-info', barra: 'info' },
 };
 
 interface TrilhoCartaoProps {
@@ -30,13 +31,13 @@ export function TrilhoCartao({ viaturas, alertas }: TrilhoCartaoProps) {
   const conflitos = alertas.length;
 
   const cards = [
-    { valor: viaturas.length, rotulo: 'Viaturas', Icone: Car, cor: 'var(--primary)', bg: 'var(--primary-soft)' },
-    { valor: setores.size, rotulo: 'Setores', Icone: MapIcon, cor: 'var(--info-fg)', bg: 'var(--info-bg)' },
-    { valor: atividades.size, rotulo: 'Atividades', Icone: Activity, cor: 'var(--roxo)', bg: 'var(--roxo-bg)' },
+    { valor: viaturas.length, rotulo: 'Viaturas', Icone: Car, tom: 'tom-primary', fundo: 'fundo-primary' },
+    { valor: setores.size, rotulo: 'Setores', Icone: MapIcon, tom: 'tom-info', fundo: 'fundo-info' },
+    { valor: atividades.size, rotulo: 'Atividades', Icone: Activity, tom: 'tom-roxo', fundo: 'fundo-roxo' },
     {
       valor: conflitos, rotulo: 'Conflitos', Icone: AlertTriangle,
-      cor: conflitos ? 'var(--danger-fg)' : 'var(--success-fg)',
-      bg: conflitos ? 'var(--danger-bg)' : 'var(--success-bg)',
+      tom: conflitos ? 'tom-danger' : 'tom-success',
+      fundo: conflitos ? 'fundo-danger' : 'fundo-success',
     },
   ];
 
@@ -57,9 +58,9 @@ export function TrilhoCartao({ viaturas, alertas }: TrilhoCartaoProps) {
         <div className="cartao-resumo-mini">
           {cards.map((c) => (
             <div className="resumo-mini-card" key={c.rotulo}>
-              <span className="resumo-mini-icone" style={{ background: c.bg, color: c.cor }}><c.Icone /></span>
+              <span className={`resumo-mini-icone ${c.fundo} ${c.tom}`}><c.Icone /></span>
               <div>
-                <div className="resumo-mini-valor" style={{ color: c.cor }}>{c.valor}</div>
+                <div className={`resumo-mini-valor ${c.tom}`}>{c.valor}</div>
                 <div className="resumo-mini-rotulo">{c.rotulo}</div>
               </div>
             </div>
@@ -77,14 +78,14 @@ export function TrilhoCartao({ viaturas, alertas }: TrilhoCartaoProps) {
           ) : (
             linhasCategoria.map(([cat, qtd]) => {
               const pct = Math.round((qtd / totalViaturas) * 100);
-              const cor = CORES_CATEGORIA[cat] || 'var(--badge-neutro)';
+              const tom = TONS_CATEGORIA[cat] || { texto: 'tom-neutro', barra: 'neutro' as const };
               return (
                 <div className="categoria-linha" key={cat}>
                   <div className="categoria-topo">
-                    <span style={{ fontWeight: 600, color: cor }}>{cat}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{qtd} ({pct}%)</span>
+                    <span className={`peso-600 ${tom.texto}`}>{cat}</span>
+                    <span className="texto-muted">{qtd} ({pct}%)</span>
                   </div>
-                  <div className="mini-bar-track"><div className="mini-bar-fill" style={{ width: `${pct}%`, background: cor }} /></div>
+                  <BarraPercentual valor={pct} tom={tom.barra} />
                 </div>
               );
             })
@@ -103,7 +104,7 @@ export function TrilhoCartao({ viaturas, alertas }: TrilhoCartaoProps) {
           ) : (
             alertas.map((a, i) => (
               <div className="dash-alerta-item" key={i}>
-                <span className="dash-alerta-icone" style={{ background: 'var(--warning-bg)', color: 'var(--warning-fg)' }}>
+                <span className="dash-alerta-icone fundo-warning tom-warning">
                   <AlertTriangle />
                 </span>
                 <div className="dash-alerta-texto">

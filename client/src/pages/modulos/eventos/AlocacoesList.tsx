@@ -12,7 +12,7 @@ interface AlocacoesListProps {
 export function AlocacoesList({ alocacoes, podeEditar, onRemover }: AlocacoesListProps) {
   if (alocacoes.length === 0) {
     return (
-      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>
+      <p className="texto-auxiliar texto-centro espaco-3">
         Nenhuma modalidade alocada.
       </p>
     );
@@ -33,7 +33,7 @@ export function AlocacoesList({ alocacoes, podeEditar, onRemover }: AlocacoesLis
               className="btn-icon btn-danger btn-sm" title="Remover alocação" aria-label="Remover alocação"
               onClick={() => onRemover(item)}
             >
-              <Trash style={{ width: 12, height: 12 }} />
+              <Trash className="icone-inline-sm" />
             </button>
           )}
         </div>

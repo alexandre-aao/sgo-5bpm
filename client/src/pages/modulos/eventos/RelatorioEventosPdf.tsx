@@ -30,12 +30,12 @@ export function RelatorioEventosPdf({ eventos, filtros }: RelatorioEventosPdfPro
       <table className="rel-pdf-tabela">
         <thead>
           <tr>
-            <th style={{ width: 34 }}>Nº</th>
-            <th style={{ width: 78 }}>Data</th>
-            <th style={{ width: 150 }}>Nº OS</th>
+            <th className="rel-col-34">Nº</th>
+            <th className="rel-col-78">Data</th>
+            <th className="rel-col-150">Nº OS</th>
             <th>Nome do Evento</th>
             <th>Endereço/Local</th>
-            <th style={{ width: 150 }}>Nº SEI</th>
+            <th className="rel-col-150">Nº SEI</th>
           </tr>
         </thead>
         <tbody>

@@ -1,6 +1,7 @@
 import { Calendar, ShieldAlert, Wallet, AlertTriangle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { DashboardStats } from './useDashboardStats';
+import { BarraPercentual } from '../../../components/BarraPercentual';
 
 // Espelha renderTendencia() em public/app.js: "novo" quando não havia nada no
 // período anterior, seta + variação % nos demais casos, nada quando os dois são 0.
@@ -57,8 +58,8 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
           leitura pura e obrigavam a navegação manual até o dado. */}
       <Link to={`/eventos?de=${hojeIso()}&ate=${daquiASeteDias()}`} className="kpi-card kpi-card-clicavel" title="Ver estes eventos na lista">
         <div className="kpi-topo">
-          <span className="kpi-label" style={{ color: 'var(--primary)' }}>Eventos (7 dias)</span>
-          <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
+          <span className="kpi-label texto-primary">Eventos (7 dias)</span>
+          <span className="kpi-icone fundo-primary tom-primary">
             <Calendar />
           </span>
         </div>
@@ -74,8 +75,8 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
         <div className="kpi-topo">
           {/* Contagem de operações não é situação nem prioridade — sai do verde
               e volta pro azul institucional (Etapa 1, item 3). */}
-          <span className="kpi-label" style={{ color: 'var(--primary)' }}>Operações (período)</span>
-          <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
+          <span className="kpi-label texto-primary">Operações (período)</span>
+          <span className="kpi-icone fundo-primary tom-primary">
             <ShieldAlert />
           </span>
         </div>
@@ -95,21 +96,19 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
         <div className="kpi-topo">
           {/* O amarelo daqui era decorativo; o estouro de cota continua sinalizado
               em vermelho no próprio número, logo abaixo. */}
-          <span className="kpi-label" style={{ color: 'var(--primary)' }}>Diárias Consumidas</span>
-          <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
+          <span className="kpi-label texto-primary">Diárias Consumidas</span>
+          <span className="kpi-icone fundo-primary tom-primary">
             <Wallet />
           </span>
         </div>
         <div className="kpi-valor-linha">
-          <span className="kpi-valor" style={{ color: stats.cota > 0 && stats.consumidoMes > stats.cota ? 'var(--danger-fg)' : undefined }}>
+          <span className={`kpi-valor${stats.cota > 0 && stats.consumidoMes > stats.cota ? ' texto-danger' : ''}`}>
             {stats.consumidoMes}
           </span>
           <span className="kpi-sufixo">de {stats.cota}</span>
         </div>
         <div className="kpi-rodape kpi-rodape-barra">
-          <div className="mini-bar-track">
-            <div className="mini-bar-fill" style={{ width: `${pctCota}%` }} />
-          </div>
+          <BarraPercentual valor={pctCota} ariaLabel={`${pctCota}% da cota consumida`} />
           <span className="kpi-pct">{pctCota}%</span>
         </div>
       </Link>
@@ -120,19 +119,10 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
         title="Ir para o Cartão Programa de hoje"
       >
         <div className="kpi-topo">
-          <span
-            className="kpi-label"
-            style={{ color: semConflito ? 'var(--success-fg)' : 'var(--danger-fg)' }}
-          >
+          <span className={`kpi-label ${semConflito ? 'texto-success' : 'texto-danger'}`}>
             Conflitos Hoje
           </span>
-          <span
-            className="kpi-icone"
-            style={{
-              background: semConflito ? 'var(--success-bg)' : 'var(--danger-bg)',
-              color: semConflito ? 'var(--success-fg)' : 'var(--danger-fg)',
-            }}
-          >
+          <span className={`kpi-icone ${semConflito ? 'fundo-success tom-success' : 'fundo-danger tom-danger'}`}>
             <AlertTriangle />
           </span>
         </div>

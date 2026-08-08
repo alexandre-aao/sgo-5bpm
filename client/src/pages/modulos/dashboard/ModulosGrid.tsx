@@ -29,37 +29,37 @@ export function ModulosGrid({ resumo, cartaoHoje }: ModulosGridProps) {
       </div>
       <div className="mod-grid">
         <Link to="/eventos" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><CalendarRange /></span>
+          <span className="mod-icone fundo-primary tom-primary"><CalendarRange /></span>
           <span className="mod-nome">Eventos</span>
           <span className="mod-desc">{descEventos}</span>
         </Link>
         <Link to="/cartao" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><Car /></span>
+          <span className="mod-icone fundo-primary tom-primary"><Car /></span>
           <span className="mod-nome">Cartão Programa</span>
           <span className="mod-desc">{descCartao}</span>
         </Link>
         <Link to="/planejador" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><ClipboardList /></span>
+          <span className="mod-icone fundo-primary tom-primary"><ClipboardList /></span>
           <span className="mod-nome">Planejador de Diárias</span>
           <span className="mod-desc">{descPlanejador}</span>
         </Link>
         <Link to="/relatorio" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--roxo-bg)', color: 'var(--roxo)' }}><FileText /></span>
+          <span className="mod-icone fundo-roxo tom-roxo"><FileText /></span>
           <span className="mod-nome">Relatório de Diárias</span>
           <span className="mod-desc">Consolidado por militar</span>
         </Link>
         <Link to="/viaturas" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--info-bg)', color: 'var(--info-fg)' }}><Car /></span>
+          <span className="mod-icone fundo-info tom-info"><Car /></span>
           <span className="mod-nome">Cadastro de Viaturas</span>
           <span className="mod-desc">{descViaturas}</span>
         </Link>
         <Link to="/pessoal" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--roxo-bg)', color: 'var(--roxo)' }}><Users /></span>
+          <span className="mod-icone fundo-roxo tom-roxo"><Users /></span>
           <span className="mod-nome">Pessoal</span>
           <span className="mod-desc">{descPessoal}</span>
         </Link>
         <Link to="/usuarios" className="mod-card">
-          <span className="mod-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><User /></span>
+          <span className="mod-icone fundo-primary tom-primary"><User /></span>
           <span className="mod-nome">Usuários</span>
           <span className="mod-desc">{descUsuarios}</span>
         </Link>

@@ -72,10 +72,10 @@ export function GerenciarBairrosPanel({ bairros, criarBairro, atualizarBairro, e
           <MapPinPlus />
           <h2>Cadastro de Bairros</h2>
         </div>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Alimenta o Mapa e a lista de Bairro em Novo Evento.</p>
+        <p className="texto-auxiliar">Alimenta o Mapa e a lista de Bairro em Novo Evento.</p>
       </div>
 
-      <form className="styled-form" style={{ padding: '0 20px 16px' }} onSubmit={handleSubmit}>
+      <form className="styled-form bairros-form" onSubmit={handleSubmit}>
         <div className="form-row">
           <div className="form-group col-md-5">
             <label htmlFor="bairro-nome">Nome do Bairro</label>
@@ -98,10 +98,9 @@ export function GerenciarBairrosPanel({ bairros, criarBairro, atualizarBairro, e
               value={form.longitude} onChange={(e) => atualizar('longitude', e.target.value)}
             />
           </div>
-          <div className="form-group col-md-1" style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <div className="form-group col-md-1 bairros-submit">
             <button
-              type="submit" className={`btn btn-primary btn-sm${enviando ? ' btn-carregando' : ''}`} disabled={enviando}
-              style={{ width: '100%' }}
+              type="submit" className={`btn btn-primary btn-sm ocupar-largura${enviando ? ' btn-carregando' : ''}`} disabled={enviando}
             >
               {bairroEmEdicao ? <Check /> : <Plus />}
             </button>
@@ -129,7 +128,7 @@ export function GerenciarBairrosPanel({ bairros, criarBairro, atualizarBairro, e
                   <td>{b.latitude}</td>
                   <td>{b.longitude}</td>
                   <td className="text-right">
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <div className="bairros-acoes">
                       <button
                         type="button" className="btn-icon btn-sm" title="Editar" aria-label="Editar"
                         onClick={() => iniciarEdicao(b)}

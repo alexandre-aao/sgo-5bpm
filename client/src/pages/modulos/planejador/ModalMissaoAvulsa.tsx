@@ -64,7 +64,7 @@ export function ModalMissaoAvulsa({ dataPreenchida, onFechar, onCriada }: ModalM
           <h3 id={idTitulo}><CalendarPlus /> Lançar Missão Avulsa</h3>
           <button className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
         </div>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+        <p className="texto-auxiliar margem-inferior-1">
           Registro rápido para diárias avulsas (Missa, Bar, etc.), sem o cadastro completo de evento.
           Depois de criar, você poderá escalar o(s) militar(es) na gaveta de detalhes.
         </p>

@@ -87,7 +87,7 @@ function enviarPdfAoNavegador(
   formulario.method = 'POST';
   formulario.action = `${API_BASE_URL}/api/cartoes/${encodeURIComponent(cartaoId)}/arquivo-pdf`;
   formulario.target = '_blank';
-  formulario.style.display = 'none';
+  formulario.hidden = true;
 
   const campos = {
     token,

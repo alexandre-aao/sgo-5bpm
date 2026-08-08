@@ -10,16 +10,16 @@ import type { MapaPrefs } from './useMapaPrefs';
  * a fonte da verdade é o valor literal, e a legenda precisa bater com ele.
  */
 const CATEGORIAS = [
-  { rotulo: 'Força Tática', cor: '#ef4444' },
-  { rotulo: 'Suplementar', cor: '#f59e0b' },
-  { rotulo: 'Ordinária', cor: '#2563eb' },
+  { rotulo: 'Força Tática', classe: 'mapa-cor-forca-tatica' },
+  { rotulo: 'Suplementar', classe: 'mapa-cor-suplementar' },
+  { rotulo: 'Ordinária', classe: 'mapa-cor-ordinaria' },
 ];
 
 const PRIORIDADES = [
-  { rotulo: 'Crítica', cor: '#b91c1c' },
-  { rotulo: 'Alta', cor: '#ea580c' },
-  { rotulo: 'Atenção', cor: '#ca8a04' },
-  { rotulo: 'Informativa', cor: '#0369a1' },
+  { rotulo: 'Crítica', classe: 'mapa-prioridade-critica' },
+  { rotulo: 'Alta', classe: 'mapa-prioridade-alta' },
+  { rotulo: 'Atenção', classe: 'mapa-prioridade-atencao' },
+  { rotulo: 'Informativa', classe: 'mapa-prioridade-informativa' },
 ];
 
 export function LegendaMapa({ prefs }: { prefs: MapaPrefs }) {
@@ -34,7 +34,7 @@ export function LegendaMapa({ prefs }: { prefs: MapaPrefs }) {
           <span className="mapa-legenda-titulo">Viaturas</span>
           {CATEGORIAS.map((c) => (
             <span className="mapa-legenda-item" key={c.rotulo}>
-              <span className="mapa-legenda-quadrado" style={{ background: c.cor }} aria-hidden="true" />
+              <span className={`mapa-legenda-quadrado ${c.classe}`} aria-hidden="true" />
               {c.rotulo}
             </span>
           ))}
@@ -46,7 +46,7 @@ export function LegendaMapa({ prefs }: { prefs: MapaPrefs }) {
           <span className="mapa-legenda-titulo">Alertas</span>
           {PRIORIDADES.map((p) => (
             <span className="mapa-legenda-item" key={p.rotulo}>
-              <span className="mapa-legenda-circulo" style={{ borderColor: p.cor, background: `${p.cor}26` }} aria-hidden="true" />
+              <span className={`mapa-legenda-circulo ${p.classe}`} aria-hidden="true" />
               {p.rotulo}
             </span>
           ))}

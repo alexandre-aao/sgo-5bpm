@@ -152,7 +152,7 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
                     <td className="text-center">
                       {t.padrao_ativo ? (
                         <span className="badge status-ativa">
-                          <CheckCircle2 style={{ width: 12, height: 12 }} /> Ativo
+                          <CheckCircle2 className="icone-inline-sm" /> Ativo
                         </span>
                       ) : (
                         <button className="btn btn-secondary btn-sm" onClick={() => void handleDefinirPadrao(t.id)}>
@@ -162,10 +162,10 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
                     </td>
                     <td className="text-right">
                       <button className="btn btn-secondary btn-sm" onClick={() => onAbrir(t.id)}>
-                        <FolderOpen style={{ width: 12, height: 12 }} /> Abrir
+                        <FolderOpen className="icone-inline-sm" /> Abrir
                       </button>
                       <button className="btn btn-secondary btn-sm" onClick={() => void handleDuplicar(t)}>
-                        <Copy style={{ width: 12, height: 12 }} /> Duplicar
+                        <Copy className="icone-inline-sm" /> Duplicar
                       </button>
                       {/* O padrão ativo não pode ser excluído: sem ele o Adjunto toma
                           409 ao criar o cartão do dia. O servidor também recusa. */}
@@ -175,7 +175,7 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
                         title={t.padrao_ativo ? 'Ative outro padrão antes de excluir este' : 'Excluir cartão padrão'}
                         onClick={() => setAExcluir(t)}
                       >
-                        <Trash2 style={{ width: 12, height: 12 }} /> Excluir
+                        <Trash2 className="icone-inline-sm" /> Excluir
                       </button>
                     </td>
                   </tr>,

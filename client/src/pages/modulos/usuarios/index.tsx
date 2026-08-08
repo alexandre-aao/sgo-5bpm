@@ -73,7 +73,7 @@ export default function UsuariosPage() {
             <UsersRound />
             <h2>Usuários do Sistema</h2>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="flex-linha gap-2">
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => void handleExportarBackup()}>
               <Download /> Exportar Backup
             </button>

@@ -34,13 +34,13 @@ export function RelatorioDiarioTexto({ agrupar, onMudarAgrupar, onAbrirPdf, dado
   const texto = carregando ? 'Carregando...' : erro ? erro : dados ? montarTexto(dados) : 'Selecione o mês/ano acima.';
 
   return (
-    <div className="panel report-panel" style={{ marginTop: 16 }}>
+    <div className="panel report-panel margem-topo-4">
       <div className="panel-header flex-column-mobile">
         <div className="panel-title">
           <CalendarDays />
           <h2>Relatório Diário de Diárias</h2>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="flex-centralizado flex-quebra gap-2">
           <button type="button" className={`btn btn-sm ${agrupar === 'data' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => onMudarAgrupar('data')}>
             Por Data
           </button>
@@ -55,7 +55,7 @@ export function RelatorioDiarioTexto({ agrupar, onMudarAgrupar, onAbrirPdf, dado
           </button>
         </div>
       </div>
-      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '0 4px 8px' }}>
+      <p className="texto-auxiliar relatorio-diario-ajuda">
         Usa o mês/ano selecionados acima. Fonte: operações + escalas (diária = aparições × 2).
       </p>
       <pre className="lista-sei-texto">{texto}</pre>

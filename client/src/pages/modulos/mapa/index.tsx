@@ -67,8 +67,8 @@ export default function MapaPage() {
             <MapIcon />
             <h2>Mapa de Eventos da Semana</h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          <div className="flex-centralizado gap-3">
+            <p className="texto-auxiliar">
               Eventos da pauta com data dentro da semana corrente (segunda a domingo), agrupados por bairro.
             </p>
             {podeGerenciarBairros && (
@@ -115,7 +115,7 @@ export default function MapaPage() {
               </button>
             ))}
           </div>
-          <div className="filter-group" style={{ marginLeft: 'auto' }}>
+          <div className="filter-group empurrar-direita">
             <label htmlFor="mapa-select-estilo">Estilo do Mapa</label>
             <select
               id="mapa-select-estilo" value={prefs.estilo}

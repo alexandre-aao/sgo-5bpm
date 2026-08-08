@@ -70,7 +70,7 @@ export function ModalNovoTemplate({ onFechar, onCriado }: ModalNovoTemplateProps
               </select>
             </div>
           </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          <p className="texto-auxiliar">
             Depois de criado, adicione as viaturas e os roteiros do cartão padrão normalmente — o campo Comandante pode ficar em branco, já que será preenchido pelo Adjunto no dia.
           </p>
           <div className="form-actions form-actions-modal">

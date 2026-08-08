@@ -60,7 +60,7 @@ export function DashRail({ eventos }: DashRailProps) {
                         <span className="celula-sub">{evt.bairro || 'Bairro não informado'}</span>
                       </td>
                       <td title={evt.num_os_manual || ''}>
-                        <code style={{ color: 'var(--primary)' }}>{evt.num_os_manual || '-'}</code>
+                        <code className="texto-primary">{evt.num_os_manual || '-'}</code>
                       </td>
                     </tr>
                   );

@@ -4,17 +4,17 @@ import { horaParaMinutos } from '../../../lib/cartaoConflitos';
 
 // Cor do marcador de viatura por categoria — reaproveita as mesmas cores dos
 // badges do Cartão Programa. Espelha CORES_CATEGORIA_VIATURA em public/app.js.
-const CORES_CATEGORIA_VIATURA: Record<string, string> = {
-  'Força Tática': '#ef4444',
-  Suplementar: '#f59e0b',
-  Ordinária: '#2563eb',
+const CLASSES_CATEGORIA_VIATURA: Record<string, string> = {
+  'Força Tática': 'mapa-cor-forca-tatica',
+  Suplementar: 'mapa-cor-suplementar',
+  Ordinária: 'mapa-cor-ordinaria',
 };
 
 export function criarIconeViatura(categoria: string): L.DivIcon {
-  const cor = CORES_CATEGORIA_VIATURA[categoria] || CORES_CATEGORIA_VIATURA['Ordinária'];
+  const classe = CLASSES_CATEGORIA_VIATURA[categoria] || CLASSES_CATEGORIA_VIATURA.Ordinária;
   return L.divIcon({
     className: 'mapa-icone-viatura',
-    html: `<div style="background:${cor};width:16px;height:16px;border-radius:4px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);"></div>`,
+    html: `<div class="mapa-viatura-marcador ${classe}"></div>`,
     iconSize: [16, 16],
     iconAnchor: [8, 8],
     popupAnchor: [0, -8],

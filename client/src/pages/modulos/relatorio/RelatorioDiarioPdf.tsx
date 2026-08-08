@@ -17,9 +17,9 @@ export function RelatorioDiarioPdf({ dados }: RelatorioDiarioPdfProps) {
       <table className="rel-pdf-tabela">
         <thead>
           <tr>
-            <th style={{ width: 40 }}>Nº</th>
+            <th className="rel-col-40">Nº</th>
             <th>Militar</th>
-            <th style={{ width: 130 }}>Diárias</th>
+            <th className="rel-col-130">Diárias</th>
           </tr>
         </thead>
         <tbody>

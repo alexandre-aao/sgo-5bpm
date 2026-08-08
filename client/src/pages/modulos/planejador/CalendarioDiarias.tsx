@@ -109,7 +109,7 @@ export function CalendarioDiarias({ recarregarSinal, onClickDia }: CalendarioDia
           {DIAS_SEMANA.map((d) => <div key={d}>{d}</div>)}
         </div>
         {erro ? (
-          <p className="turno-vazio" style={{ gridColumn: '1/-1' }}>
+          <p className="turno-vazio grade-largura-total">
             Não foi possível carregar o calendário. Tente de novo em instantes.
           </p>
         ) : (

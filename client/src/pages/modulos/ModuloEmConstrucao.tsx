@@ -3,7 +3,7 @@
 // src/pages/modulos/*.tsx só pra já existir um ponto de lazy-loading por rota).
 export function ModuloEmConstrucao() {
   return (
-    <p style={{ color: 'var(--text-muted)' }}>
+    <p className="texto-muted">
       Em construção — conteúdo desta aba chega na Fase 3/4 da migração.
     </p>
   );

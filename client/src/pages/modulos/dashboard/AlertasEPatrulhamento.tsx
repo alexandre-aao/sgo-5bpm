@@ -52,15 +52,14 @@ export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, p
             </div>
           ) : (
             todosAlertas.map((a, i) => {
-              const cor = a.deCartao ? 'var(--warning-fg)' : 'var(--danger-fg)';
-              const bg = a.deCartao ? 'var(--warning-bg)' : 'var(--danger-bg)';
+              const classesIcone = a.deCartao ? 'fundo-warning tom-warning' : 'fundo-danger tom-danger';
               const Icone = a.deCartao ? AlertTriangle : AlertCircle;
               const titulo = a.deCartao ? 'Conflito no Cartão Programa de hoje' : 'Evento próximo com pendência';
               return (
                 // A pendência leva ao lugar de resolvê-la: antes era leitura pura
                 // e obrigava o usuário a navegar até o dado por conta própria.
                 <Link className="dash-alerta-item dash-alerta-clicavel" to={a.destino} key={i}>
-                  <span className="dash-alerta-icone" style={{ background: bg, color: cor }}>
+                  <span className={`dash-alerta-icone ${classesIcone}`}>
                     <Icone />
                   </span>
                   <div className="dash-alerta-texto">
@@ -83,11 +82,11 @@ export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, p
         </div>
 
         {semViaturas && (
-          <div className="cartao-empty-state" style={{ padding: '28px 24px' }}>
+          <div className="cartao-empty-state cartao-empty-state-compacto">
             <ClipboardX />
             <h3>Nenhum Cartão Programa lançado para hoje</h3>
             <p>Lance o cartão de patrulhamento para orientar as viaturas do dia.</p>
-            <Link to="/cartao" className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>
+            <Link to="/cartao" className="btn btn-primary btn-sm margem-topo-3">
               <Plus /> Lançar Cartão de Hoje
             </Link>
           </div>

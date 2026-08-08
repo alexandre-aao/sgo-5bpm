@@ -28,7 +28,7 @@ export function EventosKpis({ eventosFiltrados, todosEventos }: EventosKpisProps
   return (
     <div className="kpi-row eventos-kpis">
       <div className="kpi-card kpi-card-horizontal">
-        <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><CalendarRange /></span>
+        <span className="kpi-icone fundo-primary tom-primary"><CalendarRange /></span>
         <div>
           <div className="kpi-valor">{eventosFiltrados.length}</div>
           <div className="kpi-label-sob">No filtro atual</div>
@@ -36,17 +36,14 @@ export function EventosKpis({ eventosFiltrados, todosEventos }: EventosKpisProps
       </div>
       <div className="kpi-card kpi-card-horizontal">
         {/* Contagem simples — verde fica reservado aos dois KPIs de pendência ao lado */}
-        <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><CalendarClock /></span>
+        <span className="kpi-icone fundo-primary tom-primary"><CalendarClock /></span>
         <div>
           <div className="kpi-valor">{proximos}</div>
           <div className="kpi-label-sob">Próximos 7 dias</div>
         </div>
       </div>
       <div className="kpi-card kpi-card-horizontal">
-        <span
-          className="kpi-icone"
-          style={{ background: semOs ? 'var(--warning-bg)' : 'var(--success-bg)', color: semOs ? 'var(--warning-fg)' : 'var(--success-fg)' }}
-        >
+        <span className={`kpi-icone ${semOs ? 'fundo-warning tom-warning' : 'fundo-success tom-success'}`}>
           <FileWarning />
         </span>
         <div>
@@ -55,10 +52,7 @@ export function EventosKpis({ eventosFiltrados, todosEventos }: EventosKpisProps
         </div>
       </div>
       <div className="kpi-card kpi-card-horizontal">
-        <span
-          className="kpi-icone"
-          style={{ background: semSei ? 'var(--warning-bg)' : 'var(--success-bg)', color: semSei ? 'var(--warning-fg)' : 'var(--success-fg)' }}
-        >
+        <span className={`kpi-icone ${semSei ? 'fundo-warning tom-warning' : 'fundo-success tom-success'}`}>
           <FileQuestion />
         </span>
         <div>

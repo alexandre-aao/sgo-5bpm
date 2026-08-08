@@ -89,7 +89,7 @@ export function TabelaPessoal({ carregando = false, pessoal, filtroAtivo, onEdit
                   <td data-label="Categorias">
                     {p.categorias.length > 0 ? (
                       p.categorias.map((c) => (
-                        <span key={c} className={`badge ${categoriaPessoalBadgeClass(c)}`} style={{ margin: 2 }}>{c}</span>
+                        <span key={c} className={`badge badge-com-respiro ${categoriaPessoalBadgeClass(c)}`}>{c}</span>
                       ))
                     ) : (
                       <span className="celula-vazia">Sem categoria</span>

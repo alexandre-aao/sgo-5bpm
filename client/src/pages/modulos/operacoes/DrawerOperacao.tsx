@@ -135,7 +135,7 @@ export function DrawerOperacao({
                 <div className="detail-item"><strong>Hora:</strong> <span>{operacao.horario_inicio || 'Não informada'}</span></div>
                 <div className="detail-item"><strong>Bairro:</strong> <span>{operacao.bairro || '-'}</span></div>
                 <div className="detail-item"><strong>Diárias Estimadas:</strong> <span>{operacao.qtd_diarias_estimada || 0} diária(s)</span></div>
-                <div className="detail-item" style={{ gridColumn: 'span 2' }}><strong>Local/Itinerário:</strong> <span>{operacao.local_itinerario || '-'}</span></div>
+                <div className="detail-item detalhe-duplo"><strong>Local/Itinerário:</strong> <span>{operacao.local_itinerario || '-'}</span></div>
               </div>
             </div>
 

@@ -15,28 +15,28 @@ export function RelatorioKpis({ lista }: RelatorioKpisProps) {
   return (
     <div className="kpi-row relatorio-kpis">
       <div className="kpi-card kpi-card-horizontal">
-        <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><Users /></span>
+        <span className="kpi-icone fundo-primary tom-primary"><Users /></span>
         <div>
           <div className="kpi-valor">{militares}</div>
           <div className="kpi-label-sob">Militares no mês</div>
         </div>
       </div>
       <div className="kpi-card kpi-card-horizontal">
-        <span className="kpi-icone" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}><Wallet /></span>
+        <span className="kpi-icone fundo-primary tom-primary"><Wallet /></span>
         <div>
           <div className="kpi-valor">{diarias}</div>
           <div className="kpi-label-sob">Total de diárias</div>
         </div>
       </div>
       <div className="kpi-card kpi-card-horizontal">
-        <span className="kpi-icone" style={{ background: 'var(--roxo-bg)', color: 'var(--roxo)' }}><ListChecks /></span>
+        <span className="kpi-icone fundo-roxo tom-roxo"><ListChecks /></span>
         <div>
           <div className="kpi-valor">{escalas}</div>
           <div className="kpi-label-sob">Escalas lançadas</div>
         </div>
       </div>
       <div className="kpi-card kpi-card-horizontal">
-        <span className="kpi-icone" style={{ background: 'var(--info-bg)', color: 'var(--info-fg)' }}><TrendingUp /></span>
+        <span className="kpi-icone fundo-info tom-info"><TrendingUp /></span>
         <div>
           <div className="kpi-valor">{mediaTexto}</div>
           <div className="kpi-label-sob">Média por militar</div>

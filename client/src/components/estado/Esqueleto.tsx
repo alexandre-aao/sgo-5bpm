@@ -9,17 +9,14 @@
  */
 
 interface EsqueletoProps {
-  /** Largura CSS: '100%', '8ch', 120… */
-  largura?: string;
-  altura?: string;
+  tamanho?: 'linha' | 'linha-curta' | 'linha-media' | 'linha-longa' | 'rotulo' | 'valor' | 'rodape' | 'bloco';
   className?: string;
 }
 
-export function Esqueleto({ largura = '100%', altura = '1em', className = '' }: EsqueletoProps) {
+export function Esqueleto({ tamanho = 'linha', className = '' }: EsqueletoProps) {
   return (
     <span
-      className={`esqueleto ${className}`.trim()}
-      style={{ width: largura, height: altura }}
+      className={`esqueleto esqueleto-${tamanho} ${className}`.trim()}
       aria-hidden="true"
     />
   );
@@ -31,9 +28,9 @@ export function EsqueletoKpis({ quantidade = 4 }: { quantidade?: number }) {
     <div className="kpi-row" aria-hidden="true">
       {Array.from({ length: quantidade }, (_, i) => (
         <div className="kpi-card" key={i}>
-          <Esqueleto largura="60%" altura=".75rem" />
-          <Esqueleto largura="40%" altura="1.8rem" />
-          <Esqueleto largura="80%" altura=".7rem" />
+          <Esqueleto tamanho="rotulo" />
+          <Esqueleto tamanho="valor" />
+          <Esqueleto tamanho="rodape" />
         </div>
       ))}
     </div>
@@ -47,7 +44,7 @@ export function EsqueletoLinhasTabela({ linhas = 5, colunas }: { linhas?: number
       {Array.from({ length: linhas }, (_, l) => (
         <tr key={l} aria-hidden="true">
           {Array.from({ length: colunas }, (_, c) => (
-            <td key={c}><Esqueleto largura={c === 0 ? '70%' : '55%'} /></td>
+            <td key={c}><Esqueleto tamanho={c === 0 ? 'linha-media' : 'linha-curta'} /></td>
           ))}
         </tr>
       ))}
@@ -60,7 +57,7 @@ export function EsqueletoPainel({ linhas = 3 }: { linhas?: number }) {
   return (
     <div className="esqueleto-painel" aria-hidden="true">
       {Array.from({ length: linhas }, (_, i) => (
-        <Esqueleto key={i} largura={i === linhas - 1 ? '60%' : '100%'} altura="1.1rem" />
+        <Esqueleto key={i} tamanho={i === linhas - 1 ? 'linha-media' : 'bloco'} />
       ))}
     </div>
   );

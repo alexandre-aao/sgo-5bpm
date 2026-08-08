@@ -34,10 +34,11 @@ export function OcupacaoCota({ resumo }: OcupacaoCotaProps) {
         </span>
       </div>
       <div className="budget-bar-section">
-        <div className="budget-bar">
-          <div className={`budget-bar-fill${classeFill}`} style={{ width: `${larguraConsumido}%` }} />
-          <div className="budget-bar-fill-planejado" style={{ width: `${larguraPlanejado}%` }} />
-        </div>
+        <svg className="budget-bar budget-bar-svg" viewBox="0 0 100 12" preserveAspectRatio="none" role="img" aria-label={`${Math.round(pctTotal)}% da cota ocupada`}>
+          <rect className="budget-bar-track-svg" width="100" height="12" rx="6" />
+          <rect className={`budget-bar-fill-svg${classeFill}`} width={larguraConsumido} height="12" rx="6" />
+          <rect className="budget-bar-fill-planejado-svg" x={larguraConsumido} width={larguraPlanejado} height="12" />
+        </svg>
         <div className="budget-bar-legenda">
           <span><i className="legenda-dot legenda-consumido" /> Consumido (escalas reais) <strong>{resumo.total_consumido}</strong></span>
           <span><i className="legenda-dot legenda-planejado-cota" /> Planejado (estimado) <strong>{totalPlanejado}</strong></span>

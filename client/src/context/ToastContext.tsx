@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {itens.map((t) => {
           const Icone = ICONE[t.tipo];
           return (
-            <div key={t.id} className={`toast ${t.tipo}`} style={{ opacity: t.saindo ? 0 : undefined }}>
+            <div key={t.id} className={`toast ${t.tipo}${t.saindo ? ' toast-saindo' : ''}`}>
               <Icone className="toast-icon" />
               <div className="toast-content">{t.mensagem}</div>
             </div>

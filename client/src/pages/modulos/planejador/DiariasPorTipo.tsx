@@ -1,5 +1,6 @@
 import { BarChart3 } from 'lucide-react';
 import type { OperacaoDoMes } from './usePlanejadorDiarias';
+import { BarraPercentual } from '../../../components/BarraPercentual';
 
 interface DiariasPorTipoProps {
   operacoes: OperacaoDoMes[];
@@ -7,10 +8,14 @@ interface DiariasPorTipoProps {
 
 // Série categórica (tipo de operação) — família azul/roxo, sem verde/amarelo:
 // aqui a cor distingue categorias, não sinaliza situação.
-const CORES = [
-  'var(--primary)', 'var(--info-fg)', 'var(--roxo)',
-  'var(--badge-evento-1)', 'var(--badge-evento-4)', 'var(--badge-neutro)',
-];
+const TONS = [
+  { texto: 'tom-primary', barra: 'primary' },
+  { texto: 'tom-info', barra: 'info' },
+  { texto: 'tom-roxo', barra: 'roxo' },
+  { texto: 'tom-evento-1', barra: 'evento-1' },
+  { texto: 'tom-evento-4', barra: 'evento-4' },
+  { texto: 'tom-neutro', barra: 'neutro' },
+] as const;
 
 // Barras "Diárias por Tipo de Operação" do trilho do Planejador — espelha
 // renderDiariasPorTipo() em public/app.js.
@@ -38,14 +43,14 @@ export function DiariasPorTipo({ operacoes }: DiariasPorTipoProps) {
         ) : (
           linhas.map(([tipo, qtd], i) => {
             const pct = Math.round((qtd / maior) * 100);
-            const cor = CORES[i % CORES.length];
+            const tom = TONS[i % TONS.length];
             return (
               <div className="categoria-linha" key={tipo}>
                 <div className="categoria-topo">
-                  <span style={{ fontWeight: 600, color: cor }}>{tipo}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{qtd}</span>
+                  <span className={`peso-600 ${tom.texto}`}>{tipo}</span>
+                  <span className="texto-muted">{qtd}</span>
                 </div>
-                <div className="mini-bar-track"><div className="mini-bar-fill" style={{ width: `${pct}%`, background: cor }} /></div>
+                <BarraPercentual valor={pct} tom={tom.barra} />
               </div>
             );
           })
