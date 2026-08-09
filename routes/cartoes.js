@@ -645,6 +645,9 @@ module.exports = function criarRouterCartoes({
       return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
     }
 
+    const viatura = (cartao.viaturas || []).find(v => v.id === req.params.vid);
+    if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada neste cartão' });
+
     cartao.viaturas = cartao.viaturas.filter(v => v.id !== req.params.vid);
     const atualizado = await gravarCartaoSeAtual(req, res, cartao);
     if (atualizado) res.json({ message: 'Viatura removida do cartão' });
