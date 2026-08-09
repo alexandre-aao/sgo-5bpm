@@ -5602,13 +5602,16 @@ kbd {
   }
 
   /* ---- Header azul do shell mobile (protótipo "* Mobile.dc.html") ----
-     A topbar branca vira uma faixa azul com o título da tela. Data e nome do
-     usuário saem (aparecem no drawer); o toggle de tema fica só com os ícones. */
+     Duas linhas curtas evitam que título e controles disputem a mesma largura.
+     Antes o título quebrava palavra por palavra e fazia a faixa ocupar quase
+     300px em aparelhos estreitos. */
   .topbar {
     height: auto;
-    min-height: 64px;
-    padding: 10px 14px;
-    gap: 10px;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px 14px;
     background-color: var(--primary-solid);
     border-bottom: none;
     color: var(--primary-fg);
@@ -5635,18 +5638,27 @@ kbd {
   #tab-subtitle { display: none; }
 
   #tab-title {
-    font-size: 1.02rem;
-    line-height: 1.25;
+    font-size: 1rem;
+    line-height: 1.2;
     color: var(--primary-fg);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     overflow: hidden;
   }
 
-  .header-title { min-width: 0; flex: 1; }
-  .header-title-text { min-width: 0; }
-  .header-actions { gap: 10px; flex-shrink: 0; }
+  .header-title {
+    min-width: 0;
+    width: 100%;
+    gap: 10px;
+  }
+  .header-title-text { min-width: 0; flex: 1; }
+  .header-actions {
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+    justify-content: flex-end;
+    gap: 8px;
+  }
 
   /* botão de menu e toggle de tema sobre o azul */
   .topbar .nav-drawer-toggle.btn-icon {
