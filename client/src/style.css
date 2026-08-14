@@ -812,12 +812,6 @@ a {
   letter-spacing: -0.02em;
 }
 
-.header-title p {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
 .header-actions {
   display: flex;
   align-items: center;
@@ -940,6 +934,56 @@ a {
   justify-content: center;
   font-weight: 700;
   font-size: 0.8rem;
+}
+
+/* Desktop intermediário: preserva a navegação desktop, mas compacta o topo
+   para impedir que título e controles disputem a largura útil. */
+@media (min-width: 769px) and (max-width: 1180px) {
+  .topbar {
+    height: 60px;
+    padding: 0 14px;
+    gap: var(--space-3);
+  }
+
+  .header-title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-title-text { min-width: 0; }
+  .header-title h1 {
+    font-size: 1rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-actions {
+    flex-shrink: 0;
+    gap: var(--space-2);
+  }
+
+  .indicador-frescor {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .indicador-frescor span,
+  .tema-opcao span,
+  .profile-texto { display: none; }
+
+  .tema-opcao {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .topbar-data { display: none; }
+  .profile { padding-left: var(--space-2); gap: 0; }
+  .profile-avatar { width: 36px; height: 36px; }
 }
 
 /* -------------------------------------------------------------
@@ -5662,24 +5706,22 @@ kbd {
     flex-direction: row;
   }
 
-  /* ---- Header azul do shell mobile (protótipo "* Mobile.dc.html") ----
-     Duas linhas curtas evitam que título e controles disputem a mesma largura.
-     Antes o título quebrava palavra por palavra e fazia a faixa ocupar quase
-     300px em aparelhos estreitos. */
+  /* Header móvel em uma única linha: menu, nome da tela, tema e perfil. */
   .topbar {
-    height: auto;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-    padding: 8px 14px;
+    height: 60px;
+    min-height: 60px;
+    display: flex;
+    gap: var(--space-2);
+    padding: 8px 12px;
     background-color: var(--primary-solid);
     border-bottom: none;
     color: var(--primary-fg);
   }
 
   .topbar-data,
-  .profile-texto { display: none; }
+  .profile-texto,
+  .header-title-text p,
+  .indicador-frescor { display: none; }
 
   .tema-toggle { display: none; }
   .tema-botao-mobile {
@@ -5697,8 +5739,9 @@ kbd {
   .tema-botao-mobile svg { width: 19px; height: 19px; }
 
   .profile {
-    padding-left: var(--space-3);
+    padding-left: 6px;
     border-left-color: rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
   }
 
   /* O protótipo usa um quadrado translúcido com texto branco, mas sobre o azul
@@ -5711,9 +5754,7 @@ kbd {
     color: var(--primary-solid);
   }
 
-  #tab-subtitle { display: none; }
-
-  #tab-title {
+  .header-title h1 {
     font-size: 1rem;
     line-height: 1.2;
     color: var(--primary-fg);
@@ -5724,16 +5765,18 @@ kbd {
 
   .header-title {
     min-width: 0;
-    width: 100%;
+    width: auto;
+    flex: 1;
     gap: 10px;
   }
   .header-title-text { min-width: 0; flex: 1; }
   .header-actions {
-    min-width: 0;
-    width: 100%;
-    min-height: 44px;
+    min-width: auto;
+    width: auto;
+    min-height: 0;
+    flex-shrink: 0;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 6px;
   }
 
   /* botão de menu e toggle de tema sobre o azul */

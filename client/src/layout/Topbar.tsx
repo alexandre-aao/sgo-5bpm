@@ -25,7 +25,7 @@ export function Topbar({ onAbrirDrawer, onAbrirConta }: TopbarProps) {
   const { tema, definirTema } = useTheme();
   const { dia, semana } = dataHojeFormatada();
   const activeSection = useActiveSection();
-  const { title, subtitle } = activeSection ? SECTION_TITLES[activeSection] : { title: '', subtitle: '' };
+  const { title } = activeSection ? SECTION_TITLES[activeSection] : { title: '' };
 
   if (!usuario) return null;
   const sigla = usuario.role === 'P3' ? 'P3' : usuario.role.substring(0, 2).toUpperCase();
@@ -40,7 +40,6 @@ export function Topbar({ onAbrirDrawer, onAbrirConta }: TopbarProps) {
         </button>
         <div className="header-title-text">
           <h1>{title}</h1>
-          <p>{subtitle}</p>
         </div>
       </div>
       <div className="header-actions">
