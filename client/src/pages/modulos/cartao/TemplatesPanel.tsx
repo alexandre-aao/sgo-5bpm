@@ -154,7 +154,7 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
         </p>
       </div>
       <div className="table-responsive">
-        <table className="styled-table">
+        <table className="styled-table table-cards-mobile tabela-templates">
           <thead>
             <tr>
               <th>Nome do Cartão Padrão</th>
@@ -179,7 +179,7 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
                   : t.estado_template;
                 return [
                   <tr key={t.id}>
-                    <td>
+                    <td className="card-title-cell" data-label="Cartão Padrão">
                       <button
                         type="button" className="btn-expandir-linha"
                         aria-expanded={aberto}
@@ -190,15 +190,15 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
                         <strong>{t.nome_template}</strong>
                       </button>
                     </td>
-                    <td>{t.tipo_periodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'}</td>
-                    <td className="text-center">{t.qtd_viaturas_base}</td>
-                    <td className="text-center">{t.qtd_viaturas}</td>
-                    <td className="text-center">
+                    <td data-label="Período">{t.tipo_periodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'}</td>
+                    <td className="text-center" data-label="VTRs Base">{t.qtd_viaturas_base}</td>
+                    <td className="text-center" data-label="Viaturas">{t.qtd_viaturas}</td>
+                    <td className="text-center" data-label="Estado">
                       <span className={`badge ${estadoTemplate === 'publicado' ? 'status-ativa' : 'status-pendente'}`}>
                         {estadoTemplate === 'publicado' ? `Publicado${t.versao_publicada ? ` · v${t.versao_publicada}` : ''}` : 'Rascunho'}
                       </span>
                     </td>
-                    <td className="text-center">
+                    <td className="text-center" data-label="Padrão">
                       {t.padrao_ativo ? (
                         <span className="badge status-ativa">
                           <CheckCircle2 className="icone-inline-sm" /> Ativo
@@ -214,7 +214,7 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
                         </button>
                       )}
                     </td>
-                    <td className="text-right">
+                    <td className="text-right" data-label="Ações">
                       <button className="btn btn-secondary btn-sm" onClick={() => onAbrir(t.id)}>
                         <FolderOpen className="icone-inline-sm" /> Abrir
                       </button>

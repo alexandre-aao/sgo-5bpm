@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CalendarDays, Zap, CalendarPlus, ShieldPlus, ClipboardList, FileText, Map } from 'lucide-react';
+import { CalendarDays, Zap, CalendarPlus, ShieldPlus, ClipboardList } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { LinhaTabelaVazia } from '../../../components/tabela/LinhaTabelaVazia';
 
@@ -79,12 +79,10 @@ export function DashRail({ eventos }: DashRailProps) {
           </div>
         </div>
         <div className="atalhos-lista">
+          <Link to="/cartao" className="atalho atalho-principal"><ClipboardList /> Criar/Abrir Cartão de Hoje</Link>
           <Link to="/cadastro" className="atalho"><CalendarPlus /> Novo Evento</Link>
           <Link to="/operacoes" className="atalho"><ShieldPlus /> Nova Operação</Link>
-          <Link to="/cartao" className="atalho"><ClipboardList /> Cartão Programa de Hoje</Link>
           <Link to="/planejador" className="atalho"><Zap /> Lançamento — Missão Avulsa</Link>
-          <Link to="/relatorio" className="atalho"><FileText /> Relatório de Diárias</Link>
-          <Link to="/mapa" className="atalho"><Map /> Mapa de Eventos</Link>
         </div>
       </div>
     </aside>

@@ -8,7 +8,6 @@ import { useDashboardStats } from './useDashboardStats';
 import { useDashboardResumo } from './useDashboardResumo';
 import { KpiRow } from './KpiRow';
 import { AlertasEPatrulhamento } from './AlertasEPatrulhamento';
-import { ModulosGrid } from './ModulosGrid';
 import { DonutDiarias, DonutTipo } from './Donuts';
 import { OperacoesRecentes } from './OperacoesRecentes';
 import { TopMilitares } from './TopMilitares';
@@ -55,7 +54,6 @@ export default function DashboardPage() {
             eventos={dados.eventos}
             pessoal={dados.pessoal}
           />
-          <ModulosGrid resumo={resumo} cartaoHoje={cartaoHoje} />
           <DonutDiarias
             periodo={`${mes}/${ano}`}
             consumido={resumo?.diarias.total_pago_periodo ?? 0}

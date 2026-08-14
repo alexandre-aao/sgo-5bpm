@@ -109,7 +109,7 @@ export function GerenciarBairrosPanel({ bairros, criarBairro, atualizarBairro, e
       </form>
 
       <div className="table-responsive">
-        <table className="styled-table">
+        <table className="styled-table table-cards-mobile">
           <thead>
             <tr>
               <th>Nome do Bairro</th>
@@ -124,10 +124,10 @@ export function GerenciarBairrosPanel({ bairros, criarBairro, atualizarBairro, e
             ) : (
               bairros.map((b) => (
                 <tr key={b.id}>
-                  <td><strong>{b.nome_bairro}</strong></td>
-                  <td>{b.latitude}</td>
-                  <td>{b.longitude}</td>
-                  <td className="text-right">
+                  <td className="card-title-cell" data-label="Bairro"><strong>{b.nome_bairro}</strong></td>
+                  <td data-label="Latitude">{b.latitude}</td>
+                  <td data-label="Longitude">{b.longitude}</td>
+                  <td className="text-right" data-label="Ações">
                     <div className="bairros-acoes">
                       <button
                         type="button" className="btn-icon btn-sm" title="Editar" aria-label="Editar"

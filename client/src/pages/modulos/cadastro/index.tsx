@@ -199,7 +199,7 @@ export default function CadastroPage() {
               <SeletorBairro idPrefix="bairro" value={form.bairro} onChange={(v) => atualizar('bairro', v)} />
             </div>
             <div className="form-row">
-              <div className="form-group">
+              <div className="form-group campo-largura-total">
                 <label htmlFor="local_itinerario">Local / Itinerário *</label>
                 <input
                   type="text" id="local_itinerario" required maxLength={300} placeholder="Ex: Praça do evento ou percurso previsto"

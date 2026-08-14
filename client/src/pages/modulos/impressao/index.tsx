@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, FileCheck2, FileSliders,
-  FolderArchive, History, Info, Printer, Send, Share2, ShieldAlert, Table2, TriangleAlert, Users, XCircle,
+  FolderArchive, History, Info, Maximize2, Minimize2, Printer, Send, Share2, ShieldAlert, Table2, TriangleAlert, Users, XCircle,
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../../../lib/api';
 import { useAuth } from '../../../context/useAuth';
@@ -201,6 +201,16 @@ export default function CentralEmissaoPage() {
   const [pdfPronto, setPdfPronto] = useState<PdfPronto | null>(null);
   const [historico, setHistorico] = useState<RegistroEmissao[]>([]);
   const [historicoAberto, setHistoricoAberto] = useState(false);
+  const [previaTelaCheia, setPreviaTelaCheia] = useState(false);
+
+  useEffect(() => {
+    if (!previaTelaCheia) return;
+    const fecharComEsc = (evento: KeyboardEvent) => {
+      if (evento.key === 'Escape') setPreviaTelaCheia(false);
+    };
+    window.addEventListener('keydown', fecharComEsc);
+    return () => window.removeEventListener('keydown', fecharComEsc);
+  }, [previaTelaCheia]);
 
   const carregarHistorico = useCallback(async (cartaoId: string) => {
     const res = await apiFetch(`/api/cartoes/${cartaoId}/emissoes`);
@@ -534,10 +544,21 @@ export default function CentralEmissaoPage() {
                 </div>
               </div>
 
-              <div className="panel central-previa-panel">
+              <div className={`panel central-previa-panel${previaTelaCheia ? ' central-previa-tela-cheia' : ''}`}>
                 <div className="central-previa-topo">
                   <h3>4. Prévia do documento</h3>
-                  {documentosExibidos.length > 1 && <div className="central-previa-nav"><button type="button" disabled={indicePrevia === 0} onClick={() => setIndicePrevia((i) => i - 1)}><ChevronLeft /></button><span>{indicePrevia + 1} / {documentosExibidos.length}</span><button type="button" disabled={indicePrevia >= documentosExibidos.length - 1} onClick={() => setIndicePrevia((i) => i + 1)}><ChevronRight /></button></div>}
+                  <div className="central-previa-controles">
+                    {documentosExibidos.length > 1 && <div className="central-previa-nav"><button type="button" disabled={indicePrevia === 0} onClick={() => setIndicePrevia((i) => i - 1)} aria-label="Documento anterior"><ChevronLeft /></button><span>{indicePrevia + 1} / {documentosExibidos.length}</span><button type="button" disabled={indicePrevia >= documentosExibidos.length - 1} onClick={() => setIndicePrevia((i) => i + 1)} aria-label="Próximo documento"><ChevronRight /></button></div>}
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setPreviaTelaCheia((aberta) => !aberta)}
+                      aria-label={previaTelaCheia ? 'Sair da visualização em tela cheia' : 'Visualizar documento em tela cheia'}
+                    >
+                      {previaTelaCheia ? <Minimize2 /> : <Maximize2 />}
+                      <span>{previaTelaCheia ? 'Fechar' : 'Tela cheia'}</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="central-previa-documento">
                   {previa ? <DocumentoCartaoView documento={previa} /> : <p>Selecione viaturas para visualizar o documento.</p>}

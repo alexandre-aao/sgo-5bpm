@@ -149,6 +149,8 @@
   --icone-sm: 12px;
   --icone-md: 14px;
   --icone-lg: 16px;
+  --control-height: 40px;
+  --touch-target: 44px;
 }
 
 /* Tema Escuro (azulado). Só remapeia tokens — nenhuma regra de componente
@@ -868,6 +870,8 @@ a {
   color: var(--primary-fg);
 }
 
+.tema-botao-mobile { display: none; }
+
 /* Bloco de data da topbar */
 .topbar-data {
   display: flex;
@@ -901,6 +905,17 @@ a {
   padding-left: var(--space-5);
   border-left: 1px solid var(--border-color);
 }
+
+.profile-button {
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.profile-button:hover .profile-avatar { box-shadow: 0 0 0 3px var(--primary-soft); }
 
 .profile-nome {
   font-size: var(--text-sm);
@@ -1588,6 +1603,8 @@ body.sgo-sincronizando .topbar::before {
   transform: translateY(-1px);
 }
 
+.kpi-card-prioritario { border-color: var(--primary); }
+
 /* Pendência do Dashboard: mesma ideia, mas a linha é a área clicável inteira. */
 .dash-alerta-clicavel {
   text-decoration: none;
@@ -1871,6 +1888,16 @@ body.sgo-sincronizando .topbar::before {
   border-color: var(--primary);
   color: var(--text-main);
 }
+
+.atalho-principal {
+  background-color: var(--primary-solid);
+  border-color: var(--primary-solid);
+  color: var(--primary-fg);
+  font-weight: 700;
+}
+
+.atalho-principal svg { color: var(--primary-fg); }
+.atalho-principal:hover { background-color: var(--primary-hover); color: var(--primary-fg); }
 
 .atalho i {
   width: 17px;
@@ -2274,6 +2301,8 @@ body.sgo-sincronizando .topbar::before {
   flex-wrap: wrap;
   gap: var(--space-4);
 }
+
+.campo-largura-total { flex: 1 1 100%; min-width: 0; }
 
 .col-md-6 { flex: 1 1 calc(50% - 8px); min-width: 250px; }
 .col-md-4 { flex: 1 1 calc(33.33% - 11px); min-width: 180px; }
@@ -5059,6 +5088,22 @@ body.sgo-sincronizando .topbar::before {
   padding: var(--space-4); border: 1px solid var(--border-color); border-radius: var(--space-2); background: var(--surface-3);
 }
 .central-previa-documento .documento-cartao { zoom: .55; box-shadow: var(--shadow-md); }
+.central-previa-controles { display: flex; align-items: center; gap: var(--space-2); }
+.central-previa-tela-cheia {
+  position: fixed;
+  inset: var(--space-3);
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-premium);
+}
+.central-previa-tela-cheia .central-previa-topo { flex-shrink: 0; }
+.central-previa-tela-cheia .central-previa-documento {
+  flex: 1;
+  height: auto;
+  justify-content: center;
+}
+.central-previa-tela-cheia .central-previa-documento .documento-cartao { zoom: .72; }
 .central-emissao-acoes { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; }
 .central-saidas { display: flex; flex-wrap: wrap; gap: 8px; }
 .central-historico { overflow: hidden; }
@@ -5563,8 +5608,11 @@ kbd {
   .central-indicadores { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .central-indicadores > div { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
   .central-indicadores span { font-size: .58rem; }
-  .central-previa-documento { height: 430px; padding: 8px; }
-  .central-previa-documento .documento-cartao { zoom: .38; }
+  .central-previa-documento { height: 430px; padding: 8px; justify-content: flex-start; }
+  .central-previa-documento .documento-cartao { zoom: .44; }
+  .central-previa-tela-cheia { inset: 0; border-radius: 0; }
+  .central-previa-tela-cheia .central-previa-documento .documento-cartao { zoom: .58; }
+  .central-previa-controles { width: 100%; justify-content: space-between; }
   .central-saidas { display: grid; grid-template-columns: 1fr; }
   .central-emissao-acoes .btn { width: 100%; }
   .central-historico-item { align-items: flex-start; flex-direction: column; }
@@ -5632,6 +5680,21 @@ kbd {
 
   .topbar-data,
   .profile-texto { display: none; }
+
+  .tema-toggle { display: none; }
+  .tema-botao-mobile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--primary-fg);
+    cursor: pointer;
+  }
+  .tema-botao-mobile svg { width: 19px; height: 19px; }
 
   .profile {
     padding-left: var(--space-3);
@@ -5808,6 +5871,20 @@ kbd {
     opacity: 1;
     visibility: visible;
   }
+  .app-container.nav-aberta .tab-content { overflow: hidden; }
+
+  .styled-form .form-group[class*="col-md-"],
+  .styled-form .campo-largura-total {
+    flex-basis: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+  .styled-form input,
+  .styled-form select,
+  .styled-form textarea { font-size: 16px; }
+  .styled-form .form-actions { align-items: stretch; }
+  .styled-form .form-actions .btn { min-height: var(--touch-target); }
+  .styled-form .form-actions .btn-primary { flex: 1 1 auto; }
 
   /* Gavetas de detalhe (#drawer de evento / #drawer-op de operação) em telas estreitas.
      Três correções, todas escopadas ao mobile — desktop fica intacto:
@@ -5896,6 +5973,17 @@ kbd {
     margin-bottom: var(--space-1);
   }
   .table-cards-mobile .card-title-cell::before { content: none; }
+  .table-cards-mobile td[data-label="Ação"] .btn,
+  .table-cards-mobile td[data-label="Ações"] .btn,
+  .table-cards-mobile td[data-label="Ação"] .btn-icon,
+  .table-cards-mobile td[data-label="Ações"] .btn-icon { min-height: var(--touch-target); }
+  .tabela-templates tr.linha-previa { padding: 0; }
+  .tabela-templates tr.linha-previa td {
+    display: block;
+    padding: var(--space-3);
+    text-align: left;
+  }
+  .tabela-templates tr.linha-previa td::before { content: none; }
 }
 
 /* ---- Recorrência de Operações (modal Nova Operação) ----
@@ -6276,6 +6364,23 @@ kbd {
 .escala-badge-ocorrencias svg { width: var(--icone-sm); height: var(--icone-sm); }
 
 @media (max-width: 768px) {
+  .events-filters-bar,
+  .report-filters,
+  .plan-toolbar-filtros {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .events-filters-bar > *,
+  .report-filters > *,
+  .plan-toolbar-filtros > * { width: 100%; min-width: 0; }
+  .events-filters-bar input,
+  .events-filters-bar select,
+  .report-filters input,
+  .report-filters select,
+  .plan-toolbar-filtros input,
+  .plan-toolbar-filtros select { width: 100%; }
+
   .escala-chip { flex-wrap: wrap; gap: var(--space-2); }
   .escala-chip-nome { flex: 1 1 100%; }
   .escala-escopo-opcoes { flex-direction: column; }

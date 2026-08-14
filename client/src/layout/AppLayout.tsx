@@ -30,6 +30,15 @@ export function AppLayout() {
     if (usuario?.exigir_troca_senha) setContaAberta(true);
   }, [usuario?.exigir_troca_senha]);
 
+  useEffect(() => {
+    if (!drawerAberto) return;
+    const fecharComEsc = (evento: KeyboardEvent) => {
+      if (evento.key === 'Escape') setDrawerAberto(false);
+    };
+    window.addEventListener('keydown', fecharComEsc);
+    return () => window.removeEventListener('keydown', fecharComEsc);
+  }, [drawerAberto]);
+
   // Fecha o drawer mobile sempre que a rota muda — mesmo papel do fecharNavDrawer()
   // chamado a cada clique de nav-btn no app antigo, mas genérico (cobre navegação
   // por Sidebar, BottomTabs ou botão "voltar" do navegador). Ajuste de estado
@@ -63,10 +72,11 @@ export function AppLayout() {
   }
 
   return (
-    <div className="app-container">
+    <div className={`app-container${drawerAberto ? ' nav-aberta' : ''}`}>
       <div
         className={`nav-drawer-overlay${drawerAberto ? ' open' : ''}`}
         onClick={() => setDrawerAberto(false)}
+        aria-hidden="true"
       />
       <Sidebar
         drawerAberto={drawerAberto}
@@ -77,7 +87,7 @@ export function AppLayout() {
       />
 
       <main className="main-content">
-        <Topbar onAbrirDrawer={() => setDrawerAberto(true)} />
+        <Topbar onAbrirDrawer={() => setDrawerAberto(true)} onAbrirConta={() => setContaAberta(true)} />
         {/* .tab-content.active: só uma seção "ativa" por vez (a que o Router
             renderizou), então sempre entra com as duas classes juntas — o
             toggle active/inativo que existia no app antigo (múltiplas seções

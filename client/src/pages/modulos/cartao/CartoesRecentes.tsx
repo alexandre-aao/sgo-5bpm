@@ -55,7 +55,7 @@ export function CartoesRecentes({ dataSelecionada, onAbrir }: CartoesRecentesPro
         </div>
       </div>
       <div className="table-responsive">
-        <table className="styled-table">
+        <table className="styled-table table-cards-mobile">
           <thead>
             <tr>
               <th>Data</th>
@@ -73,11 +73,11 @@ export function CartoesRecentes({ dataSelecionada, onAbrir }: CartoesRecentesPro
             ) : (
               recentes.map((c) => (
                 <tr key={c.id}>
-                  <td><strong>{c.data.split('-').reverse().join('/')}</strong></td>
-                  <td>{c.fiscal || '-'}</td>
-                  <td>{c.adjunto || '-'}</td>
-                  <td className="text-center">{c.qtd_viaturas}</td>
-                  <td className="text-right">
+                  <td className="card-title-cell" data-label="Data"><strong>{c.data.split('-').reverse().join('/')}</strong></td>
+                  <td data-label="Fiscal de Operações">{c.fiscal || '-'}</td>
+                  <td data-label="Adjunto">{c.adjunto || '-'}</td>
+                  <td className="text-center" data-label="Viaturas">{c.qtd_viaturas}</td>
+                  <td className="text-right" data-label="Ação">
                     <button className="btn btn-secondary btn-sm" onClick={() => onAbrir(c.data)}>
                       <FolderOpen /> Abrir
                     </button>

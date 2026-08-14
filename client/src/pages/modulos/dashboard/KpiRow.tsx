@@ -56,6 +56,28 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
     <div className="kpi-row">
       {/* Cada KPI leva ao lugar onde o número pode ser investigado — antes eram
           leitura pura e obrigavam a navegação manual até o dado. */}
+      <Link
+        to="/cartao"
+        className="kpi-card kpi-card-clicavel kpi-card-prioritario"
+        title="Ir para o Cartão Programa de hoje"
+      >
+        <div className="kpi-topo">
+          <span className={`kpi-label ${semConflito ? 'texto-success' : 'texto-danger'}`}>
+            Cartão de Hoje
+          </span>
+          <span className={`kpi-icone ${semConflito ? 'fundo-success tom-success' : 'fundo-danger tom-danger'}`}>
+            <AlertTriangle />
+          </span>
+        </div>
+        <div className="kpi-valor-linha">
+          <span className="kpi-valor">{conflitosHoje}</span>
+          <span className="kpi-sufixo">conflito(s)</span>
+        </div>
+        <div className="kpi-rodape">
+          <span className="kpi-link">{cartaoHojeResumo}</span>
+        </div>
+      </Link>
+
       <Link to={`/eventos?de=${hojeIso()}&ate=${daquiASeteDias()}`} className="kpi-card kpi-card-clicavel" title="Ver estes eventos na lista">
         <div className="kpi-topo">
           <span className="kpi-label texto-primary">Eventos (7 dias)</span>
@@ -113,26 +135,6 @@ export function KpiRow({ stats, conflitosHoje, cartaoHojeResumo }: KpiRowProps) 
         </div>
       </Link>
 
-      <Link
-        to="/cartao"
-        className="kpi-card kpi-card-clicavel"
-        title="Ir para o Cartão Programa de hoje"
-      >
-        <div className="kpi-topo">
-          <span className={`kpi-label ${semConflito ? 'texto-success' : 'texto-danger'}`}>
-            Conflitos Hoje
-          </span>
-          <span className={`kpi-icone ${semConflito ? 'fundo-success tom-success' : 'fundo-danger tom-danger'}`}>
-            <AlertTriangle />
-          </span>
-        </div>
-        <div className="kpi-valor-linha">
-          <span className="kpi-valor">{conflitosHoje}</span>
-        </div>
-        <div className="kpi-rodape">
-          <span className="kpi-link">{cartaoHojeResumo}</span>
-        </div>
-      </Link>
     </div>
   );
 }

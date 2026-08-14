@@ -17,9 +17,10 @@ function dataHojeFormatada() {
 
 interface TopbarProps {
   onAbrirDrawer: () => void;
+  onAbrirConta: () => void;
 }
 
-export function Topbar({ onAbrirDrawer }: TopbarProps) {
+export function Topbar({ onAbrirDrawer, onAbrirConta }: TopbarProps) {
   const { usuario } = useAuth();
   const { tema, definirTema } = useTheme();
   const { dia, semana } = dataHojeFormatada();
@@ -28,6 +29,8 @@ export function Topbar({ onAbrirDrawer }: TopbarProps) {
 
   if (!usuario) return null;
   const sigla = usuario.role === 'P3' ? 'P3' : usuario.role.substring(0, 2).toUpperCase();
+  const proximoTema = tema === 'claro' ? 'escuro' : tema === 'escuro' ? 'auto' : 'claro';
+  const IconeTema = tema === 'claro' ? Sun : tema === 'escuro' ? Moon : MonitorSmartphone;
 
   return (
     <header className="topbar">
@@ -76,6 +79,15 @@ export function Topbar({ onAbrirDrawer }: TopbarProps) {
             <MonitorSmartphone /> <span>Auto</span>
           </button>
         </div>
+        <button
+          type="button"
+          className="tema-botao-mobile"
+          aria-label={`Tema atual: ${tema}. Alterar para ${proximoTema}`}
+          title={`Tema: ${tema}`}
+          onClick={() => definirTema(proximoTema)}
+        >
+          <IconeTema />
+        </button>
 
         <div className="topbar-data">
           <CalendarDays />
@@ -85,13 +97,13 @@ export function Topbar({ onAbrirDrawer }: TopbarProps) {
           </div>
         </div>
 
-        <div className="profile">
+        <button type="button" className="profile profile-button" onClick={onAbrirConta} aria-label="Abrir Minha Conta" title="Minha Conta">
           <div className="profile-avatar">{sigla}</div>
           <div className="profile-texto">
             <div className="profile-nome">{usuario.nome}</div>
             <div className="profile-role">{usuario.role === 'P3' ? 'P3 — Planejamento' : usuario.role}</div>
           </div>
-        </div>
+        </button>
       </div>
     </header>
   );
