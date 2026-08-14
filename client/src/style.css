@@ -6076,6 +6076,9 @@ kbd {
        com área de toque, em vez de estourar/espremer (antes: flex sem wrap). */
   .drawer {
     height: 100dvh;
+    /* A gaveta é uma camada modal e precisa cobrir também a navegação inferior.
+       Antes, a bottom-tabs (z-index 150) escondia as últimas ações do rodapé. */
+    z-index: 160;
   }
   .drawer-footer {
     flex-wrap: wrap;
@@ -6083,7 +6086,25 @@ kbd {
     padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
   }
   .drawer-footer .btn {
-    flex: 1 1 auto;
+    min-width: 0;
+  }
+  /* No celular, prioriza a ação que conclui a operação. Excluir e editar
+     dividem a segunda linha; o X fixo no cabeçalho já cumpre o papel de fechar. */
+  .drawer-footer .drawer-acao-executar {
+    order: 1;
+    flex: 1 1 100%;
+    min-height: 44px;
+  }
+  .drawer-footer .drawer-acao-editar,
+  .drawer-footer .drawer-acao-excluir {
+    order: 2;
+    flex: 1 1 calc(50% - 5px);
+    padding-inline: 8px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .drawer-footer .drawer-acao-fechar {
+    display: none;
   }
 
   /* Donut de distribuição por tipo (Dashboard) — só em desktop, poupa processamento em tela pequena */

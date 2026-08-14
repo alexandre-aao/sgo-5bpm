@@ -179,23 +179,23 @@ export function DrawerOperacao({
           </div>
 
           <div className="drawer-footer">
-            <button className="btn btn-danger" onClick={() => setModalExcluirAberto(true)}>
+            <button className="btn btn-danger drawer-acao-excluir" onClick={() => setModalExcluirAberto(true)}>
               <Trash2 /> Excluir Operação
             </button>
-            <button className="btn btn-secondary" onClick={() => setModalEditarAberto(true)}>
+            <button className="btn btn-secondary drawer-acao-editar" onClick={() => setModalEditarAberto(true)}>
               <Pencil /> Editar Operação
             </button>
             {/* Ação principal do rodapé — antes era verde (btn-success) e o
                 "Fechar" é que vinha preenchido, invertendo a hierarquia. */}
             {operacao.situacao !== 'Executada' && (
               <button
-                className={`btn btn-primary${marcandoExecutada ? ' btn-carregando' : ''}`} disabled={marcandoExecutada}
+                className={`btn btn-primary drawer-acao-executar${marcandoExecutada ? ' btn-carregando' : ''}`} disabled={marcandoExecutada}
                 onClick={handleMarcarExecutada}
               >
                 <CheckCircle /> Marcar como Executada
               </button>
             )}
-            <button className="btn btn-ghost" onClick={onFechar}>Fechar</button>
+            <button className="btn btn-ghost drawer-acao-fechar" onClick={onFechar}>Fechar</button>
           </div>
         </div>
       </div>
