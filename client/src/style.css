@@ -4726,7 +4726,10 @@ body.sgo-sincronizando .topbar::before {
 .ctc-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background-color: var(--bg-app);
 }
 
@@ -4768,7 +4771,13 @@ body.sgo-sincronizando .topbar::before {
 
 .ctc-conteudo {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding: var(--space-5);
+  padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
+  scroll-padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
 }
 
 .ctc-vazio {
@@ -4782,7 +4791,7 @@ body.sgo-sincronizando .topbar::before {
 }
 
 @media (max-width: 768px) {
-  .ctc-shell { min-height: 100dvh; }
+  .ctc-shell { min-height: 0; }
   .ctc-barra {
     display: grid;
     grid-template-columns: var(--touch-target) minmax(0, 1fr);
