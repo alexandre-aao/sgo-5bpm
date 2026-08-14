@@ -153,7 +153,7 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
           Modelos reutilizáveis de setores/viaturas por período e quantidade de frota.
         </p>
       </div>
-      <div className="table-responsive">
+      <div className="table-responsive templates-table-wrap">
         <table className="styled-table table-cards-mobile tabela-templates">
           <thead>
             <tr>

@@ -5,6 +5,7 @@ export type ResultadoAcao = { ok: true } | { ok: false; mensagem: string };
 
 export interface PessoaPayload {
   nome: string;
+  nome_guerra: string;
   matricula: string;
   subunidade: string;
   posto_graduacao: string;

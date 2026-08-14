@@ -16,12 +16,13 @@ interface ModalPessoaProps {
 function formularioVazio(): PessoaPayload {
   // posto_graduacao começa na 1ª opção (Soldado PM) — o <select> antigo não
   // tinha opção em branco, então o navegador já selecionava a 1ª por padrão.
-  return { nome: '', matricula: '', subunidade: '', posto_graduacao: POSTOS_GRADUACAO[0].posto, categorias: [] };
+  return { nome: '', nome_guerra: '', matricula: '', subunidade: '', posto_graduacao: POSTOS_GRADUACAO[0].posto, categorias: [] };
 }
 
 function formularioDaPessoa(pessoa: Tables<'pessoal'>): PessoaPayload {
   return {
     nome: pessoa.nome,
+    nome_guerra: pessoa.nome_guerra || '',
     matricula: pessoa.matricula || '',
     subunidade: pessoa.subunidade || '',
     posto_graduacao: pessoa.posto_graduacao,
@@ -32,10 +33,8 @@ function formularioDaPessoa(pessoa: Tables<'pessoal'>): PessoaPayload {
 const PRACAS = POSTOS_GRADUACAO.filter((p) => p.tipo === 'Praça');
 const OFICIAIS = POSTOS_GRADUACAO.filter((p) => p.tipo === 'Oficial');
 
-// Modal "Nova/Editar Pessoa" — espelha #modal-pessoa + abrirModalPessoa()/
-// handleSalvarPessoa() em public/app.js. Sem campo de nome de guerra de
-// propósito: não existe no form antigo (só populado pela importação em massa
-// do SGEPM) — editar aqui nunca deve tocar em pessoa.nome_guerra.
+// Modal "Nova/Editar Pessoa" — o nome completo identifica o cadastro; o nome
+// de guerra é a forma curta usada nos seletores e documentos operacionais.
 export function ModalPessoa({ pessoa, onFechar, onSalvar }: ModalPessoaProps) {
   const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
@@ -60,6 +59,7 @@ export function ModalPessoa({ pessoa, onFechar, onSalvar }: ModalPessoaProps) {
     e.preventDefault();
     const payload: PessoaPayload = {
       nome: form.nome.trim(),
+      nome_guerra: form.nome_guerra.trim(),
       matricula: form.matricula.trim(),
       subunidade: form.subunidade,
       posto_graduacao: form.posto_graduacao,
@@ -86,10 +86,17 @@ export function ModalPessoa({ pessoa, onFechar, onSalvar }: ModalPessoaProps) {
         </div>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="pes-nome">Nome (como deve aparecer no Cartão Programa)</label>
+            <label htmlFor="pes-nome">Nome completo</label>
             <input
-              type="text" id="pes-nome" required placeholder="Ex: 3º SGT PM HERAYSON"
+              type="text" id="pes-nome" required placeholder="Ex: Abraão Jordão Gregório Mota"
               value={form.nome} onChange={(e) => atualizar('nome', e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="pes-nome-guerra">Nome de Guerra</label>
+            <input
+              type="text" id="pes-nome-guerra" maxLength={80} placeholder="Ex: Abraão"
+              value={form.nome_guerra} onChange={(e) => atualizar('nome_guerra', e.target.value)}
             />
           </div>
           <div className="form-group">

@@ -3,6 +3,7 @@ import type { Tables } from '../../../types/supabase';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { useToast } from '../../../context/useToast';
 import { janela24h } from '../../../lib/janelaCartao';
+import { abreviarPosto } from '../../../lib/abrevPosto';
 import type { ResultadoAcao } from './useCartaoPrograma';
 
 interface CartaoHeaderProps {
@@ -57,7 +58,9 @@ function SelectPessoal({
       >
         <option value="">Selecione...</option>
         {pessoasDaCategoria.map((p) => (
-          <option key={p.id} value={p.nome}>{p.nome} ({p.posto_graduacao})</option>
+          <option key={p.id} value={p.nome}>
+            {abreviarPosto(p.posto_graduacao)} · {p.nome_guerra || p.nome}
+          </option>
         ))}
         {valorFaltante && <option value={valorAtual}>{valorAtual} (não cadastrado)</option>}
       </select>

@@ -197,6 +197,7 @@ create table if not exists pessoal (
   categorias text[] not null default '{}', -- pode ficar vazio: efetivo geral sem papel no Cartão Programa ainda
   ativo boolean not null default true,
   matricula text default '', -- RE (matrícula), opcional, alimentado pela importação do relatório de efetivo do SGEPM
+  nome_guerra text default '', -- forma curta usada nos cartões, escalas e relatórios operacionais
   subunidade text default '' -- PCS / 1ª Companhia / 2ª Companhia / 3ª Companhia, texto livre (mesmo domínio de `companhia` em viaturas, mas sem "Não informada")
 );
 
@@ -596,6 +597,7 @@ create index if not exists idx_operacoes_data_inicio on operacoes(data_inicio);
 create index if not exists idx_escalas_operacao_id    on escalas(operacao_id);
 create index if not exists idx_cartoes_data           on cartoes(data);
 create index if not exists idx_eventos_data_inicio    on eventos(data_inicio);
+alter table if exists pessoal add column if not exists nome_guerra text default '';
 create index if not exists idx_pessoal_nome_guerra    on pessoal(nome_guerra);
 create index if not exists idx_alocacoes_evento_id    on alocacoes(evento_id);
 create index if not exists idx_alocacoes_operacao_id  on alocacoes(operacao_id);

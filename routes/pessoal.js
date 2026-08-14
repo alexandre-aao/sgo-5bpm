@@ -31,7 +31,7 @@ module.exports = function criarRouterPessoal({
     if (!v.ok) return res.status(400).json({ error: v.erro });
 
     const { nome, posto_graduacao } = v.valores;
-    const { categorias, matricula, subunidade } = req.body;
+    const { categorias, matricula, nome_guerra, subunidade } = req.body;
     const postoInfo = POSTOS_GRADUACAO.find(p => p.posto === posto_graduacao);
     if (!postoInfo) return res.status(400).json({ error: 'Posto/graduação inválido.' });
     const categoriasValidas = Array.isArray(categorias)
@@ -46,6 +46,7 @@ module.exports = function criarRouterPessoal({
       categorias: categoriasValidas,
       ativo: true,
       matricula: matricula ? String(matricula).trim().slice(0, 30) : '',
+      nome_guerra: nome_guerra ? String(nome_guerra).trim().slice(0, 80) : '',
       subunidade: SUBUNIDADES_PESSOAL.includes(subunidade) ? subunidade : ''
     };
     await writeRow('pessoal', novaPessoa);
@@ -71,6 +72,7 @@ module.exports = function criarRouterPessoal({
         : [];
     }
     if (req.body.matricula !== undefined) pessoa.matricula = String(req.body.matricula).trim().slice(0, 30);
+    if (req.body.nome_guerra !== undefined) pessoa.nome_guerra = String(req.body.nome_guerra).trim().slice(0, 80);
     if (req.body.subunidade !== undefined) {
       pessoa.subunidade = SUBUNIDADES_PESSOAL.includes(req.body.subunidade) ? req.body.subunidade : '';
     }
