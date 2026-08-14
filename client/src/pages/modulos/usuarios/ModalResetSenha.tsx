@@ -7,7 +7,7 @@ import { useModalA11y } from '../../../hooks/useModalA11y';
 interface ModalResetSenhaProps {
   usuario: UsuarioPublico;
   onFechar: () => void;
-  onResetar: (login: string, senhaNova: string) => Promise<ResultadoAcao>;
+  onResetar: (login: string, senhaNova: string, exigirTrocaSenha?: boolean) => Promise<ResultadoAcao>;
 }
 
 export function ModalResetSenha({ usuario, onFechar, onResetar }: ModalResetSenhaProps) {
@@ -15,11 +15,12 @@ export function ModalResetSenha({ usuario, onFechar, onResetar }: ModalResetSenh
   const { toast } = useToast();
   const [senha, setSenha] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [exigirTroca, setExigirTroca] = useState(true);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setEnviando(true);
-    const resultado = await onResetar(usuario.usuario, senha);
+    const resultado = await onResetar(usuario.usuario, senha, exigirTroca);
     setEnviando(false);
     if (resultado.ok) {
       toast(`Senha de ${usuario.usuario} redefinida com sucesso.`, 'success');
@@ -43,10 +44,11 @@ export function ModalResetSenha({ usuario, onFechar, onResetar }: ModalResetSenh
           <div className="form-group">
             <label htmlFor="reset-senha-nova">Nova Senha</label>
             <input
-              type="password" id="reset-senha-nova" required minLength={8} placeholder="Mínimo 8 caracteres" autoComplete="new-password"
+              type="password" id="reset-senha-nova" required minLength={3} placeholder="Mínimo 3 caracteres" autoComplete="new-password"
               value={senha} onChange={(e) => setSenha(e.target.value)}
             />
           </div>
+          <label className="checkbox-inline"><input type="checkbox" checked={exigirTroca} onChange={(e) => setExigirTroca(e.target.checked)} /> Exigir troca no próximo acesso</label>
           <div className="form-actions form-actions-modal">
             <button type="button" className="btn btn-secondary" onClick={onFechar}>Cancelar</button>
             <button type="submit" className={`btn btn-primary${enviando ? ' btn-carregando' : ''}`} disabled={enviando}>

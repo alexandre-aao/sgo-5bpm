@@ -22,6 +22,7 @@ module.exports = function criarRouterCartoes({
   validarCampos,
   writeRow,
   writeRowSeVersao,
+  registrarAuditoria,
 }) {
   const router = express.Router();
   const CABECALHO_VERSAO_CARTAO = 'x-cartao-atualizado-em';
@@ -48,9 +49,73 @@ module.exports = function criarRouterCartoes({
     });
   }
 
+  function copiarSnapshot(cartao) {
+    return JSON.parse(JSON.stringify(cartao));
+  }
+
+  async function criarVersaoPadrao(cartao, req, versaoInformada = null) {
+    const { data: ultima, error: erroUltima } = await supabase
+      .from('cartao_padrao_versoes')
+      .select('versao')
+      .eq('cartao_id', cartao.id)
+      .order('versao', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (erroUltima) throw new Error(erroUltima.message);
+    const versao = versaoInformada || (ultima?.versao || 0) + 1;
+    const snapshot = copiarSnapshot(cartao);
+    const { data, error } = await supabase.from('cartao_padrao_versoes').insert({
+      id: generateId('cpvrs'),
+      cartao_id: cartao.id,
+      versao,
+      criado_por: req.user.usuario,
+      snapshot,
+    }).select('*').single();
+    if (error) throw new Error(error.message);
+
+    const { data: antigas, error: erroAntigas } = await supabase
+      .from('cartao_padrao_versoes')
+      .select('id')
+      .eq('cartao_id', cartao.id)
+      .order('versao', { ascending: false });
+    if (erroAntigas) throw new Error(erroAntigas.message);
+    const idsParaExcluir = (antigas || []).slice(5).map((item) => item.id);
+    if (idsParaExcluir.length) {
+      const { error: erroExcluir } = await supabase.from('cartao_padrao_versoes').delete().in('id', idsParaExcluir);
+      if (erroExcluir) throw new Error(erroExcluir.message);
+    }
+    return data || { versao, snapshot };
+  }
+
+  async function prepararRascunhoTemplate(cartao, req) {
+    if (!cartao.is_template) return;
+    const atual = await buscarCartaoPorId(cartao.id);
+    if (atual?.estado_template !== 'publicado') return;
+    // A publicação já criou o snapshot correspondente a `versao_publicada`.
+    // Só criamos um snapshot de entrada para templates antigos que foram
+    // migrados sem histórico.
+    if (!atual.versao_publicada) {
+      const versaoInicial = await criarVersaoPadrao(atual, req);
+      cartao.versao_publicada = versaoInicial.versao;
+    }
+    cartao.estado_template = 'rascunho';
+    cartao.publicado_em = null;
+    cartao.publicado_por = null;
+  }
+
+  async function marcarRascunhoSeDisponivel(id) {
+    const { error } = await supabase.from('cartoes').update({ estado_template: 'rascunho' }).eq('id', id);
+    // O campo entra pela migration 014. Até ela ser aplicada, o cartão legado
+    // continua funcionando com estado implícito (ativo/inativo).
+    if (error && !/estado_template|column/i.test(error.message || '')) {
+      console.error('Falha ao marcar cartão padrão como rascunho:', error.message);
+    }
+  }
+
   async function gravarCartaoSeAtual(req, res, cartao) {
     const versao = exigirVersaoCarregada(req, res);
     if (!versao) return null;
+    await prepararRascunhoTemplate(cartao, req);
     const atualizado = await writeRowSeVersao('cartoes', cartao, versao);
     if (!atualizado) responderConflito(res);
     return atualizado;
@@ -155,7 +220,7 @@ module.exports = function criarRouterCartoes({
 
   // Lista de templates de Cartão Programa, com filtro opcional por período/quantidade de viaturas
   // IMPORTANTE: precisa vir antes de /api/cartoes/:id para o Express não tratar "templates" como :id
-  router.get('/cartoes/templates', asyncRoute(async (req, res) => {
+  router.get('/cartoes/templates', exigirP3, asyncRoute(async (req, res) => {
     let templates = await readTabela('cartoes', { is_template: true });
 
     if (req.query.tipo_periodo) {
@@ -173,6 +238,8 @@ module.exports = function criarRouterCartoes({
       qtd_viaturas_base: c.qtd_viaturas_base,
       qtd_viaturas: (c.viaturas || []).length,
       padrao_ativo: !!c.padrao_ativo,
+      estado_template: c.estado_template || (c.padrao_ativo ? 'publicado' : 'rascunho'),
+      versao_publicada: c.versao_publicada || null,
       atualizado_em: c.atualizado_em
     })));
   }));
@@ -228,7 +295,136 @@ module.exports = function criarRouterCartoes({
     };
 
     await writeRow('cartoes', copia);
+    await marcarRascunhoSeDisponivel(copia.id);
     res.status(201).json(copia);
+  }));
+
+  // Histórico curto dos cartões padrão. Mantemos somente as cinco versões mais
+  // recentes por padrão para permitir restauração sem transformar a tabela em
+  // um espelho infinito do JSONB operacional.
+  router.get('/cartoes/:id/versoes', exigirP3, asyncRoute(async (req, res) => {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao || !cartao.is_template) return res.status(404).json({ error: 'Cartão padrão não encontrado.' });
+    const { data, error } = await supabase.from('cartao_padrao_versoes')
+      .select('id,cartao_id,versao,criado_em,criado_por,snapshot')
+      .eq('cartao_id', cartao.id).order('versao', { ascending: false });
+    if (error) throw new Error(error.message);
+    res.json(data || []);
+  }));
+
+  // Publicação explícita: só o que estiver publicado pode ser usado como fonte
+  // de um cartão do dia. O cartão continua editável; a próxima edição o devolve
+  // a rascunho e preserva esta fotografia para restauração.
+  router.post('/cartoes/:id/publicar', exigirP3, asyncRoute(async (req, res) => {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao || !cartao.is_template) return res.status(404).json({ error: 'Cartão padrão não encontrado.' });
+    const versaoCarregada = exigirVersaoCarregada(req, res);
+    if (!versaoCarregada) return;
+    // A linha, o snapshot e a retenção das cinco versões são uma única transação
+    // no Postgres. Antes, o snapshot era inserido (e versões antigas apagadas)
+    // antes do compare-and-swap do cartão; um conflito deixava histórico órfão e
+    // podia bloquear definitivamente a próxima publicação.
+    const { data: atualizado, error } = await supabase.rpc('publicar_cartao_padrao', {
+      p_id: cartao.id,
+      p_atualizado_em: versaoCarregada,
+      p_usuario: req.user.usuario,
+      p_versao_id: generateId('cpvrs'),
+    });
+    if (error) {
+      if (error.code === 'P0001' || String(error.message || '').includes(CODIGO_CARTAO_DESATUALIZADO)) {
+        return responderConflito(res);
+      }
+      throw new Error(`Falha ao publicar cartão padrão: ${error.message}`);
+    }
+    const publicado = Array.isArray(atualizado) ? atualizado[0] : atualizado;
+    if (!publicado) return responderConflito(res);
+    await registrarAuditoria({ req, acao: 'publicou', entidade: 'Cartão padrão', entidadeId: cartao.id, descricao: `Publicou o cartão padrão “${cartao.nome_template || cartao.id}” na versão ${publicado.versao_publicada}.` });
+    res.json({ ...publicado, snapshot: copiarSnapshot(publicado) });
+  }));
+
+  router.post('/cartoes/:id/versoes/:versao/restaurar', exigirP3, asyncRoute(async (req, res) => {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao || !cartao.is_template) return res.status(404).json({ error: 'Cartão padrão não encontrado.' });
+    const versao = Number(req.params.versao);
+    if (!Number.isInteger(versao) || versao < 1) return res.status(400).json({ error: 'Versão inválida.' });
+    const { data: registro, error } = await supabase.from('cartao_padrao_versoes')
+      .select('snapshot').eq('cartao_id', cartao.id).eq('versao', versao).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!registro) return res.status(404).json({ error: 'Versão não encontrada.' });
+    const versaoCarregada = exigirVersaoCarregada(req, res);
+    if (!versaoCarregada) return;
+    const restaurado = {
+      ...registro.snapshot,
+      id: cartao.id,
+      data: null,
+      is_template: true,
+      nome_template: cartao.nome_template,
+      estado_template: 'rascunho',
+      padrao_ativo: !!cartao.padrao_ativo,
+      publicado_em: null,
+      publicado_por: null,
+    };
+    const atualizado = await writeRowSeVersao('cartoes', restaurado, versaoCarregada);
+    if (!atualizado) return responderConflito(res);
+    await registrarAuditoria({ req, acao: 'restaurou', entidade: 'Cartão padrão', entidadeId: cartao.id, descricao: `Restaurou a versão ${versao} do cartão padrão “${cartao.nome_template || cartao.id}”.` });
+    res.json(atualizado);
+  }));
+
+  // Biblioteca reutilizável de grupos especiais: aplica uma cópia profunda da
+  // configuração ao cartão, sem compartilhar arrays de roteiro entre registros.
+  router.post('/cartoes/:id/aplicar-grupo-modelo/:grupoId', exigirEdicaoCartao, asyncRoute(async (req, res) => {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado.' });
+    if (cartao.is_template && req.user.role !== 'P3') return res.status(403).json({ error: 'Apenas o perfil P3 pode editar um cartão padrão.' });
+    const { data: grupo, error: erroGrupo } = await supabase.from('cartao_grupos_modelo').select('*').eq('id', req.params.grupoId).eq('ativo', true).maybeSingle();
+    if (erroGrupo) throw new Error(erroGrupo.message);
+    if (!grupo) return res.status(404).json({ error: 'Grupo de modelo não encontrado ou inativo.' });
+    const configuracao = grupo.configuracao && typeof grupo.configuracao === 'object' ? JSON.parse(JSON.stringify(grupo.configuracao)) : {};
+    const itens = Array.isArray(configuracao.itens) && configuracao.itens.length
+      ? configuracao.itens
+      : [{
+        inicio: grupo.horario_inicio,
+        fim: grupo.horario_fim,
+        local: grupo.area || grupo.bairro || grupo.pontos,
+        atividade: [grupo.missao || grupo.nome, grupo.pontos ? `Pontos: ${grupo.pontos}` : ''].filter(Boolean).join(' · '),
+      }];
+    const itensNormalizados = [];
+    for (const item of itens) {
+      const validado = validarCampos({
+        inicio: String(item.inicio || grupo.horario_inicio || ''),
+        fim: String(item.fim || grupo.horario_fim || ''),
+        local: String(item.local || grupo.area || grupo.bairro || ''),
+        atividade: String(item.atividade || grupo.missao || grupo.nome),
+      }, {
+        inicio: { obrigatorio: true, tipo: 'string', max: 5, label: 'Horário de Início' },
+        fim: { obrigatorio: false, tipo: 'string', max: 5, padrao: '', label: 'Horário de Fim' },
+        local: { obrigatorio: true, tipo: 'string', max: 150, label: 'Local' },
+        atividade: { obrigatorio: true, tipo: 'string', max: 100, label: 'Atividade' },
+      });
+      if (!validado.ok) return res.status(400).json({ error: `O grupo “${grupo.nome}” contém roteiro inválido: ${validado.erro}` });
+      itensNormalizados.push(validado.valores);
+    }
+    const idsSelecionados = Array.isArray(req.body.viaturas_ids) ? req.body.viaturas_ids : [];
+    if (idsSelecionados.length === 0) return res.status(400).json({ error: 'Selecione ao menos uma viatura para aplicar o grupo.' });
+    const viaturasCartao = Array.isArray(cartao.viaturas) ? cartao.viaturas : [];
+    const viaturasAlvo = viaturasCartao.filter((v) => idsSelecionados.includes(v.id));
+    if (!viaturasAlvo.length) return res.status(400).json({ error: 'Selecione ao menos uma viatura para aplicar o grupo.' });
+    viaturasAlvo.forEach((viatura) => {
+      viatura.itens = ordenarPorTurno(itensNormalizados.map((item) => ({
+        id: generateId('cpi'),
+        inicio: item.inicio,
+        fim: item.fim,
+        local: item.local,
+        atividade: item.atividade,
+      })));
+      if (grupo.observacoes && !viatura.observacao) viatura.observacao = grupo.observacoes;
+    });
+    reavaliarStatusEnvio(cartao);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) {
+      await registrarAuditoria({ req, acao: 'aplicou', entidade: 'Grupo de modelo', entidadeId: grupo.id, descricao: `Aplicou o grupo “${grupo.nome}” ao Cartão Programa ${cartao.data || cartao.nome_template || cartao.id}.` });
+      res.json(atualizado);
+    }
   }));
 
   // Transforma o cartão de UM DIA em um novo cartão padrão. O inverso de
@@ -297,6 +493,7 @@ module.exports = function criarRouterCartoes({
     };
 
     await writeRow('cartoes', novoPadrao);
+    await marcarRascunhoSeDisponivel(novoPadrao.id);
     res.status(201).json(novoPadrao);
   }));
 
@@ -320,6 +517,9 @@ module.exports = function criarRouterCartoes({
   router.get('/cartoes/:id', asyncRoute(async (req, res) => {
     const cartao = await buscarCartaoPorId(req.params.id);
     if (!cartao) return res.status(404).json({ error: 'Cartão Programa não encontrado' });
+    if (cartao.is_template && req.user.role !== 'P3') {
+      return res.status(403).json({ error: 'Apenas o perfil P3 pode consultar cartões padrão.' });
+    }
 
     // Reordena os itens por turno na leitura — cartões salvos antes desta mudança ainda estão
     // em ordem alfabética simples; isso corrige a exibição sem exigir migração de dados.
@@ -363,6 +563,7 @@ module.exports = function criarRouterCartoes({
         padrao_ativo: false
       };
       await writeRow('cartoes', novoTemplate);
+      await marcarRascunhoSeDisponivel(novoTemplate.id);
       return res.status(201).json(novoTemplate);
     }
 
@@ -443,6 +644,9 @@ module.exports = function criarRouterCartoes({
     const template = await buscarCartaoPorId(req.params.id);
     if (!template) return res.status(404).json({ error: 'Cartão padrão não encontrado.' });
     if (!template.is_template) return res.status(400).json({ error: 'Este cartão não é um template.' });
+    if (template.estado_template && template.estado_template !== 'publicado') {
+      return res.status(409).json({ error: 'Publique o cartão padrão antes de defini-lo como ativo.' });
+    }
 
     const { error } = await supabase.rpc('ativar_cartao_padrao', { p_id: req.params.id });
     if (error) return res.status(500).json({ error: 'Falha ao definir o padrão ativo.' });

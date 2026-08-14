@@ -29,6 +29,41 @@ export function FormAdicionarViatura({ viaturasCadastradas, pessoal, bairros, av
   const [form, setForm] = useState<ViaturaPayload>(VAZIO);
   const [enviando, setEnviando] = useState(false);
 
+  function atualizarPrefixo(prefixo: string) {
+    const prefixoNormalizado = prefixo.trim().toLocaleUpperCase('pt-BR');
+    const cadastro = viaturasCadastradas.find((viatura) => viatura.prefixo.trim().toLocaleUpperCase('pt-BR') === prefixoNormalizado);
+    setForm((atual) => {
+      if (cadastro) {
+        return {
+          ...atual,
+          prefixo,
+          setor: cadastro.setor || atual.setor,
+          companhia: cadastro.companhia || atual.companhia,
+          categoria: cadastro.categoria || atual.categoria,
+          // A observação cadastrada passa a ser o valor inicial do cartão; o
+          // operador ainda pode ajustar o texto no cartão do dia sem alterar o
+          // cadastro central.
+          observacao: cadastro.observacao || atual.observacao,
+        };
+      }
+
+      // Ao sair de um prefixo cadastrado, remova somente os valores que ainda
+      // são exatamente os defaults daquele cadastro. Sem isso, uma VTR digitada
+      // livremente herdava Companhia/setor/observação do prefixo anterior.
+      const anterior = viaturasCadastradas.find((viatura) =>
+        viatura.prefixo.trim().toLocaleUpperCase('pt-BR') === atual.prefixo.trim().toLocaleUpperCase('pt-BR'));
+      if (!anterior) return { ...atual, prefixo };
+      return {
+        ...atual,
+        prefixo,
+        setor: atual.setor === (anterior.setor || '') ? '' : atual.setor,
+        companhia: atual.companhia === (anterior.companhia || '') ? '' : atual.companhia,
+        categoria: atual.categoria === (anterior.categoria || 'Ordinária') ? 'Ordinária' : atual.categoria,
+        observacao: atual.observacao === (anterior.observacao || '') ? '' : atual.observacao,
+      };
+    });
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const payload: ViaturaPayload = {
@@ -63,7 +98,7 @@ export function FormAdicionarViatura({ viaturasCadastradas, pessoal, bairros, av
             <label htmlFor="vtr_prefixo">Prefixo VTR *</label>
             <input
               type="text" id="vtr_prefixo" placeholder="Ex: B05-05" list="lista-prefixos-viaturas" required
-              value={form.prefixo} onChange={(e) => setForm({ ...form, prefixo: e.target.value })}
+              value={form.prefixo} onChange={(e) => atualizarPrefixo(e.target.value)}
             />
           </div>
           <div className="form-group col-md-4">

@@ -18,6 +18,7 @@ function criarRouterAutenticacaoPublica({
   supabase,
   verificarBloqueioProgressivo,
   verificarSenha,
+  registrarAuditoria,
 }) {
   const router = express.Router();
 
@@ -38,6 +39,11 @@ router.post('/login', loginRateLimiter, asyncRoute(async (req, res) => {
 
   const user = await buscarUsuarioPorLogin(usuario);
 
+  if (user?.ativo === false) {
+    await registrarAuditoria({ req: { user: { usuario: user.usuario, nome: user.nome, role: user.role } }, acao: 'tentou acessar', entidade: 'Usuário', entidadeId: user.usuario, descricao: 'Tentativa de login de usuário desativado.' });
+    return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+  }
+
   if (!user || !verificarSenha(senha, user.senha)) {
     await registrarFalhaLogin(usuario);
     return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
@@ -57,15 +63,24 @@ router.post('/login', loginRateLimiter, asyncRoute(async (req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   const expira = Date.now() + SESSAO_DURACAO_MS;
 
-  const { error } = await supabase.from('sessoes').insert({ token, usuario: user.usuario, role: user.role, nome: user.nome, expira });
+  const { error } = await supabase.from('sessoes').insert({
+    token,
+    usuario: user.usuario,
+    role: user.role,
+    nome: user.nome,
+    expira,
+    exigir_troca_senha: !!user.exigir_troca_senha,
+  });
   if (error) throw new Error(error.message);
+
+  await registrarAuditoria({ req: { user: { usuario: user.usuario, nome: user.nome, role: user.role } }, acao: 'entrou', entidade: 'Sessão', entidadeId: user.usuario, descricao: 'Login realizado com sucesso.' });
 
   definirCookieSessao(res, token);
 
   // `token` continua no corpo durante a transição: o cliente antigo (que guarda
   // em localStorage e manda Bearer) segue funcionando até todo mundo ter
   // recarregado a página com o build novo. Remover depois disso.
-  res.json({ usuario: user.usuario, role: user.role, nome: user.nome, token, expira });
+  res.json({ usuario: user.usuario, role: user.role, nome: user.nome, ativo: true, exigir_troca_senha: !!user.exigir_troca_senha, token, expira });
 }));
 
 // Entrega o PDF já montado pela Central de Emissão como uma resposta HTTP real.
@@ -89,6 +104,9 @@ router.post('/cartoes/:id/arquivo-pdf', entregaPdfRateLimiter, receberFormulario
   const sessao = token ? await buscarSessaoPorToken(token) : null;
   if (!sessao || sessao.expira <= Date.now()) {
     return res.status(401).type('text/plain').send('Sessão expirada. Faça login novamente.');
+  }
+  if (sessao.exigir_troca_senha) {
+    return res.status(403).type('text/plain').send('Cadastre uma nova senha antes de emitir documentos.');
   }
 
   const cartao = await buscarCartaoPorId(req.params.id);
@@ -130,6 +148,7 @@ function criarRouterAutenticacaoProtegida({
   supabase,
   tokenDaRequisicao,
   verificarSenha,
+  registrarAuditoria,
 }) {
   const router = express.Router();
 
@@ -139,6 +158,7 @@ router.post('/logout', asyncRoute(async (req, res) => {
   // qualquer um dos dois, e sair pela metade deixaria a linha viva em `sessoes`.
   const token = tokenDaRequisicao(req);
   if (token) await supabase.from('sessoes').delete().eq('token', token);
+  await registrarAuditoria({ req, acao: 'saiu', entidade: 'Sessão', entidadeId: req.user.usuario, descricao: 'Logout realizado.' });
   limparCookieSessao(res);
   res.json({ message: 'Sessão encerrada.' });
 }));
@@ -150,8 +170,11 @@ router.post('/alterar-senha', asyncRoute(async (req, res) => {
   if (!senha_atual || !senha_nova) {
     return res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });
   }
-  if (String(senha_nova).length < 8) {
-    return res.status(400).json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' });
+  if (String(senha_nova).length < 3) {
+    return res.status(400).json({ error: 'A nova senha deve ter pelo menos 3 caracteres.' });
+  }
+  if (String(senha_nova) === String(senha_atual)) {
+    return res.status(400).json({ error: 'A nova senha deve ser diferente da senha atual.' });
   }
 
   const user = await buscarUsuarioPorLogin(req.user.usuario);
@@ -159,8 +182,12 @@ router.post('/alterar-senha', asyncRoute(async (req, res) => {
     return res.status(401).json({ error: 'Senha atual incorreta.' });
   }
 
-  const { error } = await supabase.from('usuarios').update({ senha: hashSenha(senha_nova) }).eq('usuario', user.usuario);
+  const antes = { exigir_troca_senha: !!user.exigir_troca_senha };
+  const { error } = await supabase.from('usuarios').update({ senha: hashSenha(senha_nova), exigir_troca_senha: false }).eq('usuario', user.usuario);
   if (error) throw new Error(error.message);
+  const { error: erroSessoes } = await supabase.from('sessoes').update({ exigir_troca_senha: false }).eq('usuario', user.usuario);
+  if (erroSessoes) throw new Error(`Falha ao liberar as sessões após a troca de senha: ${erroSessoes.message}`);
+  await registrarAuditoria({ req, acao: 'alterou senha', entidade: 'Usuário', entidadeId: user.usuario, descricao: 'Alterou a própria senha.', antes, depois: { exigir_troca_senha: false }, campos: ['exigir_troca_senha'] });
   res.json({ message: 'Senha alterada com sucesso.' });
 }));
 

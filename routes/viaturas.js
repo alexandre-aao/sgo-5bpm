@@ -13,6 +13,7 @@ module.exports = function criarRouterViaturas({
   supabase,
   validarCampos,
   writeRow,
+  registrarAuditoria,
 }) {
   const router = express.Router();
 
@@ -47,6 +48,7 @@ module.exports = function criarRouterViaturas({
       setor: valid.valores.setor
     };
     await writeRow('viaturas', novaViatura);
+    await registrarAuditoria({ req, acao: 'criou', entidade: 'Viatura', entidadeId: novaViatura.id, descricao: `Cadastrou a viatura “${novaViatura.prefixo}”.` });
     res.status(201).json(novaViatura);
   }));
 
@@ -54,6 +56,7 @@ module.exports = function criarRouterViaturas({
     const viaturas = await readTabela('viaturas');
     const viatura = viaturas.find(v => v.id === req.params.id);
     if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada.' });
+    const antes = { ...viatura };
 
     if (req.body.prefixo !== undefined) {
       if (!req.body.prefixo) return res.status(400).json({ error: 'O prefixo da viatura é obrigatório.' });
@@ -82,6 +85,7 @@ module.exports = function criarRouterViaturas({
     if (req.body.setor !== undefined) viatura.setor = String(req.body.setor).trim();
 
     await writeRow('viaturas', viatura);
+    await registrarAuditoria({ req, acao: 'alterou', entidade: 'Viatura', entidadeId: viatura.id, descricao: `Alterou a viatura “${viatura.prefixo}”.`, antes, depois: viatura, campos: ['prefixo', 'companhia', 'categoria', 'status', 'setor', 'observacao'] });
     res.json(viatura);
   }));
 
@@ -91,6 +95,7 @@ module.exports = function criarRouterViaturas({
     if (erroBusca) throw new Error(`Falha ao ler "viaturas" do Supabase: ${erroBusca.message}`);
     if (!viatura) return res.status(404).json({ error: 'Viatura não encontrada.' });
     await deleteRow('viaturas', req.params.id);
+    await registrarAuditoria({ req, acao: 'excluiu', entidade: 'Viatura', entidadeId: req.params.id, descricao: `Excluiu uma viatura do cadastro.` });
     res.json({ message: 'Viatura excluída.' });
   }));
 

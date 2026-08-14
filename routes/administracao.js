@@ -22,11 +22,21 @@ router.get('/backup', exigirP3, asyncRoute(async (req, res) => {
   const db = await readDB();
   const { sessoes, ...backup } = db;
   backup.usuarios = (db.usuarios || []).map(usuarioPublico);
-  // `avisos` fica FORA de TABELAS de propósito (senão toda rota agregadora
-  // baixaria a tabela sem usar), então readDB não a traz — aqui é somada
-  // explicitamente, porque é dado de negócio e precisa estar no backup.
-  backup.avisos = await readTabela('avisos');
-  backup.emissoes_cartao = await readTabela('emissoes_cartao');
+  // Estas tabelas ficam FORA de TABELAS de propósito (senão toda rota
+  // agregadora baixaria dados que não usa). No backup, porém, os cadastros e o
+  // histórico restaurável dos padrões precisam entrar explicitamente.
+  const [avisos, emissoes, tiposEvento, gruposModelo, versoesPadrao] = await Promise.all([
+    readTabela('avisos'),
+    readTabela('emissoes_cartao'),
+    readTabela('tipos_evento'),
+    readTabela('cartao_grupos_modelo'),
+    readTabela('cartao_padrao_versoes'),
+  ]);
+  backup.avisos = avisos;
+  backup.emissoes_cartao = emissoes;
+  backup.tipos_evento = tiposEvento;
+  backup.cartao_grupos_modelo = gruposModelo;
+  backup.cartao_padrao_versoes = versoesPadrao;
   res.json(backup);
 }));
 

@@ -6,7 +6,7 @@ import { TabelaUsuarios } from './TabelaUsuarios';
 import { PainelArquivamento } from './PainelArquivamento';
 import { ModalUsuario } from './ModalUsuario';
 import { ModalResetSenha } from './ModalResetSenha';
-import { useUsuariosCrud, type NovoUsuarioPayload, type UsuarioPublico } from './useUsuariosCrud';
+import { useUsuariosCrud, type EditarUsuarioPayload, type NovoUsuarioPayload, type UsuarioPublico } from './useUsuariosCrud';
 
 function getLocalDateStr(date = new Date()): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -97,7 +97,7 @@ export default function UsuariosPage() {
           usuario={usuarioEditando}
           onFechar={() => setModalAberto(false)}
           onSalvar={(payload) =>
-            usuarioEditando ? atualizarUsuario(usuarioEditando.usuario, payload) : criarUsuario(payload as NovoUsuarioPayload)
+            usuarioEditando ? atualizarUsuario(usuarioEditando.usuario, payload as EditarUsuarioPayload) : criarUsuario(payload as NovoUsuarioPayload)
           }
         />
       )}

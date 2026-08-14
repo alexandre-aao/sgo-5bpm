@@ -5505,6 +5505,19 @@ kbd {
 }
 .template-previa-vtr-cabecalho { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .template-previa-vtr-cabecalho span:not(.badge) { color: var(--text-muted); font-size: var(--text-sm); }
+.template-versoes { display: flex; flex-direction: column; gap: var(--space-3); }
+.template-versoes > strong { display: inline-flex; align-items: center; gap: var(--space-2); }
+.template-versoes-lista { display: flex; flex-direction: column; gap: var(--space-2); }
+.template-versao { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--bg-panel); border-radius: var(--radius-xs); }
+.grupos-modelo-conteudo { display: flex; flex-direction: column; gap: var(--space-3); }
+.grupos-modelo-vtrs { display: flex; flex-direction: column; gap: var(--space-2); }
+.chips-selecao { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chip-checkbox { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
+.panel-subsection { padding: var(--space-3); background: var(--surface-2); border-radius: var(--radius-sm); }
+
+@media (max-width: 600px) {
+  .template-versao { align-items: flex-start; flex-direction: column; }
+}
 
 /* Quadro Resumo (folha única de conferência). Mesmo desenho do roteiro, mas com
    as seis colunas distribuídas: aqui nenhuma domina, então não se fixa largura

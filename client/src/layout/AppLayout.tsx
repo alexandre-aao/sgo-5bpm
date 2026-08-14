@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -11,14 +11,24 @@ import { Carregando } from '../components/estado/Carregando';
 import { ErroAoCarregar } from '../components/estado/ErroAoCarregar';
 import { PaletaComandos } from '../components/paleta/PaletaComandos';
 import { ModalAtalhos } from '../components/paleta/ModalAtalhos';
+import { AlterarSenhaModal } from '../components/AlterarSenhaModal';
+import { useAuth } from '../context/useAuth';
 
 export function AppLayout() {
   const [drawerAberto, setDrawerAberto] = useState(false);
   const [paletaAberta, setPaletaAberta] = useState(false);
   const [ajudaAberta, setAjudaAberta] = useState(false);
+  const [contaAberta, setContaAberta] = useState(false);
   const { recolhida, alternar } = useSidebarRecolhida();
   const { carregandoNucleo, erro, recarregar } = useAppData();
   const { pathname } = useLocation();
+  const { usuario } = useAuth();
+
+  useEffect(() => {
+    // A troca de sessão é a fonte externa que abre o modal obrigatório.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (usuario?.exigir_troca_senha) setContaAberta(true);
+  }, [usuario?.exigir_troca_senha]);
 
   // Fecha o drawer mobile sempre que a rota muda — mesmo papel do fecharNavDrawer()
   // chamado a cada clique de nav-btn no app antigo, mas genérico (cobre navegação
@@ -63,6 +73,7 @@ export function AppLayout() {
         recolhida={recolhida}
         onAlternarRecolhida={alternar}
         onNavigate={() => setDrawerAberto(false)}
+        onAbrirConta={() => setContaAberta(true)}
       />
 
       <main className="main-content">
@@ -84,6 +95,7 @@ export function AppLayout() {
 
       {paletaAberta && <PaletaComandos onFechar={() => setPaletaAberta(false)} />}
       {ajudaAberta && <ModalAtalhos onFechar={() => setAjudaAberta(false)} />}
+      {contaAberta && <AlterarSenhaModal obrigatoria={!!usuario?.exigir_troca_senha} onFechar={() => setContaAberta(false)} />}
     </div>
   );
 }

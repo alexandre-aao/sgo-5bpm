@@ -136,6 +136,26 @@ function formatarHistorico(data: string): string {
   }).format(new Date(data));
 }
 
+function textoInstanteComAutor(data: string, usuario: string): string {
+  const instante = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(data)).replace(',', ' às');
+  return `${instante} · gerado por ${usuario}`;
+}
+
+function documentosComIdentidadeBackend(documentos: DocumentoCartao[], emissao: Pick<RegistroEmissao, 'emitido_em' | 'usuario' | 'usuario_nome'>): DocumentoCartao[] {
+  const autor = emissao.usuario_nome || emissao.usuario;
+  return documentos.map((documento) => ({
+    ...documento,
+    controle: {
+      ...documento.controle,
+      emitidoEm: new Date(emissao.emitido_em),
+      geradoPor: autor,
+      rodape: `Cartão Programa nº ${documento.cabecalho.numero || 'não informado'} · versão ${documento.controle.versao} · ${textoInstanteComAutor(emissao.emitido_em, autor)}`,
+    },
+  }));
+}
+
 function compartilharTextoNativo(titulo: string, texto: string): Promise<'compartilhado' | 'copiado' | 'cancelado' | 'falhou'> {
   return (async () => {
     if (navigator.share) {
@@ -321,8 +341,8 @@ export default function CentralEmissaoPage() {
     toast('Emissão conferida. O horário foi registrado; escolha a forma de saída.', 'success');
   }
 
-  async function registrarEmissao(acao: 'gerado' | 'enviado'): Promise<boolean> {
-    if (!cartao) return false;
+  async function registrarEmissao(acao: 'gerado' | 'enviado'): Promise<RegistroEmissao | null> {
+    if (!cartao) return null;
     const res = await apiFetch(`/api/cartoes/${cartao.id}/emissoes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...cabecalhosVersaoCartao(cartao) },
@@ -343,14 +363,14 @@ export default function CentralEmissaoPage() {
         (erro) => avisarConflito(() => carregarPorId(cartao.id), erro),
       );
       toast(mensagem, 'danger');
-      return false;
+      return null;
     }
-    const corpo = (await res.json()) as { atualizado_em?: string | null };
+    const corpo = (await res.json()) as { emissao?: RegistroEmissao; atualizado_em?: string | null };
     if (corpo.atualizado_em) {
       setCartao((atual) => atual ? { ...atual, atualizado_em: corpo.atualizado_em ?? null } : atual);
     }
     await carregarHistorico(cartao.id);
-    return true;
+    return corpo.emissao || null;
   }
 
   function nomeDoArquivoConfirmado(): string {
@@ -368,9 +388,16 @@ export default function CentralEmissaoPage() {
     if (gerandoPdf) return;
     setGerandoPdf(true);
     try {
+      // O servidor é a fonte do nome e do instante que entram no rodapé. O PDF
+      // só é montado depois desse registro, evitando confiar no texto editável
+      // do navegador para identificar quem gerou o documento.
+      const emissao = await registrarEmissao('gerado');
+      if (!emissao) return;
+      const documentos = documentosComIdentidadeBackend(confirmada.documentos, emissao);
+      setConfirmada((atual) => atual ? { ...atual, documentos } : atual);
       const blob = motorPdf === 'vetorial'
-        ? await gerarDocumentosCartaoPdfVetorial(confirmada.documentos)
-        : await gerarDocumentosCartaoPdf(confirmada.documentos);
+        ? await gerarDocumentosCartaoPdfVetorial(documentos)
+        : await gerarDocumentosCartaoPdf(documentos);
       const base64 = await blobParaBase64(blob);
       const nomeArquivo = `${nomeDoArquivoConfirmado()}.pdf`;
       setPdfPronto({
@@ -378,8 +405,7 @@ export default function CentralEmissaoPage() {
         nomeArquivo,
         chaveConfiguracao: chaveAtual,
       });
-      const ok = await registrarEmissao('gerado');
-      if (ok) toast('PDF pronto. Clique em “Guardar PDF” para baixar ou abrir o arquivo.', 'success');
+      toast('PDF pronto. Clique em “Guardar PDF” para baixar ou abrir o arquivo.', 'success');
     } catch (erro) {
       console.error('Falha ao gerar PDF do Cartão Programa:', erro);
       toast(erro instanceof Error ? erro.message : 'Não foi possível gerar o PDF.', 'danger');
@@ -417,8 +443,8 @@ export default function CentralEmissaoPage() {
       toast('Não foi possível compartilhar nem copiar o texto.', 'danger');
       return;
     }
-    const ok = await registrarEmissao('enviado');
-    if (ok) toast(resultado === 'compartilhado' ? 'Texto compartilhado e envio registrado.' : 'Texto copiado e envio registrado.', 'success');
+    const emissao = await registrarEmissao('enviado');
+    if (emissao) toast(resultado === 'compartilhado' ? 'Texto compartilhado e envio registrado.' : 'Texto copiado e envio registrado.', 'success');
   }
 
   const previa = documentosExibidos[Math.min(indicePrevia, Math.max(0, documentosExibidos.length - 1))];

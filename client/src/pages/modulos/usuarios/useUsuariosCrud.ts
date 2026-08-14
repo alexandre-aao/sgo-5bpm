@@ -7,6 +7,8 @@ export interface UsuarioPublico {
   usuario: string;
   nome: string;
   role: string;
+  ativo?: boolean;
+  exigir_troca_senha?: boolean;
 }
 
 export interface NovoUsuarioPayload {
@@ -14,11 +16,13 @@ export interface NovoUsuarioPayload {
   nome: string;
   role: string;
   senha: string;
+  exigir_troca_senha?: boolean;
 }
 
 export interface EditarUsuarioPayload {
   nome: string;
   role: string;
+  ativo: boolean;
 }
 
 async function extrairErro(res: Response, padrao: string): Promise<string> {
@@ -80,12 +84,12 @@ export function useUsuariosCrud() {
     }
   }, [recarregar]);
 
-  const resetarSenha = useCallback(async (login: string, senhaNova: string): Promise<ResultadoAcao> => {
+  const resetarSenha = useCallback(async (login: string, senhaNova: string, exigirTrocaSenha = true): Promise<ResultadoAcao> => {
     try {
       const res = await apiFetch(`/api/usuarios/${encodeURIComponent(login)}/resetar-senha`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senha_nova: senhaNova }),
+        body: JSON.stringify({ senha_nova: senhaNova, exigir_troca_senha: exigirTrocaSenha }),
       });
       if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao redefinir a senha.') };
       return { ok: true };

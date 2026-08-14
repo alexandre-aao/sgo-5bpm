@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { FilePlus, FileText, Info, MapPin, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../../lib/api';
-import { TIPOS_EVENTO } from '../../../lib/tiposEvento';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
 import { SeletorBairro } from '../../../components/SeletorBairro';
@@ -44,7 +43,7 @@ function formularioVazio(): FormularioEvento {
 // wizard) — decisão já registrada no CLAUDE.md.
 export default function CadastroPage() {
   const navigate = useNavigate();
-  const { recarregar } = useAppData();
+  const { dados, recarregar } = useAppData();
   const { toast } = useToast();
   const [form, setForm] = useState<FormularioEvento>(formularioVazio);
   const [enviando, setEnviando] = useState(false);
@@ -144,7 +143,7 @@ export default function CadastroPage() {
                 <label htmlFor="tipo_evento">Tipo de Evento *</label>
                 <select id="tipo_evento" required value={form.tipoEvento} onChange={(e) => atualizar('tipoEvento', e.target.value)}>
                   <option value="" disabled>Selecione o tipo...</option>
-                  {TIPOS_EVENTO.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {dados.tiposEvento.map((t) => <option key={t.id} value={t.nome}>{t.nome}</option>)}
                 </select>
               </div>
               <div className="form-group col-md-4">

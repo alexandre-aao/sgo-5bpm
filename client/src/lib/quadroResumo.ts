@@ -51,5 +51,7 @@ export function horarioDaAtividade(itens: ItemComHorario[], atividade: string): 
  *  registrado antes de a atividade existir. Cartões antigos continuam legíveis
  *  sem migração de dado — mesma razão do regex em documentoCartao.ts. */
 export function madrugadaSeguraTexto(itens: ItemComHorario[], observacao: string): string {
-  return horarioDaAtividade(itens, ATIVIDADE_MADRUGADA_SEGURA) || observacao || '';
+  const horario = horarioDaAtividade(itens, ATIVIDADE_MADRUGADA_SEGURA);
+  if (horario && observacao) return `${horario} · ${observacao}`;
+  return horario || observacao || '';
 }

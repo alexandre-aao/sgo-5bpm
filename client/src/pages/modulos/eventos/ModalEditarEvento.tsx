@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Pencil, X, Check } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
-import { TIPOS_EVENTO } from '../../../lib/tiposEvento';
+import { useAppData } from '../../../context/useAppData';
 import { SeletorBairro } from '../../../components/SeletorBairro';
 import { useToast } from '../../../context/useToast';
 import type { EventoPayload, ResultadoAcao } from './useEventoDrawer';
@@ -37,6 +37,7 @@ function formularioDoEvento(evento: Tables<'eventos'>): EventoPayload {
 export function ModalEditarEvento({ evento, onFechar, onSalvar }: ModalEditarEventoProps) {
   const { idTitulo, refCaixa, propsOverlay } = useModalA11y(onFechar);
   const { toast } = useToast();
+  const { dados } = useAppData();
   const [form, setForm] = useState<EventoPayload>(() => formularioDoEvento(evento));
   const [enviando, setEnviando] = useState(false);
 
@@ -102,7 +103,10 @@ export function ModalEditarEvento({ evento, onFechar, onSalvar }: ModalEditarEve
               <div className="form-group col-md-4">
                 <label htmlFor="edit-tipo_evento">Tipo de Evento *</label>
                 <select id="edit-tipo_evento" required value={form.tipo_evento} onChange={(e) => atualizar('tipo_evento', e.target.value)}>
-                  {TIPOS_EVENTO.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {dados.tiposEvento.map((t) => <option key={t.id} value={t.nome}>{t.nome}</option>)}
+                  {form.tipo_evento && !dados.tiposEvento.some((t) => t.nome === form.tipo_evento) && (
+                    <option value={form.tipo_evento}>{form.tipo_evento} (tipo desativado)</option>
+                  )}
                 </select>
               </div>
               <div className="form-group col-md-4">

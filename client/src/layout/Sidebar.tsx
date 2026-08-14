@@ -10,9 +10,10 @@ interface SidebarProps {
   recolhida: boolean;
   onAlternarRecolhida: () => void;
   onNavigate: () => void;
+  onAbrirConta: () => void;
 }
 
-export function Sidebar({ drawerAberto, recolhida, onAlternarRecolhida, onNavigate }: SidebarProps) {
+export function Sidebar({ drawerAberto, recolhida, onAlternarRecolhida, onNavigate, onAbrirConta }: SidebarProps) {
   const { usuario, logout } = useAuth();
   const { dados } = useAppData();
 
@@ -101,9 +102,9 @@ export function Sidebar({ drawerAberto, recolhida, onAlternarRecolhida, onNaviga
             </div>
           </div>
         </div>
-        <button className="btn btn-ghost btn-sm btn-sidebar-acao" disabled title="Em breve">
+        <button className="btn btn-ghost btn-sm btn-sidebar-acao" onClick={onAbrirConta} title="Minha Conta">
           <KeyRound />
-          <span className="nav-btn-label">Alterar Senha</span>
+          <span className="nav-btn-label">Minha Conta / Alterar Senha</span>
         </button>
         <button
           className="btn btn-ghost btn-sm btn-sidebar-acao"

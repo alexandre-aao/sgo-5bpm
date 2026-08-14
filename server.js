@@ -32,6 +32,7 @@ const {
   deleteRow, deleteRowSeVersao, deleteRows, generateId, getLocalDateStrServer, indexarPor,
   normalizarTextoServer, readDB, readTabela, readTabelaIn, writeDB, writeRow, writeRowSeVersao, writeRows,
 } = require('./lib/dados');
+const { limparAuditoriaExpirada, registrarAuditoria } = require('./lib/auditoria');
 const criarRouterAlocacoes = require('./routes/alocacoes');
 const criarRouterAdministracao = require('./routes/administracao');
 const { criarRouterAutenticacaoProtegida, criarRouterAutenticacaoPublica } = require('./routes/autenticacao');
@@ -46,6 +47,9 @@ const criarRouterPessoal = require('./routes/pessoal');
 const criarRouterRelatorios = require('./routes/relatorios');
 const { criarRouterUsuarios, usuarioPublico } = require('./routes/usuarios');
 const criarRouterViaturas = require('./routes/viaturas');
+const criarRouterAuditoria = require('./routes/auditoria');
+const criarRouterTiposEvento = require('./routes/tipos-evento');
+const { criarRouterGruposModelo } = require('./routes/grupos-modelo');
 
 const app = express();
 // Na Vercel (e atrás de qualquer proxy reverso) o IP real do cliente chega em X-Forwarded-For;
@@ -296,10 +300,12 @@ function verificarSenha(senha, armazenada) {
       const senhaInicial = crypto.randomBytes(12).toString('base64url'); // ~16 chars, URL-safe
       await supabase.from('usuarios').insert({
         usuario: 'p3',
-        senha: hashSenha(senhaInicial),
-        role: 'P3',
-        nome: 'Planejamento (P3 / 5º BPM)'
-      });
+         senha: hashSenha(senhaInicial),
+         role: 'P3',
+         nome: 'Planejamento (P3 / 5º BPM)',
+         exigir_troca_senha: true,
+         ativo: true,
+       });
       console.log(`Usuário administrador padrão criado: login "p3", senha inicial "${senhaInicial}" — anote agora (não será exibida de novo) e troque no primeiro acesso.`);
     }
 
@@ -316,6 +322,34 @@ function verificarSenha(senha, armazenada) {
         { id: generateId('bco'), nome_bairro: 'Nova Descoberta', latitude: -5.8080, longitude: -35.2250 }
       ]);
       console.log('Coordenadas de bairros (Zona Sul de Natal) semeadas no Supabase.');
+    }
+
+    // O cadastro de Tipos de Evento nasce dos valores já usados nos eventos,
+    // sem impor uma lista fixa no código. Falhas aqui não impedem o boot em
+    // bancos que ainda não aplicaram a migration 013.
+    try {
+      const { data: tiposAtuais, error: erroTipos } = await supabase.from('tipos_evento').select('id,nome');
+      if (erroTipos) throw erroTipos;
+      const { data: eventosExistentes, error: erroEventos } = await supabase.from('eventos').select('tipo_evento');
+      if (erroEventos) throw erroEventos;
+      const normalizar = (texto) => String(texto || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+      const conhecidos = new Set((tiposAtuais || []).map((tipo) => normalizar(tipo.nome)));
+      const novosTipos = [];
+      for (const registro of eventosExistentes || []) {
+        const nome = String(registro.tipo_evento || '').replace(/\s+/g, ' ').trim();
+        if (!nome || conhecidos.has(normalizar(nome))) continue;
+        conhecidos.add(normalizar(nome));
+        novosTipos.push({ id: generateId('tev'), nome, descricao: '', ativo: true, criado_por: 'sistema', criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() });
+      }
+      if (novosTipos.length > 0) await supabase.from('tipos_evento').insert(novosTipos);
+    } catch (erroTipos) {
+      console.warn('Cadastro de Tipos de Evento ainda não disponível:', erroTipos.message);
+    }
+
+    try {
+      await limparAuditoriaExpirada(supabase);
+    } catch (erroAuditoria) {
+      console.warn('Limpeza do histórico de atividades indisponível:', erroAuditoria.message);
     }
 
     // Limpa sessões expiradas de qualquer usuário — antes só as do próprio usuário eram
@@ -356,7 +390,12 @@ async function autenticar(req, res, next) {
     if (!sessao || sessao.expira <= Date.now()) {
       return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
     }
-    req.user = { usuario: sessao.usuario, role: sessao.role, nome: sessao.nome };
+    req.user = {
+      usuario: sessao.usuario,
+      role: sessao.role,
+      nome: sessao.nome,
+      exigir_troca_senha: !!sessao.exigir_troca_senha,
+    };
     next();
   } catch (err) {
     console.error('Erro ao autenticar:', err.message);
@@ -368,6 +407,20 @@ async function autenticar(req, res, next) {
 function exigirP3(req, res, next) {
   if (!req.user || req.user.role !== 'P3') {
     return res.status(403).json({ error: 'Apenas o perfil P3 tem permissão para esta ação.' });
+  }
+  next();
+}
+
+// A troca imposta pela P3 é uma restrição de servidor, não apenas um modal. As
+// únicas rotas registradas antes deste middleware são logout e alterar-senha;
+// assim, editar o localStorage ou chamar a API diretamente não libera o restante
+// do sistema enquanto a credencial temporária não for substituída.
+function exigirSenhaAtualizada(req, res, next) {
+  if (req.user?.exigir_troca_senha) {
+    return res.status(403).json({
+      code: 'TROCA_SENHA_OBRIGATORIA',
+      error: 'Cadastre uma nova senha para continuar usando o sistema.',
+    });
   }
   next();
 }
@@ -400,6 +453,7 @@ app.use('/api', criarRouterAutenticacaoPublica({
   supabase,
   verificarBloqueioProgressivo,
   verificarSenha,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
 }));
 
 // A partir daqui, todas as rotas /api exigem sessão válida
@@ -413,6 +467,15 @@ app.use('/api', criarRouterAutenticacaoProtegida({
   supabase,
   tokenDaRequisicao,
   verificarSenha,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
+}));
+
+app.use('/api', exigirSenhaAtualizada);
+
+app.use('/api', criarRouterAuditoria({
+  asyncRoute,
+  exigirP3,
+  supabase,
 }));
 
 // -------------------------------------------------------------
@@ -428,6 +491,24 @@ app.use('/api', criarRouterUsuarios({
   supabase,
   validarCampos,
   writeRow,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
+}));
+
+app.use('/api', criarRouterTiposEvento({
+  asyncRoute,
+  exigirP3,
+  generateId,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
+  supabase,
+  validarCampos,
+}));
+
+app.use('/api', criarRouterGruposModelo({
+  asyncRoute,
+  exigirP3,
+  generateId,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
+  supabase,
 }));
 
 // -------------------------------------------------------------
@@ -461,6 +542,7 @@ app.use('/api', criarRouterEventos({
   supabase,
   validarCampos,
   writeRow,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
 }));
 
 
@@ -572,6 +654,7 @@ app.use('/api', criarRouterViaturas({
   supabase,
   validarCampos,
   writeRow,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
 }));
 
 // -------------------------------------------------------------
@@ -615,6 +698,7 @@ app.use('/api', criarRouterCartoes({
   validarCampos,
   writeRow,
   writeRowSeVersao,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
 }));
 
 

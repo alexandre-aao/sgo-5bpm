@@ -6,6 +6,8 @@ export interface Usuario {
   usuario: string;
   role: Role;
   nome: string;
+  ativo?: boolean;
+  exigir_troca_senha?: boolean;
   /** OPCIONAL desde a Fase 4: a sessão nova vive num cookie HttpOnly e o token
    *  não é mais exposto ao JavaScript. Só sessões antigas, criadas antes da
    *  migração e ainda salvas em localStorage, têm este campo. */

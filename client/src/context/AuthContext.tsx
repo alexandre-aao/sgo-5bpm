@@ -99,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Persistir aqui recolocaria em localStorage exatamente o que a Fase 4 tirou.
     const semToken: Usuario = {
       usuario: dados.usuario, role: dados.role, nome: dados.nome, expira: dados.expira,
+      ativo: dados.ativo !== false, exigir_troca_senha: !!dados.exigir_troca_senha,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(semToken));
     setAuthToken(null);
@@ -106,8 +107,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(semToken);
   }, []);
 
+  const atualizarUsuario = useCallback((patch: Partial<Usuario>) => {
+    setUsuario((atual) => {
+      if (!atual) return atual;
+      const novo = { ...atual, ...patch };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(novo));
+      return novo;
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ usuario, login, logout }}>
+    <AuthContext.Provider value={{ usuario, login, logout, atualizarUsuario }}>
       {children}
     </AuthContext.Provider>
   );

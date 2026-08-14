@@ -193,6 +193,10 @@ export type Database = {
           oficial_sobreaviso: string | null
           origem_template_id: string | null
           padrao_ativo: boolean | null
+          estado_template: string | null
+          publicado_em: string | null
+          publicado_por: string | null
+          versao_publicada: number | null
           qtd_viaturas_base: number | null
           tipo_periodo: string | null
           viaturas: Json
@@ -215,6 +219,10 @@ export type Database = {
           oficial_sobreaviso?: string | null
           origem_template_id?: string | null
           padrao_ativo?: boolean | null
+          estado_template?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          versao_publicada?: number | null
           qtd_viaturas_base?: number | null
           tipo_periodo?: string | null
           viaturas?: Json
@@ -237,6 +245,10 @@ export type Database = {
           oficial_sobreaviso?: string | null
           origem_template_id?: string | null
           padrao_ativo?: boolean | null
+          estado_template?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          versao_publicada?: number | null
           qtd_viaturas_base?: number | null
           tipo_periodo?: string | null
           viaturas?: Json
@@ -515,6 +527,7 @@ export type Database = {
       }
       sessoes: {
         Row: {
+          exigir_troca_senha: boolean
           expira: number
           nome: string
           role: string
@@ -522,6 +535,7 @@ export type Database = {
           usuario: string
         }
         Insert: {
+          exigir_troca_senha?: boolean
           expira: number
           nome: string
           role: string
@@ -529,6 +543,7 @@ export type Database = {
           usuario: string
         }
         Update: {
+          exigir_troca_senha?: boolean
           expira?: number
           nome?: string
           role?: string
@@ -539,18 +554,24 @@ export type Database = {
       }
       usuarios: {
         Row: {
+          ativo: boolean
+          exigir_troca_senha: boolean
           nome: string
           role: string
           senha: string
           usuario: string
         }
         Insert: {
+          ativo?: boolean
+          exigir_troca_senha?: boolean
           nome: string
           role: string
           senha: string
           usuario: string
         }
         Update: {
+          ativo?: boolean
+          exigir_troca_senha?: boolean
           nome?: string
           role?: string
           senha?: string

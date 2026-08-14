@@ -33,6 +33,32 @@ create table if not exists eventos (
   created_at timestamptz default now()
 );
 
+-- Tipos de Evento: cadastro administrável pela P3. O texto em `eventos.tipo_evento`
+-- continua sendo preservado para manter compatibilidade com os eventos antigos;
+-- este cadastro só passa a ser a fonte dos novos registros.
+create table if not exists tipos_evento (
+  id text primary key,
+  nome text not null,
+  descricao text default '',
+  ativo boolean not null default true,
+  criado_por text,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+create unique index if not exists ux_tipos_evento_nome_normalizado
+  on tipos_evento (lower(regexp_replace(trim(nome), '\s+', ' ', 'g')));
+create index if not exists idx_tipos_evento_ativo_nome on tipos_evento (ativo, nome);
+insert into tipos_evento (id, nome, descricao, ativo, criado_por) values
+  ('tev_show', 'Show', '', true, 'sistema'),
+  ('tev_futebol', 'Futebol', '', true, 'sistema'),
+  ('tev_ato_publico', 'Ato Público', '', true, 'sistema'),
+  ('tev_religioso', 'Religioso', '', true, 'sistema'),
+  ('tev_cultural', 'Cultural', '', true, 'sistema'),
+  ('tev_evento_junino', 'Evento Junino', '', true, 'sistema'),
+  ('tev_missao_avulsa', 'Missão Avulsa', '', true, 'sistema'),
+  ('tev_outros', 'Outros', '', true, 'sistema')
+on conflict do nothing;
+
 -- Operações: registro ÚNICO planejamento -> execução (não duplica registro como
 -- fazia missoes_planejadas). Separadas de "eventos": eventos são civis/sem diária;
 -- operações geram diária (via escalas) ou reservam diária estimada quando ainda Planejada.
@@ -109,14 +135,38 @@ create table if not exists usuarios (
   role text not null check (role in ('P3', 'Adjunto', 'Oficial')),
   nome text not null
 );
+alter table usuarios add column if not exists exigir_troca_senha boolean not null default false;
+alter table usuarios add column if not exists ativo boolean not null default true;
 
 create table if not exists sessoes (
   token text primary key,
   usuario text not null,
   role text not null,
   nome text not null,
-  expira bigint not null
+  expira bigint not null,
+  exigir_troca_senha boolean not null default false
 );
+alter table sessoes add column if not exists exigir_troca_senha boolean not null default false;
+
+-- Log operacional curto (30 dias). Nunca recebe senha, hash, token ou segredo.
+create table if not exists auditoria (
+  id text primary key,
+  usuario text not null,
+  usuario_id text,
+  usuario_nome text,
+  criado_em bigint not null,
+  acao text not null,
+  entidade text not null,
+  entidade_id text,
+  descricao_resumida text,
+  campos_alterados jsonb not null default '{}'::jsonb
+);
+alter table auditoria add column if not exists usuario_id text;
+alter table auditoria add column if not exists usuario_nome text;
+alter table auditoria add column if not exists campos_alterados jsonb not null default '{}'::jsonb;
+create index if not exists idx_auditoria_criado_em on auditoria (criado_em desc);
+create index if not exists idx_auditoria_usuario on auditoria (usuario);
+create index if not exists idx_auditoria_entidade on auditoria (entidade, acao);
 
 create table if not exists config (
   id int primary key default 1,
@@ -200,6 +250,52 @@ create table if not exists cartoes (
   -- entre P3 e Adjunto. Nenhum código lê ainda.
   atualizado_em timestamptz
 );
+alter table cartoes add column if not exists estado_template text;
+alter table cartoes add column if not exists publicado_em timestamptz;
+alter table cartoes add column if not exists publicado_por text;
+alter table cartoes add column if not exists versao_publicada integer;
+update cartoes set estado_template = case when padrao_ativo then 'publicado' else 'rascunho' end
+ where is_template = true and estado_template is null;
+alter table cartoes drop constraint if exists cartoes_estado_template_check;
+alter table cartoes add constraint cartoes_estado_template_check
+  check (estado_template is null or estado_template in ('rascunho', 'publicado'));
+
+-- Snapshots independentes das edições do template. A linha de `cartoes` continua
+-- sendo o rascunho atual; cartões do dia recebem cópia profunda do snapshot
+-- publicado e não mantêm referência viva ao modelo.
+create table if not exists cartao_padrao_versoes (
+  id text primary key,
+  cartao_id text not null references cartoes(id) on delete cascade,
+  versao integer not null,
+  criado_em timestamptz not null default now(),
+  criado_por text not null,
+  snapshot jsonb not null,
+  unique (cartao_id, versao)
+);
+create index if not exists idx_cartao_padrao_versoes_cartao on cartao_padrao_versoes (cartao_id, versao desc);
+
+-- Biblioteca de blocos reutilizáveis (viatura/grupo), separada dos cartões reais.
+create table if not exists cartao_grupos_modelo (
+  id text primary key,
+  nome text not null,
+  tipo text not null default 'Especial',
+  area text default '',
+  bairro text default '',
+  missao text default '',
+  pontos text default '',
+  horario_inicio text default '',
+  horario_fim text default '',
+  observacoes text default '',
+  configuracao jsonb not null default '{}'::jsonb,
+  ativo boolean not null default true,
+  ordem integer not null default 0,
+  criado_por text,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+create unique index if not exists ux_cartao_grupos_modelo_nome_normalizado
+  on cartao_grupos_modelo (lower(regexp_replace(trim(nome), '\s+', ' ', 'g')));
+create index if not exists idx_cartao_grupos_modelo_filtros on cartao_grupos_modelo (ativo, tipo, bairro);
 
 -- Numeração 000123/2026: única por ano. Templates (sem data) e cartões
 -- históricos ainda não numerados ficam fora do índice.
@@ -266,6 +362,64 @@ drop trigger if exists trg_cartoes_atualizado_em on cartoes;
 create trigger trg_cartoes_atualizado_em
   before insert or update on cartoes
   for each row execute function cartoes_marcar_atualizacao();
+
+-- Publicação transacional do cartão padrão: o compare-and-swap da linha, o
+-- snapshot publicado e a retenção das cinco versões confirmam ou falham juntos.
+create or replace function publicar_cartao_padrao(
+  p_id text,
+  p_atualizado_em timestamptz,
+  p_usuario text,
+  p_versao_id text
+) returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_cartao cartoes%rowtype;
+  v_versao integer;
+begin
+  select * into v_cartao
+    from cartoes
+   where id = p_id
+     and is_template = true
+     and atualizado_em = p_atualizado_em
+   for update;
+
+  if not found then
+    raise exception using errcode = 'P0001', message = 'CARTAO_DESATUALIZADO';
+  end if;
+
+  select coalesce(max(versao), 0) + 1 into v_versao
+    from cartao_padrao_versoes
+   where cartao_id = p_id;
+
+  update cartoes
+     set estado_template = 'publicado',
+         versao_publicada = v_versao,
+         publicado_em = now(),
+         publicado_por = p_usuario,
+         atualizado_em = now()
+   where id = p_id
+   returning * into v_cartao;
+
+  insert into cartao_padrao_versoes (id, cartao_id, versao, criado_por, snapshot)
+  values (p_versao_id, p_id, v_versao, p_usuario, to_jsonb(v_cartao));
+
+  delete from cartao_padrao_versoes
+   where id in (
+     select id from cartao_padrao_versoes
+      where cartao_id = p_id
+      order by versao desc
+      offset 5
+   );
+
+  return to_jsonb(v_cartao);
+end;
+$$;
+
+revoke all on function publicar_cartao_padrao(text, timestamptz, text, text) from public, anon, authenticated;
+grant execute on function publicar_cartao_padrao(text, timestamptz, text, text) to service_role;
 
 -- Avisos Operacionais: a P3 cadastra a orientação de um bairro (ou de uma
 -- Companhia) e ela entra automaticamente no Cartão Programa das viaturas
@@ -469,3 +623,7 @@ alter table if exists avisos              enable row level security;
 alter table if exists contador_cartoes    enable row level security;
 alter table if exists emissoes_cartao     enable row level security;
 alter table if exists tentativas_login    enable row level security;
+alter table if exists tipos_evento        enable row level security;
+alter table if exists auditoria           enable row level security;
+alter table if exists cartao_padrao_versoes enable row level security;
+alter table if exists cartao_grupos_modelo  enable row level security;

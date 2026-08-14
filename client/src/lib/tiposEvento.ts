@@ -1,13 +1,12 @@
-/** Tipos de evento civil — espelha TIPOS_EVENTO em server.js (usado também em
- * public/index.html nos <select> de Novo/Editar Evento). Usado pelo formulário
- * de criação (cadastro) e pelo modal de edição (gaveta de Evento). */
-export const TIPOS_EVENTO = [
-  'Show',
-  'Futebol',
-  'Ato Público',
-  'Religioso',
-  'Cultural',
-  'Evento Junino',
-  'Missão Avulsa',
-  'Outros',
-];
+/** Cadastro administrável pela P3. O cliente não mantém uma lista fixa: os
+ * registros vêm de GET /api/tipos-evento e eventos antigos continuam podendo
+ * exibir seu texto mesmo quando o tipo foi desativado. */
+export interface TipoEvento {
+  id: string;
+  nome: string;
+  descricao?: string | null;
+  ativo: boolean;
+  criado_por?: string | null;
+  criado_em?: string | null;
+  atualizado_em?: string | null;
+}

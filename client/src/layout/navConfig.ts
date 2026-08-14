@@ -16,6 +16,7 @@ import {
   Megaphone,
   Printer,
   Menu,
+  History,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '../types/auth';
@@ -34,7 +35,8 @@ export type SectionId =
   | 'pessoal'
   | 'viaturas'
   | 'avisos'
-  | 'impressao';
+  | 'impressao'
+  | 'historico';
 
 export interface NavItem {
   id: SectionId;
@@ -101,6 +103,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Administração',
     items: [
       { id: 'usuarios', label: 'Usuários', icon: UsersRound, roles: ['P3'] },
+      { id: 'historico', label: 'Histórico de Atividades', icon: History, roles: ['P3'] },
     ],
   },
 ];
@@ -123,6 +126,7 @@ export const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string
   viaturas: { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' },
   avisos: { title: 'Alertas', subtitle: 'Orientações da P3 por bairro e Companhia, que entram no Cartão Programa das viaturas.' },
   impressao: { title: 'Central de Emissão', subtitle: 'Saídas oficiais do Cartão Programa, num lugar só.' },
+  historico: { title: 'Histórico de Atividades', subtitle: 'Quem fez o quê no SGO nos últimos 30 dias.' },
 };
 
 /** Tela inicial por perfil — regra 7 do MIGRACAO.md. */

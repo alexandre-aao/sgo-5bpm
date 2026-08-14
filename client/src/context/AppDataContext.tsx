@@ -12,6 +12,7 @@ const DADOS_VAZIOS: AppData = {
   config: { id: 1, cota_mensal_diarias: 0 },
   pessoal: [],
   viaturas: [],
+  tiposEvento: [],
 };
 
 async function buscarJson<T>(caminho: string): Promise<T> {
@@ -45,12 +46,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // 1ª onda (núcleo): mesmo recorte de fetchData() no app antigo — eventos,
       // operações, alocações, escalas, config. pessoal/viaturas ficam pra 2ª onda,
       // sem travar a primeira pintura.
-      const [eventosResp, operacoesResp, alocacoesResp, escalasResp, configResp] = await Promise.all([
+      const [eventosResp, operacoesResp, alocacoesResp, escalasResp, configResp, tiposEventoResp] = await Promise.all([
         buscarJson<unknown>('/api/eventos'),
         ehP3 ? buscarJson<unknown>('/api/operacoes') : Promise.resolve([]),
         buscarJson<unknown>('/api/alocacoes'),
         ehP3 ? buscarJson<unknown>('/api/escalas') : Promise.resolve([]),
         buscarJson<unknown>('/api/config'),
+        buscarJson<unknown>('/api/tipos-evento?ativos=1'),
       ]);
 
       setDados((atual) => ({
@@ -63,6 +65,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           configResp && typeof configResp === 'object' && 'cota_mensal_diarias' in configResp
             ? (configResp as AppData['config'])
             : atual.config,
+        tiposEvento: usarLista(tiposEventoResp, atual.tiposEvento),
       }));
       setCarregandoNucleo(false);
       // Marca o frescor já na 1ª onda: é o núcleo que alimenta os números das

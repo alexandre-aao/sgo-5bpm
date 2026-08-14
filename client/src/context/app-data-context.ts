@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 import type { Tables } from '../types/supabase';
+import type { TipoEvento } from '../lib/tiposEvento';
 
 export interface AppData {
   eventos: Tables<'eventos'>[];
@@ -9,6 +10,7 @@ export interface AppData {
   config: Tables<'config'>;
   pessoal: Tables<'pessoal'>[];
   viaturas: Tables<'viaturas'>[];
+  tiposEvento: TipoEvento[];
 }
 
 export interface AppDataContextValue {

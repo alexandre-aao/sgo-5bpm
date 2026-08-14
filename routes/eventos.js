@@ -1,7 +1,5 @@
 const express = require('express');
 
-const TIPOS_EVENTO = ['Show', 'Futebol', 'Ato Público', 'Religioso', 'Cultural', 'Evento Junino', 'Missão Avulsa', 'Outros'];
-
 module.exports = function criarRouterEventos({
   asyncRoute,
   buscarRow,
@@ -12,8 +10,16 @@ module.exports = function criarRouterEventos({
   supabase,
   validarCampos,
   writeRow,
+  registrarAuditoria,
 }) {
   const router = express.Router();
+
+  async function validarTipoNovo(nome) {
+    const { data, error } = await supabase.from('tipos_evento').select('id,nome,ativo');
+    if (error) throw new Error(`Falha ao consultar Tipos de Evento: ${error.message}`);
+    const normalizado = String(nome || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+    return (data || []).find((tipo) => tipo.ativo && String(tipo.nome).trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR') === normalizado) || null;
+  }
 
   router.get('/eventos', asyncRoute(async (_req, res) => {
     res.json(await readTabela('eventos'));
@@ -22,7 +28,7 @@ module.exports = function criarRouterEventos({
   router.post('/eventos', exigirP3, asyncRoute(async (req, res) => {
     const v = validarCampos(req.body, {
       nome_evento: { obrigatorio: true, tipo: 'string', max: 200, label: 'Nome do Evento' },
-      tipo_evento: { obrigatorio: true, tipo: 'string', max: 50, valores: TIPOS_EVENTO, label: 'Tipo de Evento' },
+      tipo_evento: { obrigatorio: true, tipo: 'string', max: 100, label: 'Tipo de Evento' },
       local_itinerario: { obrigatorio: true, tipo: 'string', max: 300, label: 'Local/Itinerário' },
       endereco: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Endereço' },
       data_inicio: { obrigatorio: true, tipo: 'string', max: 10, label: 'Data de Início' },
@@ -35,6 +41,8 @@ module.exports = function criarRouterEventos({
       bairro: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Bairro' }
     });
     if (!v.ok) return res.status(400).json({ error: v.erro });
+    const tipoAtivo = await validarTipoNovo(v.valores.tipo_evento);
+    if (!tipoAtivo) return res.status(400).json({ error: 'Selecione um Tipo de Evento ativo.' });
 
     const novoEvento = {
       id: generateId('evt'),
@@ -53,16 +61,18 @@ module.exports = function criarRouterEventos({
     };
 
     await writeRow('eventos', novoEvento);
+    await registrarAuditoria({ req, acao: 'criou', entidade: 'Evento', entidadeId: novoEvento.id, descricao: `Cadastrou o evento “${novoEvento.nome_evento}”.` });
     res.status(201).json(novoEvento);
   }));
 
   router.put('/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
     const eventoAtual = await buscarRow('eventos', req.params.id);
     if (!eventoAtual) return res.status(404).json({ error: 'Evento não encontrado' });
+    const antes = { ...eventoAtual };
 
     const v = validarCampos(req.body, {
       nome_evento: { obrigatorio: false, tipo: 'string', max: 200, label: 'Nome do Evento' },
-      tipo_evento: { obrigatorio: false, tipo: 'string', max: 50, valores: TIPOS_EVENTO, label: 'Tipo de Evento' },
+      tipo_evento: { obrigatorio: false, tipo: 'string', max: 100, label: 'Tipo de Evento' },
       local_itinerario: { obrigatorio: false, tipo: 'string', max: 300, label: 'Local/Itinerário' },
       endereco: { obrigatorio: false, tipo: 'string', max: 300, label: 'Endereço' },
       data_inicio: { obrigatorio: false, tipo: 'string', max: 10, label: 'Data de Início' },
@@ -75,9 +85,14 @@ module.exports = function criarRouterEventos({
       bairro: { obrigatorio: false, tipo: 'string', max: 100, label: 'Bairro' }
     });
     if (!v.ok) return res.status(400).json({ error: v.erro });
+    if (v.valores.tipo_evento !== undefined && v.valores.tipo_evento !== eventoAtual.tipo_evento) {
+      const tipoAtivo = await validarTipoNovo(v.valores.tipo_evento);
+      if (!tipoAtivo) return res.status(400).json({ error: 'Selecione um Tipo de Evento ativo.' });
+    }
 
     const eventoAtualizado = { ...eventoAtual, ...v.valores };
     await writeRow('eventos', eventoAtualizado);
+    await registrarAuditoria({ req, acao: 'alterou', entidade: 'Evento', entidadeId: eventoAtualizado.id, descricao: `Alterou o evento “${eventoAtualizado.nome_evento}”.`, antes, depois: eventoAtualizado, campos: ['nome_evento', 'tipo_evento', 'data_inicio', 'data_termino', 'horario_inicio', 'local_itinerario', 'endereco', 'bairro', 'demandante', 'num_oficio', 'num_os_manual', 'num_sei'] });
     res.json(eventoAtualizado);
   }));
 
@@ -85,6 +100,7 @@ module.exports = function criarRouterEventos({
     await deleteRow('eventos', req.params.id);
     const { error: erroAlocacoes } = await supabase.from('alocacoes').delete().eq('evento_id', req.params.id);
     if (erroAlocacoes) throw new Error(`Falha ao limpar "alocacoes" no Supabase: ${erroAlocacoes.message}`);
+    await registrarAuditoria({ req, acao: 'excluiu', entidade: 'Evento', entidadeId: req.params.id, descricao: 'Excluiu evento e alocações relacionadas.' });
     res.json({ message: 'Evento e registros relacionados excluídos' });
   }));
 

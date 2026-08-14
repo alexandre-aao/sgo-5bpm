@@ -12,6 +12,7 @@ import { FiltrosEventosBar } from './FiltrosEventosBar';
 import { TabelaEventos } from './TabelaEventos';
 import { DrawerEvento } from './DrawerEvento';
 import { RelatorioEventosPdf } from './RelatorioEventosPdf';
+import { TiposEventoPanel } from './TiposEventoPanel';
 import { filtrosVazios, getEventosFiltrados, type FiltrosEventos } from './filtros';
 
 // Listar Eventos — consulta geral com filtro de período/texto e paginação
@@ -76,6 +77,8 @@ export default function EventosPage() {
   return (
     <>
       <EventosKpis eventosFiltrados={eventosFiltrados} todosEventos={dados.eventos} />
+
+      {usuario?.role === 'P3' && <TiposEventoPanel />}
 
       <div className="panel events-panel">
         <div className="panel-header flex-column-mobile">

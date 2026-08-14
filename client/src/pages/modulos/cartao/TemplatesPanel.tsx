@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  LayoutTemplate, FolderOpen, Trash2, CheckCircle2, Copy, ChevronDown, ChevronRight,
+  LayoutTemplate, FolderOpen, Trash2, CheckCircle2, Copy, ChevronDown, ChevronRight, History, RotateCcw,
 } from 'lucide-react';
 import { useToast } from '../../../context/useToast';
 import { apiFetch } from '../../../lib/api';
@@ -11,6 +11,8 @@ import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarE
 
 interface TemplatesPanelProps {
   onAbrir: (id: string) => void;
+  templateAberto: CartaoDetalhado | null;
+  onAtualizado: () => Promise<void>;
   /** Chamado após excluir com sucesso, com o id excluído — o pai fecha o
    * editor se for o template que estava aberto. */
   onExcluido: (id: string) => void;
@@ -67,12 +69,14 @@ function PreviaTemplate({ id }: { id: string }) {
 
 // Painel "Cartões Padrão" (P3-only). Um só padrão fica ativo por vez: é o que
 // POST /api/cartoes clona para o cartão do dia.
-export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
+export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExcluido }: TemplatesPanelProps) {
   const { toast } = useToast();
   const {
-    templates, carregando, excluirTemplate, definirPadraoAtivo, duplicarTemplate,
+    templates, carregando, excluirTemplate, definirPadraoAtivo, publicarTemplate, listarVersoes, restaurarVersao, duplicarTemplate,
   } = useTemplatesCartao();
   const [expandido, setExpandido] = useState<string | null>(null);
+  const [versaoAberta, setVersaoAberta] = useState<string | null>(null);
+  const [versoes, setVersoes] = useState<Record<string, Awaited<ReturnType<typeof listarVersoes>>['versoes']>>({});
   const [aExcluir, setAExcluir] = useState<TemplateResumo | null>(null);
 
   async function handleExcluir() {
@@ -90,6 +94,42 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
   async function handleDefinirPadrao(id: string) {
     const resultado = await definirPadraoAtivo(id);
     toast(resultado.ok ? 'Cartão padrão ativo definido.' : resultado.mensagem, resultado.ok ? 'success' : 'danger');
+  }
+
+  async function handlePublicar(template: TemplateResumo) {
+    const versaoAtual = templateAberto?.id === template.id
+      ? { ...template, atualizado_em: templateAberto.atualizado_em }
+      : template;
+    const resultado = await publicarTemplate(versaoAtual);
+    toast(resultado.ok ? 'Cartão padrão publicado. A versão anterior ficou disponível para restauração.' : resultado.mensagem, resultado.ok ? 'success' : 'danger');
+    if (resultado.ok) await onAtualizado();
+  }
+
+  async function handleVersoes(template: TemplateResumo) {
+    if (versaoAberta === template.id) {
+      setVersaoAberta(null);
+      return;
+    }
+    const resultado = await listarVersoes(template.id);
+    if (!resultado.ok) {
+      toast(resultado.mensagem || 'Não foi possível carregar o histórico.', 'danger');
+      return;
+    }
+    setVersoes((atual) => ({ ...atual, [template.id]: resultado.versoes }));
+    setVersaoAberta(template.id);
+  }
+
+  async function handleRestaurar(template: TemplateResumo, versao: number) {
+    if (!window.confirm(`Restaurar a versão ${versao} como rascunho? O padrão ativo atual não será trocado.`)) return;
+    const versaoAtual = templateAberto?.id === template.id
+      ? { ...template, atualizado_em: templateAberto.atualizado_em }
+      : template;
+    const resultado = await restaurarVersao(versaoAtual, versao);
+    toast(resultado.ok ? 'Versão restaurada como rascunho.' : resultado.mensagem, resultado.ok ? 'success' : 'danger');
+    if (resultado.ok) {
+      setVersaoAberta(null);
+      await onAtualizado();
+    }
   }
 
   async function handleDuplicar(template: TemplateResumo) {
@@ -121,18 +161,22 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
               <th>Período</th>
               <th className="text-center">Qtd. VTRs Base</th>
               <th className="text-center">Viaturas Cadastradas</th>
+              <th className="text-center">Estado</th>
               <th className="text-center">Padrão</th>
               <th className="text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando ? null : templates.length === 0 ? (
-              <LinhaTabelaVazia colunas={6}>
+              <LinhaTabelaVazia colunas={7}>
                 Nenhum cartão padrão cadastrado ainda.
               </LinhaTabelaVazia>
             ) : (
               templates.map((t) => {
                 const aberto = expandido === t.id;
+                const estadoTemplate = templateAberto?.id === t.id
+                  ? (templateAberto.estado_template === 'publicado' ? 'publicado' : 'rascunho')
+                  : t.estado_template;
                 return [
                   <tr key={t.id}>
                     <td>
@@ -150,12 +194,22 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
                     <td className="text-center">{t.qtd_viaturas_base}</td>
                     <td className="text-center">{t.qtd_viaturas}</td>
                     <td className="text-center">
+                      <span className={`badge ${estadoTemplate === 'publicado' ? 'status-ativa' : 'status-pendente'}`}>
+                        {estadoTemplate === 'publicado' ? `Publicado${t.versao_publicada ? ` · v${t.versao_publicada}` : ''}` : 'Rascunho'}
+                      </span>
+                    </td>
+                    <td className="text-center">
                       {t.padrao_ativo ? (
                         <span className="badge status-ativa">
                           <CheckCircle2 className="icone-inline-sm" /> Ativo
                         </span>
                       ) : (
-                        <button className="btn btn-secondary btn-sm" onClick={() => void handleDefinirPadrao(t.id)}>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          disabled={estadoTemplate !== 'publicado'}
+                          title={estadoTemplate !== 'publicado' ? 'Publique esta versão antes de defini-la como padrão' : undefined}
+                          onClick={() => void handleDefinirPadrao(t.id)}
+                        >
                           Definir como padrão
                         </button>
                       )}
@@ -166,6 +220,14 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
                       </button>
                       <button className="btn btn-secondary btn-sm" onClick={() => void handleDuplicar(t)}>
                         <Copy className="icone-inline-sm" /> Duplicar
+                      </button>
+                      {estadoTemplate !== 'publicado' && (
+                        <button className="btn btn-primary btn-sm" onClick={() => void handlePublicar(t)}>
+                          <CheckCircle2 className="icone-inline-sm" /> Publicar
+                        </button>
+                      )}
+                      <button className="btn btn-secondary btn-sm" onClick={() => void handleVersoes(t)}>
+                        <History className="icone-inline-sm" /> Versões
                       </button>
                       {/* O padrão ativo não pode ser excluído: sem ele o Adjunto toma
                           409 ao criar o cartão do dia. O servidor também recusa. */}
@@ -181,7 +243,28 @@ export function TemplatesPanel({ onAbrir, onExcluido }: TemplatesPanelProps) {
                   </tr>,
                   aberto ? (
                     <tr key={`${t.id}-previa`} className="linha-previa">
-                      <td colSpan={6}><PreviaTemplate id={t.id} /></td>
+                      <td colSpan={7}><PreviaTemplate id={t.id} /></td>
+                    </tr>
+                  ) : null,
+                  versaoAberta === t.id ? (
+                    <tr key={`${t.id}-versoes`} className="linha-previa">
+                      <td colSpan={7}>
+                        <div className="template-versoes">
+                          <strong><History className="icone-inline-sm" /> Histórico de versões</strong>
+                          {(versoes[t.id] || []).length === 0 ? <p className="texto-auxiliar">Nenhuma versão publicada ainda.</p> : (
+                            <div className="template-versoes-lista">
+                              {(versoes[t.id] || []).map((versao) => (
+                                <div className="template-versao" key={versao.id}>
+                                  <span>v{versao.versao} · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(versao.criado_em))} · {versao.criado_por}</span>
+                                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => void handleRestaurar(t, versao.versao)}>
+                                    <RotateCcw className="icone-inline-sm" /> Restaurar como rascunho
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ) : null,
                 ];

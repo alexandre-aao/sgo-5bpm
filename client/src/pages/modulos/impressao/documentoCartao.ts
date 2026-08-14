@@ -111,6 +111,7 @@ export interface DocumentoCartao {
     comAlertas: boolean;
     versao: number;
     emitidoEm: Date | null;
+    geradoPor: string;
     rodape: string;
     nomeArquivo: string;
   };
@@ -241,6 +242,7 @@ function baseDocumento(
   pessoal: Tables<'pessoal'>[],
   configuracao: ConfiguracaoEmissao,
   emitidoEm: Date | null,
+  geradoPor = '',
 ): DocumentoCartao {
   const versao = Math.max(1, ...viaturas.map((viatura) => viatura.versao));
   const numero = cartao.numero ? `${String(cartao.numero).padStart(6, '0')}/${cartao.ano}` : '';
@@ -274,6 +276,7 @@ function baseDocumento(
       comAlertas: configuracao.comAlertas,
       versao,
       emitidoEm,
+      geradoPor,
       rodape,
       nomeArquivo: nomeArquivo(cartao.data || 'sem-data', viaturas, configuracao.tipoDocumento, versao),
     },
@@ -295,14 +298,15 @@ export function montarDocumentosCartao(
   avisos: Tables<'avisos'>[],
   configuracao: ConfiguracaoEmissao,
   emitidoEm: Date | null,
+  geradoPor = '',
 ): DocumentoCartao[] {
   const viaturas = viaturasSelecionadas.map((viatura) =>
     viaturaParaDocumento(viatura, cartao, pessoal, bairros, eventos, avisos, configuracao));
 
   if (configuracao.tipoDocumento === 'individual') {
-    return viaturas.map((viatura) => baseDocumento(cartao, [viatura], pessoal, configuracao, emitidoEm));
+    return viaturas.map((viatura) => baseDocumento(cartao, [viatura], pessoal, configuracao, emitidoEm, geradoPor));
   }
-  return [baseDocumento(cartao, viaturas, pessoal, configuracao, emitidoEm)];
+  return [baseDocumento(cartao, viaturas, pessoal, configuracao, emitidoEm, geradoPor)];
 }
 
 export function estimarPaginas(documentos: DocumentoCartao[]): number {

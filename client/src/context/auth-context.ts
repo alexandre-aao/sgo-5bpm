@@ -5,6 +5,7 @@ export interface AuthContextValue {
   usuario: Usuario | null;
   login: (usuario: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
+  atualizarUsuario: (patch: Partial<Usuario>) => void;
 }
 
 // Fica num arquivo próprio (sem exportar componente) porque o

@@ -12,7 +12,17 @@ export interface TemplateResumo {
   qtd_viaturas_base: number;
   qtd_viaturas: number;
   padrao_ativo: boolean;
+  estado_template: 'rascunho' | 'publicado';
+  versao_publicada: number | null;
   atualizado_em: string | null;
+}
+
+export interface VersaoTemplate {
+  id: string;
+  versao: number;
+  criado_em: string;
+  criado_por: string;
+  snapshot: CartaoDetalhado;
 }
 
 export interface NovoTemplatePayload {
@@ -144,8 +154,45 @@ export function useTemplatesCartao() {
     }
   }, [recarregar]);
 
+  const publicarTemplate = useCallback(async (template: TemplateResumo): Promise<ResultadoAcao> => {
+    try {
+      const res = await apiFetch(`/api/cartoes/${template.id}/publicar`, {
+        method: 'POST', headers: cabecalhosVersaoCartao(template),
+      });
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao publicar o cartão padrão.') };
+      await recarregar();
+      return { ok: true };
+    } catch (erro) {
+      console.error('Erro ao publicar cartão padrão:', erro);
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [recarregar]);
+
+  const listarVersoes = useCallback(async (id: string): Promise<{ ok: boolean; versoes: VersaoTemplate[]; mensagem?: string }> => {
+    try {
+      const res = await apiFetch(`/api/cartoes/${id}/versoes`);
+      if (!res.ok) return { ok: false, versoes: [], mensagem: await extrairErro(res, 'Falha ao carregar o histórico de versões.') };
+      return { ok: true, versoes: (await res.json()) as VersaoTemplate[] };
+    } catch {
+      return { ok: false, versoes: [], mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, []);
+
+  const restaurarVersao = useCallback(async (template: TemplateResumo, versao: number): Promise<ResultadoAcao> => {
+    try {
+      const res = await apiFetch(`/api/cartoes/${template.id}/versoes/${versao}/restaurar`, {
+        method: 'POST', headers: cabecalhosVersaoCartao(template),
+      });
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao restaurar a versão.') };
+      await recarregar();
+      return { ok: true };
+    } catch {
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [recarregar]);
+
   return {
     templates, carregando, recarregar, criarTemplate, excluirTemplate,
-    definirPadraoAtivo, duplicarTemplate, salvarComoPadrao,
+    definirPadraoAtivo, publicarTemplate, listarVersoes, restaurarVersao, duplicarTemplate, salvarComoPadrao,
   };
 }

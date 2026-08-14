@@ -17,13 +17,14 @@ export function ModalUsuario({ usuario, onFechar, onSalvar }: ModalUsuarioProps)
   const [login, setLogin] = useState(usuario?.usuario ?? '');
   const [nome, setNome] = useState(usuario?.nome ?? '');
   const [role, setRole] = useState(usuario?.role ?? 'P3');
+  const [ativo, setAtivo] = useState(usuario?.ativo !== false);
   const [senha, setSenha] = useState('');
   const [enviando, setEnviando] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const payload: NovoUsuarioPayload | EditarUsuarioPayload = modoEdicao
-      ? { nome: nome.trim(), role }
+      ? { nome: nome.trim(), role, ativo }
       : { usuario: login.trim(), nome: nome.trim(), role, senha };
 
     setEnviando(true);
@@ -67,11 +68,17 @@ export function ModalUsuario({ usuario, onFechar, onSalvar }: ModalUsuarioProps)
               <option value="Oficial">Oficial</option>
             </select>
           </div>
+          {modoEdicao && (
+            <label className="checkbox-inline">
+              <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
+              Usuário ativo
+            </label>
+          )}
           {!modoEdicao && (
             <div className="form-group">
               <label htmlFor="usr-senha">Senha Inicial</label>
               <input
-                type="password" id="usr-senha" minLength={8} placeholder="Mínimo 8 caracteres" autoComplete="new-password"
+                type="password" id="usr-senha" minLength={3} placeholder="Mínimo 3 caracteres" autoComplete="new-password"
                 required value={senha} onChange={(e) => setSenha(e.target.value)}
               />
             </div>

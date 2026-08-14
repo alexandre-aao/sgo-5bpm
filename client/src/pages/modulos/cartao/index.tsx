@@ -24,6 +24,7 @@ import { ModalEditarViatura } from './ModalEditarViatura';
 import { ConflitoBanner } from './ConflitoBanner';
 import { TrilhoCartao } from './TrilhoCartao';
 import { TemplatesPanel } from './TemplatesPanel';
+import { GruposModeloPanel } from './GruposModeloPanel';
 import { ModalNovoTemplate } from './ModalNovoTemplate';
 import { ModalSalvarComoPadrao } from './ModalSalvarComoPadrao';
 import { CriarDoPadrao } from './CriarDoPadrao';
@@ -271,8 +272,14 @@ export default function CartaoProgramaPage() {
       </div>
 
       {mostrarTemplatesPanel && (
-        <TemplatesPanel onAbrir={handleAbrirTemplate} onExcluido={handleTemplateExcluido} />
+        <TemplatesPanel
+          onAbrir={handleAbrirTemplate}
+          templateAberto={templateAberto}
+          onAtualizado={recarregarAtivo}
+          onExcluido={handleTemplateExcluido}
+        />
       )}
+      {cartaoEditando && <GruposModeloPanel cartao={cartaoEditando} podeEditar={podeEditar} onAtualizado={recarregarAtivo} />}
 
       <CartoesRecentes dataSelecionada={dataSelecionada} onAbrir={setDataSelecionada} />
 
@@ -293,14 +300,14 @@ export default function CartaoProgramaPage() {
 
       {cartaoEditando && (
         <>
-          {/* Editar o padrão em vigor não afeta cartões já criados, mas muda todos os
-              próximos — o P3 precisa saber disso antes de mexer, não depois. */}
+           {/* Editar o padrão em vigor abre um rascunho; a fotografia publicada
+               continua originando os cartões do dia até a próxima publicação. */}
           {cartaoEditando.is_template && cartaoEditando.padrao_ativo && (
             <div className="cartao-padrao-ativo-banner" role="status">
               <TriangleAlert aria-hidden="true" />
               <span>
-                Você está editando o <strong>cartão padrão ativo</strong>. As mudanças valem para
-                todos os próximos cartões do dia criados a partir dele. Os cartões já criados não mudam.
+                 Você está editando o <strong>cartão padrão ativo</strong>. As mudanças ficam em rascunho
+                 e só passam a valer para novos cartões do dia depois de publicar esta versão.
               </span>
             </div>
           )}
