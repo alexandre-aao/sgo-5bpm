@@ -5802,15 +5802,27 @@ kbd {
   }
 
   /* ---- Barra de abas inferior ---- */
+  .app-container {
+    height: 100dvh;
+    flex-direction: column;
+  }
+
+  .main-content {
+    width: 100%;
+    min-height: 0;
+  }
+
   .bottom-tabs {
     display: flex;
     justify-content: space-around;
     align-items: stretch;
     gap: 2px;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    position: relative;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    width: 100%;
+    flex-shrink: 0;
     z-index: 150;
     background-color: var(--bg-panel);
     border-top: 1px solid var(--border-color);
@@ -5848,8 +5860,13 @@ kbd {
   .bottom-tab.ativo { color: var(--primary); background-color: var(--nav-active-bg); }
   .bottom-tab:active { transform: scale(0.96); }
 
-  /* espaço para o conteúdo não ficar embaixo da barra fixa */
-  .tab-content { padding-bottom: 84px; }
+  /* A barra inferior participa do layout no mobile, então nunca cobre o fim da
+     rolagem. Mantemos apenas um respiro visual depois do último elemento. */
+  .tab-content {
+    min-height: 0;
+    padding-bottom: var(--space-6);
+    scroll-padding-bottom: var(--space-6);
+  }
 
   /* Sidebar vira um drawer off-canvas (mesma técnica do #drawer de evento —
      wrapper fixo + overlay com fade + painel deslizando via transition —
@@ -5971,6 +5988,72 @@ kbd {
   #form-cartao-vtr button[type="submit"],
   .cartao-item-form button {
     min-height: 44px;
+    width: 100%;
+  }
+
+  /* Roteiro do Cartão Programa: no celular cada item vira um cartão compacto.
+     A tabela desktop tem quatro colunas e escondia os botões de edição fora da
+     largura útil; aqui horário/atividade ocupam o topo, o local usa a largura
+     inteira e as ações ficam sempre visíveis na última linha. */
+  .cartao-vtr-body { min-width: 0; }
+  .cartao-itens-table,
+  .cartao-itens-table tbody { display: block; width: 100%; }
+  .cartao-itens-table thead { display: none; }
+  .cartao-itens-table .cartao-item-linha {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(92px, auto);
+    gap: 8px 12px;
+    width: 100%;
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    background: var(--surface-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+  }
+  .cartao-itens-table .cartao-item-linha > td {
+    min-width: 0;
+    padding: 0;
+    border-bottom: 0;
+  }
+  .cartao-itens-table .cartao-item-linha > td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .cartao-itens-table .cartao-item-linha > td:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    line-height: 1.4;
+  }
+  .cartao-itens-table .cartao-item-linha > td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .cartao-itens-table .roteiro-item-acoes {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+    padding-top: var(--space-2) !important;
+    border-top: 1px solid var(--divider) !important;
+  }
+  .cartao-itens-table .roteiro-item-acoes .btn-icon {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+  .cartao-itens-table .roteiro-edicao-horas input,
+  .cartao-itens-table .roteiro-edicao-local,
+  .cartao-itens-table .cartao-item-linha select {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .cartao-itens-table .roteiro-edicao-local { width: 100%; }
+  .cartao-itens-table .cartao-item-linha > td:nth-child(3) select { width: 100%; }
+  .cartao-itens-table .cartao-item-virada,
+  .cartao-itens-table .cartao-item-vazio {
+    display: block;
     width: 100%;
   }
 

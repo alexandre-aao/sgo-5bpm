@@ -123,11 +123,11 @@ export function ViaturaRoteiroCard({
         <table className="cartao-itens-table">
           <thead><tr><th>Horário</th><th>Local / Itinerário</th><th>Atividade</th><th></th></tr></thead>
           <tbody>
-            {vtr.itens.length === 0 ? <tr><td colSpan={4} className="cartao-vazio-linha">Sem itens de roteiro.</td></tr> : marcarViradaDeDia(vtr.itens, dataCartao).map((entrada) => {
+            {vtr.itens.length === 0 ? <tr className="cartao-item-vazio"><td colSpan={4} className="cartao-vazio-linha">Sem itens de roteiro.</td></tr> : marcarViradaDeDia(vtr.itens, dataCartao).map((entrada) => {
               if (entrada.tipo === 'virada') return <tr className="cartao-item-virada" key={`virada-${vtr.id}`}><td colSpan={4}>{entrada.rotulo}</td></tr>;
               const item = entrada.item;
               const editando = editandoId === item.id;
-              return <tr key={item.id}>
+              return <tr className="cartao-item-linha" key={item.id}>
                 <td className="cartao-item-hora">{editando ? <div className="roteiro-edicao-horas"><input type="time" value={itemEmEdicao.inicio} onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, inicio: e.target.value })} /><input type="time" value={itemEmEdicao.fim} onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, fim: e.target.value })} /></div> : <>{formatHoraCartao(item.inicio)}{item.fim ? ` às ${formatHoraCartao(item.fim)}` : ''}</>}</td>
                 <td>{editando ? <input className="roteiro-edicao-local" value={itemEmEdicao.local} onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, local: e.target.value })} /> : item.local}</td>
                 <td>{editando ? <select value={itemEmEdicao.atividade} onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, atividade: e.target.value })}>{ATIVIDADES_CARTAO.map((atividade) => <option key={atividade}>{atividade}</option>)}</select> : <span className={`badge ${atividadeBadgeClass(item.atividade)}`}>{item.atividade}</span>}</td>
