@@ -88,7 +88,7 @@ export function GradeEdicao({ cartao, podeEditar, recarregar }: GradeEdicaoProps
               </thead>
               <tbody>
                 {vtr.itens.length === 0 ? (
-                  <tr>
+                  <tr className="ctc-grade-vazio">
                     <td className="ctc-vazio-linha" colSpan={podeEditar ? 5 : 4}>Sem itens de roteiro.</td>
                   </tr>
                 ) : (
@@ -104,12 +104,12 @@ export function GradeEdicao({ cartao, podeEditar, recarregar }: GradeEdicaoProps
                     const item = entrada.item;
                     const emEdicao = editando?.vtrId === vtr.id && editando?.itemId === item.id;
                     return (
-                      <tr key={item.id}>
+                      <tr className="ctc-grade-item" key={item.id}>
                         <td className="ctc-col-horario">
                           {formatHoraCartao(item.inicio)}{item.fim ? ` às ${formatHoraCartao(item.fim)}` : ''}
                         </td>
-                        <td className="ctc-col-local">{item.local}</td>
-                        <td className="ctc-col-missao">
+                        <td className="ctc-col-local" data-label="Local / Bairro">{item.local}</td>
+                        <td className="ctc-col-missao" data-label="Missão">
                           {emEdicao ? (
                             <select value={missaoEmEdicao} onChange={(e) => setMissaoEmEdicao(e.target.value)}>
                               {ATIVIDADES_CARTAO.map((a) => <option key={a} value={a}>{a}</option>)}
@@ -118,9 +118,9 @@ export function GradeEdicao({ cartao, podeEditar, recarregar }: GradeEdicaoProps
                             <span className={`badge ${atividadeBadgeClass(item.atividade)}`}>{item.atividade}</span>
                           )}
                         </td>
-                        <td className="ctc-col-efetivo">{vtr.comandante || '—'}</td>
+                        <td className="ctc-col-efetivo" data-label="Efetivo">{vtr.comandante || '—'}</td>
                         {podeEditar && (
-                          <td className="ctc-col-acoes">
+                          <td className="ctc-col-acoes" data-label="Ações">
                             {emEdicao ? (
                               <>
                                 <button className="btn-icon btn-sm" title="Salvar missão" aria-label="Salvar missão" onClick={() => handleSalvarMissao(vtr.id, item.id)}>

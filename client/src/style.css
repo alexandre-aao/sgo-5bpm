@@ -4782,8 +4782,119 @@ body.sgo-sincronizando .topbar::before {
 }
 
 @media (max-width: 768px) {
-  .ctc-barra { flex-wrap: wrap; }
+  .ctc-shell { min-height: 100dvh; }
+  .ctc-barra {
+    display: grid;
+    grid-template-columns: var(--touch-target) minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+    padding: 10px var(--space-3);
+  }
+  .ctc-barra-info {
+    justify-content: center;
+  }
+  .ctc-barra-janela {
+    line-height: 1.25;
+  }
+  .ctc-barra-acoes {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .ctc-barra-acoes .dia-switch { flex: 1; }
+  .ctc-barra-acoes .dia-opcao { flex: 1; }
   .ctc-barra-fracao { display: none; }
+  .ctc-conteudo { padding: var(--space-3); }
+
+  /* A grade de edição tem cinco colunas no desktop. No celular, cada item vira
+     um cartão para impedir a sobreposição de local, missão, efetivo e ações. */
+  .ctc-conteudo .ctc-grade-secao { padding: var(--space-3); }
+  .ctc-grade-secao .ctc-grade-scroll { overflow-x: visible; }
+  .ctc-grade-secao .ctc-grade,
+  .ctc-grade-secao .ctc-grade tbody { display: block; width: 100%; }
+  .ctc-grade thead { display: none; }
+  .ctc-grade-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(112px, auto);
+    gap: 10px var(--space-3);
+    width: 100%;
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+  }
+  .ctc-grade .ctc-grade-item > td {
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    border-bottom: 0;
+  }
+  .ctc-grade-item .ctc-col-horario {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .ctc-grade-item .ctc-col-missao {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .ctc-grade-item .ctc-col-local,
+  .ctc-grade-item .ctc-col-efetivo {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: var(--space-2);
+    white-space: normal;
+  }
+  .ctc-grade-item .ctc-col-local { grid-row: 2; }
+  .ctc-grade-item .ctc-col-efetivo { grid-row: 3; }
+  .ctc-grade-item .ctc-col-local::before,
+  .ctc-grade-item .ctc-col-efetivo::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .ctc-grade-item .ctc-col-acoes {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+    padding-top: var(--space-2) !important;
+    border-top: 1px solid var(--divider) !important;
+  }
+  .ctc-grade-item .ctc-col-acoes .btn-icon {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+  .ctc-grade-item .ctc-col-missao select {
+    width: 100%;
+    min-width: 0;
+    max-width: 145px;
+  }
+  .ctc-grade .ctc-virada,
+  .ctc-grade .ctc-grade-vazio {
+    display: block;
+    width: 100%;
+  }
+  .ctc-grade .ctc-virada td,
+  .ctc-grade .ctc-grade-vazio td {
+    display: block;
+    width: 100%;
+  }
+  .ctc-grade-secao .ctc-grade-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ctc-grade-form > * { min-width: 0; width: 100%; }
+  .ctc-grade-form > input[type="text"],
+  .ctc-grade-form > select,
+  .ctc-grade-form > .btn { grid-column: 1 / -1; }
+  .ctc-grade-form input,
+  .ctc-grade-form select { font-size: 16px; }
+  .ctc-grade-form .btn { min-height: var(--touch-target); }
 }
 
 /* Modo Edição: uma seção por viatura, colunas fixas com rolagem horizontal —
