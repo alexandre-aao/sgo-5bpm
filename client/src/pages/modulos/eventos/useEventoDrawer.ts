@@ -122,5 +122,21 @@ export function useEventoDrawer(eventoId: string | null) {
     }
   }, [recarregar]);
 
-  return { evento, alocacoes, carregando, recarregar, atualizarEvento, excluirEvento, adicionarAlocacao, removerAlocacao };
+  const converterEmOperacao = useCallback(async (): Promise<ResultadoAcao & { operacaoId?: string }> => {
+    if (!eventoId) return { ok: false, mensagem: 'Nenhum evento selecionado.' };
+    try {
+      const res = await apiFetch(`/api/eventos/${eventoId}/converter-em-operacao`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo_operacao: 'Outras', qtd_diarias_estimada: 0 }),
+      });
+      const corpo = (await res.json().catch(() => ({}))) as Tables<'operacoes'> & { error?: string; operacao_id?: string };
+      if (!res.ok) return { ok: false, mensagem: corpo.error || 'Falha ao converter o evento.' };
+      await recarregar();
+      return { ok: true, operacaoId: corpo.id };
+    } catch {
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [eventoId, recarregar]);
+
+  return { evento, alocacoes, carregando, recarregar, atualizarEvento, excluirEvento, adicionarAlocacao, removerAlocacao, converterEmOperacao };
 }

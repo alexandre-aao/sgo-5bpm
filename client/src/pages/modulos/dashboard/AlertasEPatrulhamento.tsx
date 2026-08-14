@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import type { Tables } from '../../../types/supabase';
 import { calcularAlertasCartao, type CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { calcularAlertasEventosUrgentes } from '../../../lib/alertasEventos';
+import type { DashboardResumo } from './useDashboardResumo';
 
 interface AlertaExibicao {
+  titulo: string;
   mensagem: string;
   deCartao: boolean;
   /** Para onde a pendência leva. Conflito vai ao Cartão de hoje; evento sem OS/SEI
@@ -17,18 +19,27 @@ interface AlertasEPatrulhamentoProps {
   carregandoCartao: boolean;
   eventos: Tables<'eventos'>[];
   pessoal: Tables<'pessoal'>[];
+  operacional: DashboardResumo['operacional'] | null;
 }
 
-export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, pessoal }: AlertasEPatrulhamentoProps) {
+export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, pessoal, operacional }: AlertasEPatrulhamentoProps) {
   const alertasCartao: AlertaExibicao[] = cartaoHoje
-    ? calcularAlertasCartao(cartaoHoje, pessoal).map((a) => ({ mensagem: a.mensagem, deCartao: true, destino: '/cartao' }))
+    ? calcularAlertasCartao(cartaoHoje, pessoal).map((a) => ({ titulo: 'Conflito no Cartão Programa de hoje', mensagem: a.mensagem, deCartao: true, destino: '/cartao' }))
     : [];
   const alertasEventos: AlertaExibicao[] = calcularAlertasEventosUrgentes(eventos).map((a) => ({
+    titulo: 'Evento próximo com pendência',
     mensagem: a.mensagem,
     deCartao: false,
     destino: `/eventos?evento=${encodeURIComponent(a.eventoId)}`,
   }));
-  const todosAlertas = [...alertasCartao, ...alertasEventos];
+  const alertasOperacionais: AlertaExibicao[] = operacional ? [
+    ...(!operacional.cartao_hoje_pronto ? [{ titulo: 'Preparação do serviço', mensagem: 'O Cartão Ordinário de hoje ainda não está pronto.', deCartao: true, destino: `/cartao?data=${operacional.hoje}` }] : []),
+    ...(!operacional.cartao_amanha_preparado ? [{ titulo: 'Preparação do serviço', mensagem: 'O cartão de amanhã ainda não foi preparado.', deCartao: true, destino: `/cartao?data=${operacional.amanha}` }] : []),
+    ...(!operacional.modelo_ordinario_ativo ? [{ titulo: 'Modelo Ordinário', mensagem: 'Nenhum Modelo Ordinário está definido como padrão ativo.', deCartao: true, destino: '/cartao?modelos=1' }] : []),
+    ...(operacional.modelo_ordinario_com_rascunho ? [{ titulo: 'Publicação pendente', mensagem: 'O Modelo Ordinário ativo possui alterações ainda não publicadas.', deCartao: true, destino: '/cartao?modelos=1' }] : []),
+    ...operacional.operacoes_diaria_pendente.map((op) => ({ titulo: 'Operação com diária pendente', mensagem: `${op.nome_operacao}: diária ainda não definida.`, deCartao: false, destino: `/operacoes?operacao=${op.id}` })),
+  ] : [];
+  const todosAlertas = [...alertasOperacionais, ...alertasCartao, ...alertasEventos];
 
   // Enquanto o cartão de hoje ainda está carregando, não afirma "nenhum cartão
   // lançado" — fica em branco (mesmo comportamento do app antigo: a tabela some
@@ -54,7 +65,6 @@ export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, p
             todosAlertas.map((a, i) => {
               const classesIcone = a.deCartao ? 'fundo-warning tom-warning' : 'fundo-danger tom-danger';
               const Icone = a.deCartao ? AlertTriangle : AlertCircle;
-              const titulo = a.deCartao ? 'Conflito no Cartão Programa de hoje' : 'Evento próximo com pendência';
               return (
                 // A pendência leva ao lugar de resolvê-la: antes era leitura pura
                 // e obrigava o usuário a navegar até o dado por conta própria.
@@ -63,7 +73,7 @@ export function AlertasEPatrulhamento({ cartaoHoje, carregandoCartao, eventos, p
                     <Icone />
                   </span>
                   <div className="dash-alerta-texto">
-                    <div className="dash-alerta-titulo">{titulo}</div>
+                    <div className="dash-alerta-titulo">{a.titulo}</div>
                     <div className="dash-alerta-sub">{a.mensagem}</div>
                   </div>
                 </Link>

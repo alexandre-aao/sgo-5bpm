@@ -53,6 +53,15 @@ module.exports = function criarRouterCartoes({
     return JSON.parse(JSON.stringify(cartao));
   }
 
+  async function resolverModeloPublicado(modelo) {
+    if (modelo.estado_template === 'publicado') return modelo;
+    const { data: versao, error } = await supabase.from('cartao_padrao_versoes')
+      .select('snapshot,versao').eq('cartao_id', modelo.id)
+      .order('versao', { ascending: false }).limit(1).maybeSingle();
+    if (error) throw new Error(`Falha ao buscar versão publicada do modelo: ${error.message}`);
+    return versao?.snapshot ? { ...modelo, ...versao.snapshot, id: modelo.id, estado_template: 'publicado', versao_publicada: versao.versao } : null;
+  }
+
   async function criarVersaoPadrao(cartao, req, versaoInformada = null) {
     const { data: ultima, error: erroUltima } = await supabase
       .from('cartao_padrao_versoes')
@@ -218,13 +227,13 @@ module.exports = function criarRouterCartoes({
     res.json(resumo);
   }));
 
-  // Lista de templates de Cartão Programa, com filtro opcional por período/quantidade de viaturas
+  // Lista dos Modelos Ordinário e de Operação.
   // IMPORTANTE: precisa vir antes de /api/cartoes/:id para o Express não tratar "templates" como :id
   router.get('/cartoes/templates', exigirP3, asyncRoute(async (req, res) => {
     let templates = await readTabela('cartoes', { is_template: true });
 
-    if (req.query.tipo_periodo) {
-      templates = templates.filter(c => c.tipo_periodo === req.query.tipo_periodo);
+    if (req.query.tipo_modelo) {
+      templates = templates.filter(c => (c.tipo_modelo || 'ordinario') === req.query.tipo_modelo);
     }
     if (req.query.qtd_viaturas_base) {
       const qtd = parseInt(req.query.qtd_viaturas_base, 10);
@@ -234,6 +243,7 @@ module.exports = function criarRouterCartoes({
     res.json(templates.map(c => ({
       id: c.id,
       nome_template: c.nome_template,
+      tipo_modelo: c.tipo_modelo || 'ordinario',
       tipo_periodo: c.tipo_periodo,
       qtd_viaturas_base: c.qtd_viaturas_base,
       qtd_viaturas: (c.viaturas || []).length,
@@ -241,6 +251,22 @@ module.exports = function criarRouterCartoes({
       estado_template: c.estado_template || (c.padrao_ativo ? 'publicado' : 'rascunho'),
       versao_publicada: c.versao_publicada || null,
       atualizado_em: c.atualizado_em
+    })));
+  }));
+
+  // Catálogo operacional para P3/Adjunto. Expõe somente metadados de modelos de
+  // operação que já têm ao menos uma versão publicada; rascunhos em edição não
+  // vazam e a aplicação usa a última fotografia publicada.
+  router.get('/cartoes/modelos-operacao', asyncRoute(async (_req, res) => {
+    const modelosAtuais = (await readTabela('cartoes', { is_template: true }))
+      .filter((c) => (c.tipo_modelo || 'ordinario') === 'operacao')
+      .filter((c) => c.estado_template === 'publicado' || c.versao_publicada);
+    const modelos = (await Promise.all(modelosAtuais.map(resolverModeloPublicado))).filter(Boolean);
+    res.json(modelos.map((c) => ({
+      id: c.id, nome_template: c.nome_template,
+      qtd_viaturas: (c.viaturas || []).length,
+      estado_template: c.estado_template || 'rascunho',
+      versao_publicada: c.versao_publicada || null,
     })));
   }));
 
@@ -266,6 +292,7 @@ module.exports = function criarRouterCartoes({
       oficial_sobreaviso: '',
       is_template: true,
       nome_template: nome,
+      tipo_modelo: origem.tipo_modelo || 'ordinario',
       tipo_periodo: origem.tipo_periodo,
       qtd_viaturas_base: origem.qtd_viaturas_base,
       // Não é um cartão do dia clonado de um padrão: é outro padrão. `origem_template_id`
@@ -296,6 +323,7 @@ module.exports = function criarRouterCartoes({
 
     await writeRow('cartoes', copia);
     await marcarRascunhoSeDisponivel(copia.id);
+    await registrarAuditoria({ req, acao: 'duplicou', entidade: copia.tipo_modelo === 'operacao' ? 'Modelo de Operação' : 'Modelo Ordinário', entidadeId: copia.id, descricao: `Duplicou o modelo “${origem.nome_template}” como “${copia.nome_template}”.` });
     res.status(201).json(copia);
   }));
 
@@ -359,6 +387,7 @@ module.exports = function criarRouterCartoes({
       data: null,
       is_template: true,
       nome_template: cartao.nome_template,
+      tipo_modelo: cartao.tipo_modelo || 'ordinario',
       estado_template: 'rascunho',
       padrao_ativo: !!cartao.padrao_ativo,
       publicado_em: null,
@@ -427,6 +456,49 @@ module.exports = function criarRouterCartoes({
     }
   }));
 
+  // Cartão de Operação: adiciona ao cartão do dia uma cópia profunda do modelo
+  // publicado. A cópia fica independente; publicar mudanças no modelo depois
+  // não altera retroativamente o serviço já preparado.
+  router.post('/cartoes/:id/aplicar-modelo-operacao/:modeloId', exigirEdicaoCartao, asyncRoute(async (req, res) => {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao || cartao.is_template) return res.status(404).json({ error: 'Cartão do dia não encontrado.' });
+    const modeloAtual = await buscarCartaoPorId(req.params.modeloId);
+    if (!modeloAtual || !modeloAtual.is_template || (modeloAtual.tipo_modelo || 'ordinario') !== 'operacao') {
+      return res.status(404).json({ error: 'Modelo de operação não encontrado.' });
+    }
+    const modelo = await resolverModeloPublicado(modeloAtual);
+    if (!modelo) return res.status(409).json({ error: 'Publique o modelo de operação antes de aplicá-lo.' });
+    const operacaoId = String(req.body.operacao_id || '').trim();
+    if (operacaoId) {
+      const { data: operacao, error: erroOperacao } = await supabase.from('operacoes')
+        .select('id,data_inicio').eq('id', operacaoId).maybeSingle();
+      if (erroOperacao) throw new Error(`Falha ao validar operação vinculada: ${erroOperacao.message}`);
+      if (!operacao) return res.status(400).json({ error: 'A operação vinculada não existe.' });
+      if (operacao.data_inicio !== cartao.data) return res.status(400).json({ error: 'A operação vinculada deve pertencer à mesma data do cartão.' });
+    }
+    const jaAplicado = (cartao.viaturas || []).some((v) => v.modelo_operacao_id === modelo.id && String(v.operacao_id || '') === operacaoId);
+    if (jaAplicado) return res.status(409).json({ error: 'Este Cartão de Operação já foi adicionado ao serviço.' });
+
+    const novasViaturas = (modelo.viaturas || []).map((v) => ({
+      id: generateId('cpv'), prefixo: v.prefixo, setor: v.setor,
+      companhia: v.companhia || '', categoria: v.categoria || 'Operação',
+      comandante: '', composicao: '', observacao: v.observacao || '',
+      ...camposEnvioIniciais(), bairro_id: v.bairro_id || '', bairros_ids: v.bairros_ids || [],
+      modelo_operacao_id: modelo.id, modelo_operacao_nome: modelo.nome_template || 'Operação',
+      operacao_id: operacaoId || null,
+      itens: ordenarPorTurno((v.itens || []).map((i) => ({
+        id: generateId('cpi'), inicio: i.inicio, fim: i.fim, local: i.local, atividade: i.atividade,
+      }))),
+    }));
+    if (!novasViaturas.length) return res.status(409).json({ error: 'Este modelo de operação ainda não possui viaturas/equipes.' });
+    cartao.viaturas = [...(cartao.viaturas || []), ...novasViaturas];
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) {
+      await registrarAuditoria({ req, acao: 'aplicou', entidade: 'Modelo de Operação', entidadeId: modelo.id, descricao: `Aplicou o Cartão de Operação “${modelo.nome_template}” ao serviço de ${cartao.data}.` });
+      res.json(atualizado);
+    }
+  }));
+
   // Transforma o cartão de UM DIA em um novo cartão padrão. O inverso de
   // POST /api/cartoes, que clona o padrão para criar o dia.
   router.post('/cartoes/:id/salvar-como-padrao', exigirP3, asyncRoute(async (req, res) => {
@@ -439,14 +511,7 @@ module.exports = function criarRouterCartoes({
     const nome = String(req.body.nome_template || '').trim();
     if (!nome) return res.status(400).json({ error: 'Informe o nome do novo cartão padrão.' });
 
-    // tipo_periodo é obrigatório no template (o padrão é escolhido por período) e o
-    // cartão do dia pode estar sem ele — nesse caso o P3 informa junto.
-    const tipoPeriodo = ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo)
-      ? req.body.tipo_periodo
-      : origem.tipo_periodo;
-    if (!['semana', 'fim_de_semana'].includes(tipoPeriodo)) {
-      return res.status(400).json({ error: "Informe o tipo de período ('semana' ou 'fim_de_semana')." });
-    }
+    const tipoModelo = req.body.tipo_modelo === 'operacao' ? 'operacao' : 'ordinario';
 
     const qtdViaturas = (origem.viaturas || []).length;
     const novoPadrao = {
@@ -466,7 +531,8 @@ module.exports = function criarRouterCartoes({
       delta07_viatura: '',
       is_template: true,
       nome_template: nome.slice(0, 120),
-      tipo_periodo: tipoPeriodo,
+      tipo_modelo: tipoModelo,
+      tipo_periodo: null,
       qtd_viaturas_base: [5, 6, 7].includes(qtdViaturas) ? qtdViaturas : (origem.qtd_viaturas_base || 5),
       origem_template_id: null,
       // Nasce inativo de propósito: virar padrão em vigor é um segundo ato,
@@ -537,15 +603,14 @@ module.exports = function criarRouterCartoes({
       if (!req.user || req.user.role !== 'P3') {
         return res.status(403).json({ error: 'Apenas o perfil P3 tem permissão para criar templates.' });
       }
-      const { nome_template, tipo_periodo, qtd_viaturas_base } = req.body;
+      const { nome_template, qtd_viaturas_base } = req.body;
+      const tipoModelo = req.body.tipo_modelo === 'operacao' ? 'operacao' : 'ordinario';
       if (!nome_template) {
         return res.status(400).json({ error: 'O nome do template é obrigatório.' });
       }
-      if (!['semana', 'fim_de_semana'].includes(tipo_periodo)) {
-        return res.status(400).json({ error: "tipo_periodo deve ser 'semana' ou 'fim_de_semana'." });
-      }
-      if (![5, 6, 7].includes(parseInt(qtd_viaturas_base, 10))) {
-        return res.status(400).json({ error: 'qtd_viaturas_base deve ser 5, 6 ou 7.' });
+      const qtdBase = parseInt(qtd_viaturas_base, 10);
+      if (!Number.isInteger(qtdBase) || qtdBase < 0 || qtdBase > 20) {
+        return res.status(400).json({ error: 'A quantidade base deve ser um inteiro entre 0 e 20.' });
       }
 
       const novoTemplate = {
@@ -556,14 +621,16 @@ module.exports = function criarRouterCartoes({
         oficial_sobreaviso: '',
         is_template: true,
         nome_template,
-        tipo_periodo,
-        qtd_viaturas_base: parseInt(qtd_viaturas_base, 10),
+        tipo_modelo: tipoModelo,
+        tipo_periodo: null,
+        qtd_viaturas_base: qtdBase,
         origem_template_id: null,
         viaturas: [],
         padrao_ativo: false
       };
       await writeRow('cartoes', novoTemplate);
       await marcarRascunhoSeDisponivel(novoTemplate.id);
+      await registrarAuditoria({ req, acao: 'criou', entidade: tipoModelo === 'operacao' ? 'Modelo de Operação' : 'Modelo Ordinário', entidadeId: novoTemplate.id, descricao: `Criou o modelo “${novoTemplate.nome_template}”.` });
       return res.status(201).json(novoTemplate);
     }
 
@@ -578,8 +645,7 @@ module.exports = function criarRouterCartoes({
       return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
     }
 
-    // Escolhe pelo dia da semana da data (sáb/dom = fim de semana), com fallback
-    // para o padrão do outro período quando não houver do tipo certo.
+    // Todo dia nasce do único Modelo Ordinário ativo, sem regra por dia da semana.
     const padrao = await buscarPadraoAtivo(dataCartao);
     if (!padrao) {
       return res.status(409).json({
@@ -597,9 +663,8 @@ module.exports = function criarRouterCartoes({
       oficial_sobreaviso: req.body.oficial_sobreaviso || '',
       is_template: false,
       nome_template: null,
-      tipo_periodo: ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo)
-        ? req.body.tipo_periodo
-        : (padrao.tipo_periodo || null),
+      tipo_modelo: null,
+      tipo_periodo: null,
       qtd_viaturas_base: padrao.qtd_viaturas_base,
       origem_template_id: padrao.id,
       ano,
@@ -644,6 +709,7 @@ module.exports = function criarRouterCartoes({
     const template = await buscarCartaoPorId(req.params.id);
     if (!template) return res.status(404).json({ error: 'Cartão padrão não encontrado.' });
     if (!template.is_template) return res.status(400).json({ error: 'Este cartão não é um template.' });
+    if ((template.tipo_modelo || 'ordinario') !== 'ordinario') return res.status(400).json({ error: 'Somente um Modelo Ordinário pode ser definido como padrão ativo.' });
     if (template.estado_template && template.estado_template !== 'publicado') {
       return res.status(409).json({ error: 'Publique o cartão padrão antes de defini-lo como ativo.' });
     }
@@ -651,6 +717,7 @@ module.exports = function criarRouterCartoes({
     const { error } = await supabase.rpc('ativar_cartao_padrao', { p_id: req.params.id });
     if (error) return res.status(500).json({ error: 'Falha ao definir o padrão ativo.' });
 
+    await registrarAuditoria({ req, acao: 'ativou', entidade: 'Modelo Ordinário', entidadeId: template.id, descricao: `Definiu “${template.nome_template}” como o único Cartão Ordinário padrão ativo.` });
     res.json({ ok: true });
   }));
 
@@ -687,11 +754,6 @@ module.exports = function criarRouterCartoes({
     // O cabeçalho sai no documento de TODAS as viaturas: trocar o Delta 07
     // invalida todos os cartões já enviados daquele dia.
     reavaliarStatusEnvio(cartao);
-
-    // tipo_periodo escolhido manualmente (Dia Útil / Fim de Semana). String vazia limpa (null).
-    if (req.body.tipo_periodo !== undefined) {
-      cartao.tipo_periodo = ['semana', 'fim_de_semana'].includes(req.body.tipo_periodo) ? req.body.tipo_periodo : null;
-    }
 
     const atualizado = await gravarCartaoSeAtual(req, res, cartao);
     if (atualizado) res.json(atualizado);

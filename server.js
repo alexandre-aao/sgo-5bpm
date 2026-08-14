@@ -563,6 +563,7 @@ app.use('/api', criarRouterOperacoes({
   validarRegraRecorrencia,
   writeRow,
   writeRows,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
 }));
 
 
@@ -596,6 +597,7 @@ app.use('/api', criarRouterEscalas({
   validarCampos,
   writeRow,
   writeRows,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
 }));
 
 

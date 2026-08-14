@@ -19,9 +19,7 @@ export function ModalSalvarComoPadrao({ cartao, onFechar, onCriado }: ModalSalva
   const { toast } = useToast();
   const { salvarComoPadrao } = useTemplatesCartao();
   const [nome, setNome] = useState('');
-  // O cartão do dia pode estar sem tipo_periodo; nesse caso o P3 escolhe aqui,
-  // porque o padrão é sempre classificado por período.
-  const [tipoPeriodo, setTipoPeriodo] = useState(cartao.tipo_periodo || 'semana');
+  const [tipoModelo, setTipoModelo] = useState<'ordinario' | 'operacao'>('ordinario');
   const [enviando, setEnviando] = useState(false);
 
   const qtdViaturas = (cartao.viaturas || []).length;
@@ -31,10 +29,10 @@ export function ModalSalvarComoPadrao({ cartao, onFechar, onCriado }: ModalSalva
     e.preventDefault();
     if (!nome.trim()) return;
     setEnviando(true);
-    const resultado = await salvarComoPadrao(cartao.id, nome.trim(), tipoPeriodo);
+    const resultado = await salvarComoPadrao(cartao.id, nome.trim(), tipoModelo);
     setEnviando(false);
     if (resultado.ok && resultado.template) {
-      toast('Cartão padrão criado a partir deste cartão. Ele nasce inativo — use "Definir como padrão" para colocá-lo em vigor.', 'success');
+      toast('Modelo criado a partir deste cartão. Publique-o antes de usar.', 'success');
       onCriado(resultado.template);
     } else if (!resultado.ok) {
       toast(resultado.mensagem, 'danger');
@@ -59,16 +57,16 @@ export function ModalSalvarComoPadrao({ cartao, onFechar, onCriado }: ModalSalva
             <label htmlFor="padrao-nome">Nome do cartão padrão *</label>
             <input
               type="text" id="padrao-nome" required autoFocus maxLength={120}
-              placeholder="Ex: Padrão Fim de Semana — 6 VTRs"
+              placeholder="Ex: Ordinário 5º BPM ou Operação Sentinela"
               value={nome} onChange={(e) => setNome(e.target.value)}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="padrao-periodo">Tipo de período *</label>
-            <select id="padrao-periodo" value={tipoPeriodo} onChange={(e) => setTipoPeriodo(e.target.value)}>
-              <option value="semana">Dia Útil</option>
-              <option value="fim_de_semana">Fim de Semana</option>
+            <label htmlFor="padrao-tipo-modelo">Tipo de modelo *</label>
+            <select id="padrao-tipo-modelo" value={tipoModelo} onChange={(e) => setTipoModelo(e.target.value as 'ordinario' | 'operacao')}>
+              <option value="ordinario">Modelo Ordinário</option>
+              <option value="operacao">Modelo de Operação</option>
             </select>
           </div>
 

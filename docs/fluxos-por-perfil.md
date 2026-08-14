@@ -146,7 +146,7 @@ Este é o único módulo com modelo de permissão genuinamente diferenciado por 
 
 ## Regras de negócio por módulo (resumo — detalhe completo no `CLAUDE.md`)
 
-- **Diária = nº de aparições × 2**, sempre (`escalas.total_diarias`). Regra 3 do `MIGRACAO.md`.
+- Uma nova escala começa com **2 diárias**, mas a P3 pode ajustar `escalas.total_diarias` manualmente para qualquer inteiro maior ou igual a zero. Alterar aparições não recalcula esse valor.
 - **`diariaDaOperacao(op, escalas)`**: soma real das escalas se houver militar escalado; senão usa `qtd_diarias_estimada`. Nunca soma as duas fontes (regra 5).
 - **Alocações**: vinculadas a exatamente um `evento_id` OU um `operacao_id` (nunca os dois, nunca nenhum — constraint no banco).
 - **Cartão Programa**: ordenação de itens de roteiro ancorada em 07:00 (`((minutos - refMin) + 1440) % 1440` — regra 4). Alerta não-bloqueante quando Fiscal é Praça e Sobreaviso está vazio.

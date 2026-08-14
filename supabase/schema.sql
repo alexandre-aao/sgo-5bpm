@@ -30,6 +30,7 @@ create table if not exists eventos (
   -- não houve backfill — `local_itinerario` guardava o bairro, não o endereço.
   endereco text default '',
   bairro text default '',
+  operacao_gerada_id text,
   created_at timestamptz default now()
 );
 
@@ -76,6 +77,9 @@ create table if not exists operacoes (
   horario_inicio text default '',
   local_itinerario text default '',
   bairro text default '',
+  endereco text default '',
+  evento_origem_id text references eventos(id) on delete set null,
+  diaria_definida boolean not null default false,
   situacao text not null default 'Planejada'
     check (situacao in ('Planejada', 'Executada')),
   qtd_diarias_estimada int not null default 0,
@@ -91,6 +95,20 @@ create table if not exists operacoes (
   created_at timestamptz default now()
 );
 create index if not exists idx_operacoes_grupo_recorrencia on operacoes(grupo_recorrencia_id);
+create unique index if not exists ux_operacoes_evento_origem
+  on operacoes(evento_origem_id) where evento_origem_id is not null;
+
+-- Vínculo navegável nos dois sentidos. As FKs usam SET NULL para preservar o
+-- registro restante caso um dos lados seja removido no futuro.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'eventos_operacao_gerada_id_fkey') then
+    alter table eventos add constraint eventos_operacao_gerada_id_fkey
+      foreign key (operacao_gerada_id) references operacoes(id) on delete set null;
+  end if;
+end $$;
+create index if not exists idx_eventos_operacao_gerada
+  on eventos(operacao_gerada_id) where operacao_gerada_id is not null;
 
 -- Uma alocação pertence a UM evento OU a UMA operação — nunca aos dois, nunca a
 -- nenhum (constraint alocacoes_um_vinculo). Por isso evento_id agora é nullable.
@@ -118,6 +136,7 @@ create table if not exists escalas (
   militar_id text default '',
   qtd_aparicoes int not null default 1,
   total_diarias int not null default 2,
+  constraint escalas_total_diarias_nao_negativo check (total_diarias >= 0),
   -- Data da escala (migration 004). Denormalização deliberada: antes a escala era
   -- datada só pela data_inicio da operação. Nullable e sem backfill — escala antiga
   -- fica null e o leitor cai no fallback operacao.data_inicio.
@@ -247,6 +266,7 @@ create table if not exists cartoes (
   adjunto_exibicao text,
   delta07_viatura text,
   padrao_ativo boolean not null default false,
+  tipo_modelo text check (tipo_modelo is null or tipo_modelo in ('ordinario', 'operacao')),
   -- Carimbo mantido por trigger (migration 007), para detectar edição concorrente
   -- entre P3 e Adjunto. Nenhum código lê ainda.
   atualizado_em timestamptz
@@ -304,49 +324,40 @@ create unique index if not exists idx_cartoes_numero_ano
   on cartoes (ano, numero)
   where numero is not null;
 
--- Padrão de Cartão Programa: no máximo um template ativo por tipo de período
--- (semana/fim de semana; ver migration 006).
--- O CHECK impede que um cartão do dia carregue a flag fora do índice.
-alter table cartoes
-  add constraint cartoes_padrao_so_template check (not padrao_ativo or is_template);
+-- Existe um único Modelo Ordinário ativo. `tipo_periodo` permanece apenas para
+-- leitura de templates históricos; não participa mais da seleção automática.
+alter table cartoes drop constraint if exists cartoes_padrao_so_template;
+alter table cartoes add constraint cartoes_padrao_so_template
+  check (not padrao_ativo or is_template);
+alter table cartoes drop constraint if exists cartoes_padrao_exige_modelo_ordinario;
+alter table cartoes add constraint cartoes_padrao_exige_modelo_ordinario
+  check (not padrao_ativo or (is_template = true and tipo_modelo = 'ordinario'));
 
-alter table cartoes
-  add constraint cartoes_padrao_exige_periodo
-  check (not padrao_ativo or tipo_periodo is not null);
+create unique index if not exists ux_cartoes_padrao_ordinario_unico
+  on cartoes (padrao_ativo)
+  where is_template = true and padrao_ativo = true and tipo_modelo = 'ordinario';
 
-create unique index if not exists ux_cartoes_padrao_unico_periodo
-  on cartoes (tipo_periodo)
-  where is_template = true and padrao_ativo = true;
-
--- Troca o padrão ativo do mesmo tipo numa transação só.
+-- Troca o único Modelo Ordinário ativo numa transação só.
 create or replace function ativar_cartao_padrao(p_id text)
 returns void
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
-declare
-  v_tipo text;
 begin
-  select tipo_periodo into v_tipo
-    from cartoes where id = p_id and is_template;
-
-  if not found then
-    raise exception 'Cartão padrão % não encontrado', p_id;
-  end if;
-
-  if v_tipo is null then
-    raise exception 'Cartão padrão % não tem tipo de período definido', p_id;
+  if not exists (
+    select 1 from cartoes
+     where id = p_id and is_template = true and tipo_modelo = 'ordinario'
+  ) then
+    raise exception 'Modelo ordinário % não encontrado', p_id;
   end if;
 
   update cartoes set padrao_ativo = false
-   where is_template and padrao_ativo and tipo_periodo = v_tipo and id <> p_id;
-
-  update cartoes set padrao_ativo = true
-   where id = p_id;
+   where is_template = true and padrao_ativo = true and tipo_modelo = 'ordinario' and id <> p_id;
+  update cartoes set padrao_ativo = true where id = p_id;
 end; $$;
-revoke execute on function ativar_cartao_padrao(text) from public;
-revoke execute on function ativar_cartao_padrao(text) from anon, authenticated;
+revoke all on function ativar_cartao_padrao(text) from public, anon, authenticated;
+grant execute on function ativar_cartao_padrao(text) to service_role;
 
 -- Carimbo automático usado na futura proteção contra edição concorrente.
 create or replace function cartoes_marcar_atualizacao()
@@ -558,6 +569,52 @@ $$;
 
 revoke all on function registrar_emissao_cartao(text, jsonb, jsonb, boolean, timestamptz) from public, anon, authenticated;
 grant execute on function registrar_emissao_cartao(text, jsonb, jsonb, boolean, timestamptz) to service_role;
+
+-- Conversão transacional: preserva o evento original, cria a operação com os
+-- campos compatíveis e grava os dois lados do vínculo sem janela intermediária.
+create or replace function converter_evento_em_operacao(
+  p_evento_id text,
+  p_operacao_id text,
+  p_tipo_operacao text default 'Outras',
+  p_qtd_diarias_estimada integer default 0
+) returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_evento eventos%rowtype;
+  v_operacao operacoes%rowtype;
+begin
+  if p_qtd_diarias_estimada < 0 then
+    raise exception 'Quantidade de diárias estimada inválida';
+  end if;
+
+  select * into v_evento from eventos where id = p_evento_id for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'EVENTO_NAO_ENCONTRADO';
+  end if;
+  if v_evento.operacao_gerada_id is not null then
+    raise exception using errcode = 'P0001', message = 'EVENTO_JA_CONVERTIDO';
+  end if;
+
+  insert into operacoes (
+    id, num_oficio, num_os_manual, num_sei, nome_operacao, tipo_operacao,
+    demandante, data_inicio, data_termino, horario_inicio, local_itinerario,
+    bairro, endereco, situacao, qtd_diarias_estimada, evento_origem_id
+  ) values (
+    p_operacao_id, v_evento.num_oficio, v_evento.num_os_manual, v_evento.num_sei,
+    v_evento.nome_evento, p_tipo_operacao, v_evento.demandante, v_evento.data_inicio,
+    v_evento.data_termino, v_evento.horario_inicio, v_evento.local_itinerario,
+    v_evento.bairro, v_evento.endereco, 'Planejada', p_qtd_diarias_estimada, v_evento.id
+  ) returning * into v_operacao;
+
+  update eventos set operacao_gerada_id = v_operacao.id where id = v_evento.id;
+  return to_jsonb(v_operacao);
+end;
+$$;
+revoke all on function converter_evento_em_operacao(text, text, text, integer) from public, anon, authenticated;
+grant execute on function converter_evento_em_operacao(text, text, text, integer) to service_role;
 
 -- Bloqueio progressivo de login persistente (migration 008). O backend usa
 -- service_role; anon/authenticated não recebem acesso direto.

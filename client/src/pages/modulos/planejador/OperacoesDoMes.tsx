@@ -64,7 +64,7 @@ export function OperacoesDoMes({ operacoes, onAbrir }: OperacoesDoMesProps) {
         </table>
       </div>
       <p className="panel-nota">
-        Diária = nº de aparições × 2. Consumido conta escalas reais; Planejado conta a estimativa das operações sem escala.
+        Consumido usa a quantidade registrada nas escalas; Planejado usa a estimativa das operações ainda sem escala.
       </p>
     </div>
   );

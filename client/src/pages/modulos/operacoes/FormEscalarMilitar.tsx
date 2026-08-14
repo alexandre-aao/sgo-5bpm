@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Calculator, ClipboardPaste, TriangleAlert, Wallet, X } from 'lucide-react';
+import { Calculator, ClipboardPaste, Minus, Plus, TriangleAlert, Wallet, X } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { useToast } from '../../../context/useToast';
 import { SeletorMilitares } from './SeletorMilitares';
@@ -67,11 +67,12 @@ export function FormEscalarMilitar({
       militar_id: (p.matricula || '').trim(),
       militar_nome: p.nome,
       qtd_aparicoes: padrao,
+      total_diarias: 2,
     });
   }
 
   function adicionarLivre(nome: string) {
-    adicionar({ chave: chaveMilitar('', nome), militar_id: '', militar_nome: nome, qtd_aparicoes: padrao });
+    adicionar({ chave: chaveMilitar('', nome), militar_id: '', militar_nome: nome, qtd_aparicoes: padrao, total_diarias: 2 });
   }
 
   function remover(chave: string) {
@@ -81,6 +82,11 @@ export function FormEscalarMilitar({
   function mudarAparicoes(chave: string, valor: string) {
     const qtd = Math.max(1, parseInt(valor, 10) || 1);
     setSelecionados((atual) => atual.map((m) => (m.chave === chave ? { ...m, qtd_aparicoes: qtd } : m)));
+  }
+
+  function mudarDiarias(chave: string, valor: number) {
+    const qtd = Math.max(0, Math.trunc(valor));
+    setSelecionados((atual) => atual.map((m) => (m.chave === chave ? { ...m, total_diarias: qtd } : m)));
   }
 
   function handleResolverColados() {
@@ -192,6 +198,14 @@ export function FormEscalarMilitar({
                     onChange={(e) => mudarAparicoes(m.chave, e.target.value)}
                   />
                 </label>
+                <div className="escala-chip-diarias" aria-label={`Diárias de ${m.militar_nome}`}>
+                  <span>Diárias</span>
+                  <div className="controle-quantidade">
+                    <button type="button" aria-label={`Diminuir diárias de ${m.militar_nome}`} onClick={() => mudarDiarias(m.chave, m.total_diarias - 1)} disabled={m.total_diarias === 0}><Minus /></button>
+                    <input type="number" min={0} step={1} value={m.total_diarias} onChange={(e) => mudarDiarias(m.chave, Number(e.target.value))} />
+                    <button type="button" aria-label={`Aumentar diárias de ${m.militar_nome}`} onClick={() => mudarDiarias(m.chave, m.total_diarias + 1)}><Plus /></button>
+                  </div>
+                </div>
                 <button
                   type="button" className="btn-icon btn-danger btn-sm"
                   aria-label={`Remover ${m.militar_nome} do lote`} title="Remover do lote"
@@ -237,7 +251,7 @@ export function FormEscalarMilitar({
             ) : (
               <>
                 Aplicará a <strong>{impacto.totalOperacoes} operação(ões)</strong> ·{' '}
-                <strong>{impacto.totalDiarias} diária(s)</strong> ({selecionados.length} militar(es), 2 diárias por aparição).
+                <strong>{impacto.totalDiarias} diária(s)</strong> ({selecionados.length} militar(es), valor inicial de 2 por escala).
               </>
             )}
           </span>

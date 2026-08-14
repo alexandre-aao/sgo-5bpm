@@ -56,7 +56,7 @@ export function RelatorioDiarioTexto({ agrupar, onMudarAgrupar, onAbrirPdf, dado
         </div>
       </div>
       <p className="texto-auxiliar relatorio-diario-ajuda">
-        Usa o mês/ano selecionados acima. Fonte: operações + escalas (diária = aparições × 2).
+        Usa o mês/ano selecionados acima. Fonte: operações + quantidade de diárias registrada nas escalas.
       </p>
       <pre className="lista-sei-texto">{texto}</pre>
     </div>

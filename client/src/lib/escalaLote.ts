@@ -22,6 +22,7 @@ export interface MilitarDoLote {
   militar_id: string;
   militar_nome: string;
   qtd_aparicoes: number;
+  total_diarias: number;
 }
 
 /** Espelha chaveMilitar() do server.js: sem matrícula, a identidade cai no nome, senão
@@ -62,7 +63,7 @@ export function operacoesDoEscopo(
 
 export interface ImpactoLote {
   totalOperacoes: number;
-  /** Diárias que a escala passa a somar (aparições × 2 × ocorrências). */
+  /** Diárias que a escala passa a somar (valor registrado × ocorrências). */
   totalDiarias: number;
   porMes: { mes: string; consumidoAtual: number; delta: number; saldoApos: number }[];
   acimaDoTeto: { militar_nome: string; mes: string; total_diarias: number }[];
@@ -108,7 +109,7 @@ export function calcularImpacto(
   for (const op of operacoesAlvo) {
     const mes = mesDe(op.data_inicio);
     for (const militar of militares) {
-      const novo = militar.qtd_aparicoes * 2;
+      const novo = militar.total_diarias;
       const existente = escalaPorPar.get(`${op.id}|${militar.chave}`);
       const antigo = existente?.total_diarias || 0;
       totalDiarias += novo;

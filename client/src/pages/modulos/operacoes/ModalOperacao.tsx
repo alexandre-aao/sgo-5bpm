@@ -38,6 +38,7 @@ function formularioVazio(): OperacaoPayload {
     horario_inicio: '',
     tipo_recorrencia: '',
     bairro: '',
+    endereco: '',
     local_itinerario: '',
     num_oficio: '',
     num_os_manual: '',
@@ -56,6 +57,7 @@ function formularioDaOperacao(operacao: Tables<'operacoes'>): OperacaoPayload {
     horario_inicio: operacao.horario_inicio || '',
     tipo_recorrencia: operacao.tipo_recorrencia || '',
     bairro: operacao.bairro || '',
+    endereco: operacao.endereco || '',
     local_itinerario: operacao.local_itinerario || '',
     num_oficio: operacao.num_oficio || '',
     num_os_manual: operacao.num_os_manual || '',
@@ -105,6 +107,7 @@ export function ModalOperacao({ operacao, onFechar, onSalvar }: ModalOperacaoPro
       horario_inicio: form.horario_inicio,
       tipo_recorrencia: form.tipo_recorrencia,
       bairro: form.bairro.trim(),
+      endereco: form.endereco.trim(),
       local_itinerario: form.local_itinerario.trim(),
       num_oficio: form.num_oficio.trim(),
       num_sei: form.num_sei.trim(),
@@ -236,6 +239,12 @@ export function ModalOperacao({ operacao, onFechar, onSalvar }: ModalOperacaoPro
                 type="text" id="op-bairro" placeholder="Ex: Ponta Negra"
                 value={form.bairro} onChange={(e) => atualizar('bairro', e.target.value)}
               />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group col-md-12">
+              <label htmlFor="op-endereco">Endereço</label>
+              <input type="text" id="op-endereco" placeholder="Rua, número e complemento" value={form.endereco} onChange={(e) => atualizar('endereco', e.target.value)} />
             </div>
           </div>
           <div className="form-row">

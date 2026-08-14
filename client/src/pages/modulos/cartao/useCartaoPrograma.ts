@@ -3,6 +3,7 @@ import { apiFetch } from '../../../lib/api';
 import type { CartaoDetalhado } from '../../../lib/cartaoConflitos';
 import { cabecalhosVersaoCartao, extrairErroCartao } from '../../../lib/concorrenciaCartao';
 import { useConflitoCartao } from '../../../context/useConflitoCartao';
+import { useSearchParams } from 'react-router-dom';
 
 function getLocalDateStr(date = new Date()): string {
   const y = date.getFullYear();
@@ -25,7 +26,6 @@ interface CabecalhoPatch {
   fiscal?: string;
   adjunto?: string;
   oficial_sobreaviso?: string;
-  tipo_periodo?: string;
   /** Delta 07 = Fiscal de Operações: o id do cadastro é a fonte de verdade que o
    *  PDF usa para montar "graduação + nome de guerra". */
   fiscal_pessoal_id?: string;
@@ -42,7 +42,7 @@ interface UseCartaoPrograma {
   temCartao: boolean | null;
   carregando: boolean;
   recarregar: () => Promise<void>;
-  criarCartao: (tipoPeriodo?: string) => Promise<ResultadoAcao>;
+  criarCartao: () => Promise<ResultadoAcao>;
   atualizarCabecalho: (patch: CabecalhoPatch) => Promise<ResultadoAcao>;
 }
 
@@ -50,7 +50,9 @@ interface UseCartaoPrograma {
  * public/app.js (lista por data + detalhe). */
 export function useCartaoPrograma(): UseCartaoPrograma {
   const { avisarConflito } = useConflitoCartao();
-  const [dataSelecionada, setDataSelecionada] = useState(dataInicialCartao);
+  const [parametros] = useSearchParams();
+  const dataInicial = /^\d{4}-\d{2}-\d{2}$/.test(parametros.get('data') || '') ? parametros.get('data')! : dataInicialCartao();
+  const [dataSelecionada, setDataSelecionada] = useState(dataInicial);
   const [cartao, setCartao] = useState<CartaoDetalhado | null>(null);
   const [temCartao, setTemCartao] = useState<boolean | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -121,13 +123,13 @@ export function useCartaoPrograma(): UseCartaoPrograma {
   // Cria um cartão em branco na data selecionada — espelha handleCriarCartao(false)
   // em public/app.js (o "copiar do dia anterior" fica pro lote de templates/cópia).
   const criarCartao = useCallback(
-    async (tipoPeriodo = ''): Promise<ResultadoAcao> => {
+    async (): Promise<ResultadoAcao> => {
       if (!dataSelecionada) return { ok: false, mensagem: 'Selecione a data do Cartão Programa.' };
       try {
         const res = await apiFetch('/api/cartoes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: dataSelecionada, tipo_periodo: tipoPeriodo }),
+          body: JSON.stringify({ data: dataSelecionada }),
         });
         if (res.status === 409) {
           await recarregar();
@@ -147,7 +149,7 @@ export function useCartaoPrograma(): UseCartaoPrograma {
     [dataSelecionada, recarregar],
   );
 
-  // Atualiza fiscal/adjunto/sobreaviso/tipo_periodo — espelha handleSalvarCabecalhoCartao().
+  // Atualiza fiscal/adjunto/sobreaviso — espelha handleSalvarCabecalhoCartao().
   const atualizarCabecalho = useCallback(
     async (patch: CabecalhoPatch): Promise<ResultadoAcao> => {
       if (!cartao) return { ok: false, mensagem: 'Nenhum cartão carregado.' };

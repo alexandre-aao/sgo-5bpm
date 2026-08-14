@@ -7,8 +7,19 @@ export interface DashboardResumo {
   diarias: {
     total_pago_periodo: number;
     planejado_periodo: number;
+    comprometido_periodo: number;
     saldo_cota_periodo: number;
     cota_mensal: number;
+  };
+  operacional: {
+    hoje: string; amanha: string;
+    cartao_hoje_pronto: boolean; cartao_amanha_preparado: boolean;
+    cartao_hoje_id: string | null; cartao_amanha_id: string | null;
+    modelo_ordinario_ativo: { id: string; nome: string } | null;
+    modelo_ordinario_com_rascunho: boolean;
+    operacoes_hoje: { id: string; nome_operacao: string }[];
+    operacoes_proximas: { id: string; nome_operacao: string; data_inicio: string }[];
+    operacoes_diaria_pendente: { id: string; nome_operacao: string; data_inicio: string }[];
   };
   planejador: { operacoes_planejadas: number };
   efetivo_total_periodo: number;

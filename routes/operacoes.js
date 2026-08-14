@@ -17,6 +17,7 @@ module.exports = function criarRouterOperacoes({
   validarRegraRecorrencia,
   writeRow,
   writeRows,
+  registrarAuditoria,
 }) {
   const router = express.Router();
 
@@ -47,6 +48,7 @@ module.exports = function criarRouterOperacoes({
     num_sei: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Número SEI' },
     demandante: { obrigatorio: false, tipo: 'string', max: 200, padrao: '', label: 'Demandante' },
     bairro: { obrigatorio: false, tipo: 'string', max: 100, padrao: '', label: 'Bairro' },
+    endereco: { obrigatorio: false, tipo: 'string', max: 300, padrao: '', label: 'Endereço' },
     situacao: { obrigatorio: false, tipo: 'string', valores: ['Planejada', 'Executada'], padrao: 'Planejada', label: 'Situação' },
     tipo_recorrencia: { obrigatorio: false, tipo: 'string', valores: ['diaria', 'fim_de_semana', 'dia_unico'], label: 'Tipo de Recorrência' }
   };
@@ -75,12 +77,15 @@ module.exports = function criarRouterOperacoes({
       horario_inicio: v.valores.horario_inicio,
       local_itinerario: v.valores.local_itinerario,
       bairro: v.valores.bairro,
+      endereco: v.valores.endereco,
       situacao: v.valores.situacao,
       qtd_diarias_estimada: qtdEstimada,
+      diaria_definida: true,
       tipo_recorrencia: v.valores.tipo_recorrencia || null
     };
 
     await writeRow('operacoes', novaOperacao);
+    await registrarAuditoria({ req, acao: 'criou', entidade: 'Operação', entidadeId: novaOperacao.id, descricao: `Criou a operação “${novaOperacao.nome_operacao}”.` });
     res.status(201).json(novaOperacao);
   }));
 
@@ -103,6 +108,7 @@ module.exports = function criarRouterOperacoes({
       num_sei: { obrigatorio: false, tipo: 'string', max: 100, label: 'Número SEI' },
       demandante: { obrigatorio: false, tipo: 'string', max: 200, label: 'Demandante' },
       bairro: { obrigatorio: false, tipo: 'string', max: 100, label: 'Bairro' },
+      endereco: { obrigatorio: false, tipo: 'string', max: 300, label: 'Endereço' },
       situacao: { obrigatorio: false, tipo: 'string', valores: ['Planejada', 'Executada'], label: 'Situação' },
       tipo_recorrencia: { obrigatorio: false, tipo: 'string', valores: ['diaria', 'fim_de_semana', 'dia_unico'], label: 'Tipo de Recorrência' }
     });
@@ -115,9 +121,17 @@ module.exports = function criarRouterOperacoes({
         return res.status(400).json({ error: 'Quantidade de diárias estimada inválida.' });
       }
       operacaoAtualizada.qtd_diarias_estimada = qtdEstimada;
+      operacaoAtualizada.diaria_definida = true;
     }
 
     await writeRow('operacoes', operacaoAtualizada);
+    if (req.body.qtd_diarias_estimada !== undefined && operacaoAtualizada.qtd_diarias_estimada !== operacaoAtual.qtd_diarias_estimada) {
+      await registrarAuditoria({
+        req, acao: 'alterou diárias', entidade: 'Operação', entidadeId: operacaoAtualizada.id,
+        descricao: `Alterou a estimativa de diárias de “${operacaoAtualizada.nome_operacao}”: ${operacaoAtual.qtd_diarias_estimada || 0} → ${operacaoAtualizada.qtd_diarias_estimada}.`,
+        antes: operacaoAtual, depois: operacaoAtualizada, campos: ['qtd_diarias_estimada'],
+      });
+    }
     res.json(operacaoAtualizada);
   }));
 
@@ -163,6 +177,7 @@ module.exports = function criarRouterOperacoes({
     num_sei: { obrigatorio: false, tipo: 'string', max: 100, label: 'Número SEI' },
     demandante: { obrigatorio: false, tipo: 'string', max: 200, label: 'Demandante' },
     bairro: { obrigatorio: false, tipo: 'string', max: 100, label: 'Bairro' },
+    endereco: { obrigatorio: false, tipo: 'string', max: 300, label: 'Endereço' },
     tipo_recorrencia: { obrigatorio: false, tipo: 'string', valores: ['diaria', 'fim_de_semana', 'dia_unico'], label: 'Tipo de Recorrência' }
   };
   const CAMPOS_BLOQUEADOS_GRUPO = ['id', 'data_inicio', 'data_termino', 'situacao', 'grupo_recorrencia_id', 'recorrencia_regra'];
@@ -294,15 +309,18 @@ module.exports = function criarRouterOperacoes({
       horario_inicio: v.valores.horario_inicio,
       local_itinerario: v.valores.local_itinerario,
       bairro: v.valores.bairro,
+      endereco: v.valores.endereco,
       situacao: v.valores.situacao,
       // Estimativa é POR OCORRÊNCIA — o total do grupo é este valor x total_ocorrencias.
       qtd_diarias_estimada: qtdEstimada,
+      diaria_definida: true,
       tipo_recorrencia: v.valores.tipo_recorrencia || null,
       grupo_recorrencia_id: grupoRecorrenciaId,
       recorrencia_regra: validacao.regra
     }));
 
     await writeRows('operacoes', operacoes);
+    await registrarAuditoria({ req, acao: 'criou em lote', entidade: 'Operação', entidadeId: grupoRecorrenciaId, descricao: `Criou ${operacoes.length} ocorrências da operação “${v.valores.nome_operacao}”.` });
     res.status(201).json({
       grupo_recorrencia_id: grupoRecorrenciaId,
       total: operacoes.length,
@@ -333,6 +351,7 @@ module.exports = function criarRouterOperacoes({
       const qtd = parseInt(req.body.qtd_diarias_estimada, 10);
       if (isNaN(qtd) || qtd < 0) return res.status(400).json({ error: 'Quantidade de diárias estimada inválida.' });
       alteracoes.qtd_diarias_estimada = qtd;
+      alteracoes.diaria_definida = true;
     }
     if (Object.keys(alteracoes).length === 0) {
       return res.status(400).json({ error: 'Nenhum campo válido para atualizar foi informado.' });
@@ -343,6 +362,13 @@ module.exports = function criarRouterOperacoes({
 
     const atualizadas = escopo.alvo.map(op => ({ ...op, ...alteracoes }));
     await writeRows('operacoes', atualizadas);
+    if (req.body.qtd_diarias_estimada !== undefined) {
+      await registrarAuditoria({
+        req, acao: 'alterou diárias em lote', entidade: 'Operação', entidadeId: req.params.grupoId,
+        descricao: `Definiu ${alteracoes.qtd_diarias_estimada} diária(s) estimada(s) em ${atualizadas.length} ocorrência(s) do grupo.`,
+        campos: ['qtd_diarias_estimada'],
+      });
+    }
     res.json({
       grupo_recorrencia_id: req.params.grupoId,
       escopo: req.query.escopo,

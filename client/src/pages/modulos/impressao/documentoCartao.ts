@@ -256,7 +256,9 @@ function baseDocumento(
       data: cartao.data || '',
       dataExtensa: dataBr(cartao.data),
       diaSemana: diaDaSemana(cartao.data || ''),
-      tipoPeriodo: cartao.tipo_periodo === 'fim_de_semana' ? 'Fim de semana' : cartao.tipo_periodo === 'semana' ? 'Entre semana' : '',
+      // Mantido no contrato do documento para abrir cartões históricos, mas os
+      // novos cartões usam um único Modelo Ordinário, sem classificação semanal.
+      tipoPeriodo: '',
       titulo: 'CARTÃO PROGRAMA DE PATRULHAMENTO',
     },
     servico: {

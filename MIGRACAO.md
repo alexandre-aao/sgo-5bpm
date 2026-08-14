@@ -8,7 +8,7 @@
 ## Regras invioláveis (herdadas do projeto)
 1. Identidade visual atual é referência obrigatória: mesmas cores, tipografia (Inter), espaçamentos, ícones Lucide, temas claro/escuro, navegação mobile. NÃO redesenhar.
 2. Tabelas de alta concorrência (escalas, cartoes, eventos, operacoes): sempre update/insert/delete por linha. NUNCA reescrever tabela inteira.
-3. Regra de diárias: 1 aparição em escala = 2 diárias. Inegociável.
+3. Regra de diárias: uma nova escala começa com 2 diárias; somente a P3 pode alterar o valor para um inteiro >= 0. Aparições não recalculam `total_diarias`.
 4. Cartão Programa: ordenação relativa ao turno ancorada em 07:00 fixo, via `((minutos - refMin) + 1440) % 1440`.
 5. `diariaDaOperacao()`: usa totais reais da escala se houver militares escalados; senão, `qtd_diarias_estimada`. Nunca somar as duas fontes.
 6. Permissão `exigirP3` = "perfil de administrador" na UI. Nunca expor o nome interno.

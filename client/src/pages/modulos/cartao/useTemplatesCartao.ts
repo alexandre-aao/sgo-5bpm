@@ -8,7 +8,8 @@ import { useConflitoCartao } from '../../../context/useConflitoCartao';
 export interface TemplateResumo {
   id: string;
   nome_template: string;
-  tipo_periodo: string;
+  tipo_periodo: string | null;
+  tipo_modelo: 'ordinario' | 'operacao';
   qtd_viaturas_base: number;
   qtd_viaturas: number;
   padrao_ativo: boolean;
@@ -27,7 +28,7 @@ export interface VersaoTemplate {
 
 export interface NovoTemplatePayload {
   nome_template: string;
-  tipo_periodo: string;
+  tipo_modelo: 'ordinario' | 'operacao';
   qtd_viaturas_base: number;
 }
 
@@ -36,8 +37,7 @@ async function extrairErro(res: Response, padrao: string): Promise<string> {
   return corpo.error || padrao;
 }
 
-/** Gestão de Cartões Padrão (templates) — espelha renderTemplatesTab(),
- * handleCriarTemplate() e handleExcluirTemplate() em public/app.js. */
+/** Gestão do Modelo Ordinário e dos Modelos de Operação. */
 export function useTemplatesCartao() {
   const { avisarConflito } = useConflitoCartao();
   const [templates, setTemplates] = useState<TemplateResumo[]>([]);
@@ -123,13 +123,13 @@ export function useTemplatesCartao() {
   const salvarComoPadrao = useCallback(async (
     cartaoId: string,
     nome: string,
-    tipoPeriodo?: string,
+    tipoModelo: 'ordinario' | 'operacao' = 'ordinario',
   ): Promise<ResultadoAcao & { template?: CartaoDetalhado }> => {
     try {
       const res = await apiFetch(`/api/cartoes/${cartaoId}/salvar-como-padrao`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome_template: nome, ...(tipoPeriodo ? { tipo_periodo: tipoPeriodo } : {}) }),
+        body: JSON.stringify({ nome_template: nome, tipo_modelo: tipoModelo }),
       });
       if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao salvar como cartão padrão.') };
       const criado = (await res.json()) as CartaoDetalhado;

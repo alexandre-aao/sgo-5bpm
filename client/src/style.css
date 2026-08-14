@@ -6573,6 +6573,31 @@ kbd {
   font-size: var(--text-base);
 }
 
+.escala-chip-diarias { display: grid; gap: var(--space-1); font-size: var(--text-xs); color: var(--text-muted); }
+.controle-quantidade { display: inline-flex; align-items: center; gap: var(--space-1); }
+.controle-quantidade button { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); display: grid; place-items: center; cursor: pointer; }
+.controle-quantidade button:disabled { opacity: .45; cursor: not-allowed; }
+.controle-quantidade button svg { width: 14px; height: 14px; }
+.controle-quantidade input { width: 54px; min-height: 30px; padding: 2px 4px; text-align: center; }
+.controle-quantidade-lista span { min-width: 86px; text-align: center; color: var(--text); }
+.cartao-operacoes-aplicadas { margin-bottom: var(--space-3); }
+.cartao-operacoes-acao { display: flex; align-items: flex-end; }
+.cartao-operacoes-acao .btn { width: 100%; }
+.dash-central-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.dash-central-grid .dash-cota-panel { grid-column: 1 / -1; }
+.dash-status-lista { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.dash-status-item { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--border); color: var(--text); text-decoration: none; }
+.dash-status-item:hover { color: var(--primary); }
+.dash-cota-valores { display: grid; grid-template-columns: repeat(5, minmax(90px, 1fr)); gap: var(--space-3); margin: var(--space-4) 0; }
+.dash-cota-valores span { display: grid; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
+.dash-cota-valores small { color: var(--text-muted); }
+.dash-cota-valores strong { font-size: var(--text-xl); }
+@media (max-width: 768px) {
+  .dash-central-grid { grid-template-columns: 1fr; }
+  .dash-central-grid .dash-cota-panel { grid-column: auto; }
+  .dash-cota-valores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Escopo da replicação para as demais ocorrências do grupo de recorrência. */
 .escala-escopo {
   padding: var(--space-3);

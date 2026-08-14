@@ -15,6 +15,7 @@ export interface OperacaoPayload {
   horario_inicio: string;
   tipo_recorrencia: string;
   bairro: string;
+  endereco: string;
   local_itinerario: string;
   num_oficio: string;
   num_os_manual: string;
@@ -129,6 +130,7 @@ export function useOperacaoDrawer(operacaoId: string | null) {
             militar_id: m.militar_id,
             militar_nome: m.militar_nome,
             qtd_aparicoes: m.qtd_aparicoes,
+            total_diarias: m.total_diarias,
           })),
         }),
       });
@@ -174,9 +176,22 @@ export function useOperacaoDrawer(operacaoId: string | null) {
     }
   }, [recarregar]);
 
+  const atualizarDiarias = useCallback(async (escalaId: string, totalDiarias: number): Promise<ResultadoAcao> => {
+    try {
+      const res = await apiFetch(`/api/escalas/${escalaId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ total_diarias: totalDiarias }),
+      });
+      if (!res.ok) return { ok: false, mensagem: await extrairErro(res, 'Falha ao alterar as diárias.') };
+      await recarregar();
+      return { ok: true };
+    } catch {
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [recarregar]);
+
   return {
     operacao, escalas, carregando, recarregar,
     atualizarOperacao, marcarExecutada, excluirOperacao,
-    removerEscala, escalarEmLote, removerEmLote,
+    removerEscala, atualizarDiarias, escalarEmLote, removerEmLote,
   };
 }

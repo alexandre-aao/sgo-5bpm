@@ -8,11 +8,11 @@ import { useDashboardStats } from './useDashboardStats';
 import { useDashboardResumo } from './useDashboardResumo';
 import { KpiRow } from './KpiRow';
 import { AlertasEPatrulhamento } from './AlertasEPatrulhamento';
-import { DonutDiarias, DonutTipo } from './Donuts';
 import { OperacoesRecentes } from './OperacoesRecentes';
 import { TopMilitares } from './TopMilitares';
 import { DashRail } from './DashRail';
 import { EsqueletoKpis } from '../../../components/estado/Esqueleto';
+import { CentralOperacional } from './CentralOperacional';
 
 export default function DashboardPage() {
   const { dados } = useAppData();
@@ -53,14 +53,9 @@ export default function DashboardPage() {
             carregandoCartao={carregandoCartao}
             eventos={dados.eventos}
             pessoal={dados.pessoal}
+            operacional={resumo?.operacional || null}
           />
-          <DonutDiarias
-            periodo={`${mes}/${ano}`}
-            consumido={resumo?.diarias.total_pago_periodo ?? 0}
-            planejado={resumo?.diarias.planejado_periodo ?? 0}
-            cota={resumo?.diarias.cota_mensal ?? 0}
-          />
-          <DonutTipo distribuicaoTipo={resumo?.distribuicao_tipo ?? []} />
+          {resumo && <CentralOperacional resumo={resumo} />}
           <OperacoesRecentes operacoes={dados.operacoes} escalas={dados.escalas} />
           <TopMilitares topMilitares={resumo?.top_militares ?? []} />
         </div>

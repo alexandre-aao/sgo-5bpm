@@ -1,5 +1,5 @@
-// Gerado via Supabase MCP (generate_typescript_types), projeto qzwmnkqxoubqyapmpjnb.
-// Não editar manualmente — regenerar após qualquer ALTER TABLE em supabase/schema.sql.
+// Gerado originalmente via Supabase e atualizado para refletir as migrations locais.
+// Regenerar após aplicar novas alterações de schema no projeto remoto.
 export type Json =
   | string
   | number
@@ -199,6 +199,7 @@ export type Database = {
           versao_publicada: number | null
           qtd_viaturas_base: number | null
           tipo_periodo: string | null
+          tipo_modelo: 'ordinario' | 'operacao' | null
           viaturas: Json
         }
         Insert: {
@@ -225,6 +226,7 @@ export type Database = {
           versao_publicada?: number | null
           qtd_viaturas_base?: number | null
           tipo_periodo?: string | null
+          tipo_modelo?: 'ordinario' | 'operacao' | null
           viaturas?: Json
         }
         Update: {
@@ -251,6 +253,7 @@ export type Database = {
           versao_publicada?: number | null
           qtd_viaturas_base?: number | null
           tipo_periodo?: string | null
+          tipo_modelo?: 'ordinario' | 'operacao' | null
           viaturas?: Json
         }
         Relationships: [
@@ -334,6 +337,7 @@ export type Database = {
       eventos: {
         Row: {
           bairro: string | null
+          operacao_gerada_id: string | null
           created_at: string | null
           data_inicio: string
           data_termino: string | null
@@ -350,6 +354,7 @@ export type Database = {
         }
         Insert: {
           bairro?: string | null
+          operacao_gerada_id?: string | null
           created_at?: string | null
           data_inicio: string
           data_termino?: string | null
@@ -366,6 +371,7 @@ export type Database = {
         }
         Update: {
           bairro?: string | null
+          operacao_gerada_id?: string | null
           created_at?: string | null
           data_inicio?: string
           data_termino?: string | null
@@ -380,7 +386,15 @@ export type Database = {
           num_sei?: string | null
           tipo_evento?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "eventos_operacao_gerada_id_fkey"
+            columns: ["operacao_gerada_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       missoes_planejadas: {
         Row: {
@@ -429,6 +443,9 @@ export type Database = {
       operacoes: {
         Row: {
           bairro: string | null
+          endereco: string | null
+          evento_origem_id: string | null
+          diaria_definida: boolean
           created_at: string | null
           data_inicio: string
           data_termino: string | null
@@ -452,7 +469,10 @@ export type Database = {
           created_at?: string | null
           data_inicio: string
           data_termino?: string | null
+          diaria_definida?: boolean
           demandante?: string | null
+          endereco?: string | null
+          evento_origem_id?: string | null
           grupo_recorrencia_id?: string | null
           horario_inicio?: string | null
           id: string
@@ -472,7 +492,10 @@ export type Database = {
           created_at?: string | null
           data_inicio?: string
           data_termino?: string | null
+          diaria_definida?: boolean
           demandante?: string | null
+          endereco?: string | null
+          evento_origem_id?: string | null
           grupo_recorrencia_id?: string | null
           horario_inicio?: string | null
           id?: string
@@ -487,7 +510,15 @@ export type Database = {
           tipo_operacao?: string
           tipo_recorrencia?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "operacoes_evento_origem_id_fkey"
+            columns: ["evento_origem_id"]
+            isOneToOne: true
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pessoal: {
         Row: {

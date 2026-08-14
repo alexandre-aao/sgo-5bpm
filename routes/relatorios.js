@@ -75,17 +75,21 @@ router.get('/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   // inúteis (sessoes, bairros_coordenadas, cartoes, viaturas) que o readDB() antigo fazia.
   // Continua em JS puro (Promise.all de readTabela), não em SQL — ver nota de arquitetura
   // no topo do arquivo sobre por que a lógica de negócio fica no shim, não no banco.
-  const [eventos, operacoes, escalas, alocacoes, pessoal, usuarios, config] = await Promise.all([
+  const [eventos, operacoes, escalas, alocacoes, pessoal, usuarios, cartoes, config] = await Promise.all([
     readTabela('eventos'),
     readTabela('operacoes'),
     readTabela('escalas'),
     readTabela('alocacoes'),
     readTabela('pessoal'),
     readTabela('usuarios'),
+    readTabela('cartoes'),
     buscarConfig(),
   ]);
   const hojeStr = getLocalDateStrServer();
   const [anoHoje, mesHoje] = hojeStr.split('-');
+  const amanhaData = new Date(`${hojeStr}T12:00:00Z`);
+  amanhaData.setUTCDate(amanhaData.getUTCDate() + 1);
+  const amanhaStr = amanhaData.toISOString().slice(0, 10);
 
   // Período do relatório: vem do filtro (?mes=&ano=) ou o mês/ano atual por padrão. "Hoje" (Cartão
   // Programa de hoje, próximos 7 dias) continua sempre literal, independente do período escolhido.
@@ -97,9 +101,9 @@ router.get('/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   const idsEventosDoPeriodo = new Set(eventosDoPeriodo.map(e => e.id));
 
   // Eventos: total no período + próximos 7 dias (sempre a partir de hoje, não do período filtrado)
-  const daqui7Dias = new Date();
-  daqui7Dias.setDate(daqui7Dias.getDate() + 7);
-  const daqui7DiasStr = getLocalDateStrServer(daqui7Dias);
+  const daqui7Dias = new Date(`${hojeStr}T12:00:00Z`);
+  daqui7Dias.setUTCDate(daqui7Dias.getUTCDate() + 7);
+  const daqui7DiasStr = daqui7Dias.toISOString().slice(0, 10);
   const eventosProximos7Dias = eventos.filter(e => e.data_inicio >= hojeStr && e.data_inicio <= daqui7DiasStr).length;
 
   // Diárias: total pago no período + saldo da cota do período (mesma lógica de /api/planejador-diarias).
@@ -113,6 +117,20 @@ router.get('/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
   const operacoesPlanejadas = operacoesDoPeriodo.filter(o => !opsComEscala.has(o.id));
   const planejadoPeriodo = operacoesPlanejadas.reduce((sum, o) => sum + (o.qtd_diarias_estimada || 0), 0);
   const cota = (config && config.cota_mensal_diarias) || 0;
+  const comprometidoPeriodo = consumidoPeriodo + planejadoPeriodo;
+
+  const cartaoHoje = cartoes.find((c) => !c.is_template && c.data === hojeStr) || null;
+  const cartaoAmanha = cartoes.find((c) => !c.is_template && c.data === amanhaStr) || null;
+  const modeloOrdinario = cartoes.find((c) => c.is_template && (c.tipo_modelo || 'ordinario') === 'ordinario' && c.padrao_ativo) || null;
+  const operacoesHoje = operacoes.filter((o) => o.data_inicio === hojeStr);
+  const operacoesProximas = operacoes
+    .filter((o) => o.data_inicio > hojeStr && o.data_inicio <= daqui7DiasStr)
+    .sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
+  const idsComEscala = new Set(escalas.map((e) => e.operacao_id));
+  const operacoesDiariaPendente = operacoes
+    .filter((o) => o.data_inicio >= hojeStr && o.data_inicio <= daqui7DiasStr)
+    .filter((o) => !idsComEscala.has(o.id) && o.diaria_definida !== true)
+    .map((o) => ({ id: o.id, nome_operacao: o.nome_operacao, data_inicio: o.data_inicio }));
 
   // Índice alocações por evento — construído uma vez para não varrer alocacoes dentro do forEach abaixo.
   const alocacoesPorEvento = indexarPor(alocacoes, 'evento_id');
@@ -170,7 +188,20 @@ router.get('/dashboard-resumo', exigirP3, asyncRoute(async (req, res) => {
     eventos: { total_periodo: eventosDoPeriodo.length, proximos_7_dias: eventosProximos7Dias },
     // `planejado_periodo` alimenta o donut "Diárias — Visão Geral" do Dashboard (consumido real
     // x planejado estimado). Já era calculado aqui pro saldo da cota; só passou a ser exposto.
-    diarias: { total_pago_periodo: consumidoPeriodo, planejado_periodo: planejadoPeriodo, saldo_cota_periodo: cota - consumidoPeriodo - planejadoPeriodo, cota_mensal: cota },
+    diarias: { total_pago_periodo: consumidoPeriodo, planejado_periodo: planejadoPeriodo, comprometido_periodo: comprometidoPeriodo, saldo_cota_periodo: cota - comprometidoPeriodo, cota_mensal: cota },
+    operacional: {
+      hoje: hojeStr,
+      amanha: amanhaStr,
+      cartao_hoje_pronto: !!cartaoHoje && (cartaoHoje.viaturas || []).length > 0,
+      cartao_amanha_preparado: !!cartaoAmanha && (cartaoAmanha.viaturas || []).length > 0,
+      cartao_hoje_id: cartaoHoje?.id || null,
+      cartao_amanha_id: cartaoAmanha?.id || null,
+      modelo_ordinario_ativo: modeloOrdinario ? { id: modeloOrdinario.id, nome: modeloOrdinario.nome_template } : null,
+      modelo_ordinario_com_rascunho: modeloOrdinario?.estado_template === 'rascunho',
+      operacoes_hoje: operacoesHoje.map((o) => ({ id: o.id, nome_operacao: o.nome_operacao })),
+      operacoes_proximas: operacoesProximas.map((o) => ({ id: o.id, nome_operacao: o.nome_operacao, data_inicio: o.data_inicio })),
+      operacoes_diaria_pendente: operacoesDiariaPendente,
+    },
     planejador: { operacoes_planejadas: operacoesPlanejadas.length },
     efetivo_total_periodo: efetivoTotalPeriodo,
     distribuicao_tipo: distribuicaoTipo,

@@ -21,6 +21,9 @@ export interface CartaoViatura {
   /** Composição textual da equipe além do comandante. Cartões antigos não têm. */
   composicao?: string;
   observacao: string;
+  modelo_operacao_id?: string;
+  modelo_operacao_nome?: string;
+  operacao_id?: string | null;
   itens: CartaoItem[];
   /** Campos da migration 001 (Cartão Programa em PDF + Avisos Operacionais).
    *  Opcionais de propósito: viaturas gravadas antes dela não os têm, e não há

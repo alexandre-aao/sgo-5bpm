@@ -147,18 +147,18 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
       <div className="panel-header flex-column-mobile">
         <div className="panel-title">
           <LayoutTemplate />
-          <h2>Cartões Padrão de Patrulhamento</h2>
+          <h2>Modelos de Cartão</h2>
         </div>
         <p className="texto-auxiliar">
-          Modelos reutilizáveis de setores/viaturas por período e quantidade de frota.
+          Um Modelo Ordinário principal e Modelos de Operação reutilizáveis. Publicação, versões e restauração usam o mesmo fluxo seguro.
         </p>
       </div>
       <div className="table-responsive templates-table-wrap">
         <table className="styled-table table-cards-mobile tabela-templates">
           <thead>
             <tr>
-              <th>Nome do Cartão Padrão</th>
-              <th>Período</th>
+              <th>Nome do Modelo</th>
+              <th>Tipo</th>
               <th className="text-center">Qtd. VTRs Base</th>
               <th className="text-center">Viaturas Cadastradas</th>
               <th className="text-center">Estado</th>
@@ -190,7 +190,7 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
                         <strong>{t.nome_template}</strong>
                       </button>
                     </td>
-                    <td data-label="Período">{t.tipo_periodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'}</td>
+                    <td data-label="Tipo"><span className="badge badge-info">{t.tipo_modelo === 'operacao' ? 'Operação' : 'Ordinário'}</span></td>
                     <td className="text-center" data-label="VTRs Base">{t.qtd_viaturas_base}</td>
                     <td className="text-center" data-label="Viaturas">{t.qtd_viaturas}</td>
                     <td className="text-center" data-label="Estado">
@@ -199,7 +199,9 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
                       </span>
                     </td>
                     <td className="text-center" data-label="Padrão">
-                      {t.padrao_ativo ? (
+                      {t.tipo_modelo === 'operacao' ? (
+                        <span className="texto-auxiliar">Aplicável ao dia</span>
+                      ) : t.padrao_ativo ? (
                         <span className="badge status-ativa">
                           <CheckCircle2 className="icone-inline-sm" /> Ativo
                         </span>
@@ -210,7 +212,7 @@ export function TemplatesPanel({ onAbrir, templateAberto, onAtualizado, onExclui
                           title={estadoTemplate !== 'publicado' ? 'Publique esta versão antes de defini-la como padrão' : undefined}
                           onClick={() => void handleDefinirPadrao(t.id)}
                         >
-                          Definir como padrão
+                          Definir como ordinário ativo
                         </button>
                       )}
                     </td>

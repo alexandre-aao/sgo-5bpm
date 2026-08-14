@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Info, X, Plus, Trash2, Pencil } from 'lucide-react';
+import { Info, X, Plus, Trash2, Pencil, ArrowRightLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { Tables } from '../../../types/supabase';
 import { useAuth } from '../../../context/useAuth';
 import { useToast } from '../../../context/useToast';
@@ -24,14 +25,16 @@ interface DrawerEventoProps {
 // handleSalvarEdicaoEvento() em public/app.js.
 export function DrawerEvento({ eventoId, onFechar, onAlterado }: DrawerEventoProps) {
   const { usuario } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const { evento, alocacoes, atualizarEvento, excluirEvento, adicionarAlocacao, removerAlocacao } = useEventoDrawer(eventoId);
+  const { evento, alocacoes, atualizarEvento, excluirEvento, adicionarAlocacao, removerAlocacao, converterEmOperacao } = useEventoDrawer(eventoId);
   const podeEditar = usuario?.role === 'P3';
 
   const [formAlocacaoAberto, setFormAlocacaoAberto] = useState(false);
   const [modalEditarAberto, setModalEditarAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  const [convertendo, setConvertendo] = useState(false);
 
   async function acaoComAlerta(acao: () => Promise<ResultadoAcao>, mensagemSucesso: string) {
     const resultado = await acao();
@@ -124,6 +127,25 @@ export function DrawerEvento({ eventoId, onFechar, onAlterado }: DrawerEventoPro
           </div>
 
           <div className="drawer-footer">
+            {podeEditar && !evento.operacao_gerada_id && (
+              <button className={`btn btn-secondary${convertendo ? ' btn-carregando' : ''}`} disabled={convertendo} onClick={async () => {
+                if (!window.confirm('Converter este evento em uma Operação? O evento original será preservado e os dados compatíveis serão reaproveitados.')) return;
+                setConvertendo(true);
+                const resultado = await converterEmOperacao();
+                setConvertendo(false);
+                if (!resultado.ok) return toast(resultado.mensagem, 'danger');
+                onAlterado();
+                toast('Operação criada e vinculada ao evento. Complete o planejamento específico.', 'success');
+                navigate(`/operacoes?operacao=${encodeURIComponent(resultado.operacaoId || '')}`);
+              }}>
+                <ArrowRightLeft /> Converter em Operação
+              </button>
+            )}
+            {evento.operacao_gerada_id && (
+              <button className="btn btn-secondary" onClick={() => navigate(`/operacoes?operacao=${encodeURIComponent(evento.operacao_gerada_id || '')}`)}>
+                <ArrowRightLeft /> Abrir Operação Vinculada
+              </button>
+            )}
             {podeEditar && (
               <button className="btn btn-danger" onClick={() => setModalExcluirAberto(true)}>
                 <Trash2 /> Excluir Evento

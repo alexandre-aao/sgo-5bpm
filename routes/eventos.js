@@ -96,6 +96,30 @@ module.exports = function criarRouterEventos({
     res.json(eventoAtualizado);
   }));
 
+  router.post('/eventos/:id/converter-em-operacao', exigirP3, asyncRoute(async (req, res) => {
+    const evento = await buscarRow('eventos', req.params.id);
+    if (!evento) return res.status(404).json({ error: 'Evento não encontrado.' });
+    if (evento.operacao_gerada_id) {
+      return res.status(409).json({ error: 'Este evento já originou uma operação.', operacao_id: evento.operacao_gerada_id });
+    }
+    const qtd = req.body.qtd_diarias_estimada === undefined ? 0 : Number(req.body.qtd_diarias_estimada);
+    if (!Number.isInteger(qtd) || qtd < 0) return res.status(400).json({ error: 'Quantidade de diárias estimada inválida.' });
+    const tipos = ['Ostensiva', 'Saturação', 'Cerco', 'Blitz', 'Cumprimento de Mandado', 'Reforço', 'Outras'];
+    const tipo = tipos.includes(req.body.tipo_operacao) ? req.body.tipo_operacao : 'Outras';
+    const operacaoId = generateId('op');
+    const { data, error } = await supabase.rpc('converter_evento_em_operacao', {
+      p_evento_id: evento.id, p_operacao_id: operacaoId,
+      p_tipo_operacao: tipo, p_qtd_diarias_estimada: qtd,
+    });
+    if (error) {
+      if (String(error.message || '').includes('EVENTO_JA_CONVERTIDO')) return res.status(409).json({ error: 'Este evento já originou uma operação.' });
+      throw new Error(`Falha ao converter Evento em Operação: ${error.message}`);
+    }
+    const operacao = Array.isArray(data) ? data[0] : data;
+    await registrarAuditoria({ req, acao: 'converteu', entidade: 'Evento → Operação', entidadeId: evento.id, descricao: `Converteu o evento “${evento.nome_evento}” na operação ${operacaoId}.` });
+    res.status(201).json(operacao);
+  }));
+
   router.delete('/eventos/:id', exigirP3, asyncRoute(async (req, res) => {
     await deleteRow('eventos', req.params.id);
     const { error: erroAlocacoes } = await supabase.from('alocacoes').delete().eq('evento_id', req.params.id);

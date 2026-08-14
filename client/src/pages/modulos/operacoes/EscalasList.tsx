@@ -1,4 +1,4 @@
-import { CalendarRange, Trash } from 'lucide-react';
+import { CalendarRange, Minus, Plus, Trash } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import { chaveMilitar, ocorrenciasDoMilitar, type OperacaoDoGrupo } from '../../../lib/escalaLote';
 
@@ -8,13 +8,14 @@ interface EscalasListProps {
   grupo: OperacaoDoGrupo[] | null;
   onRemover: (escala: Tables<'escalas'>) => void;
   onRemoverDoGrupo: (escala: Tables<'escalas'>, ocorrencias: number) => void;
+  onAtualizarDiarias: (escala: Tables<'escalas'>, total: number) => void;
 }
 
 // Efetivo escalado nesta operação. Quando a operação pertence a um grupo de
 // recorrência, cada militar mostra em quantas ocorrências está escalado e ganha a
 // opção de sair do grupo inteiro — sem isso, desfazer uma replicação de 26 dias
 // seria 26 remoções manuais.
-export function EscalasList({ escalas, grupo, onRemover, onRemoverDoGrupo }: EscalasListProps) {
+export function EscalasList({ escalas, grupo, onRemover, onRemoverDoGrupo, onAtualizarDiarias }: EscalasListProps) {
   if (escalas.length === 0) {
     return (
       <p className="texto-auxiliar escala-lista-vazia">
@@ -40,11 +41,15 @@ export function EscalasList({ escalas, grupo, onRemover, onRemoverDoGrupo }: Esc
                 )}
               </h5>
               <p>
-                <strong>Aparições:</strong> {item.qtd_aparicoes} | <strong>Total de Diárias:</strong>{' '}
-                <span className="escala-diarias-total">{item.total_diarias} un.</span>
+                <strong>Aparições:</strong> {item.qtd_aparicoes}
               </p>
             </div>
             <div className="sub-list-item-acoes">
+              <div className="controle-quantidade controle-quantidade-lista" aria-label={`Diárias de ${item.militar_nome}`}>
+                <button type="button" aria-label="Diminuir diárias" disabled={item.total_diarias === 0} onClick={() => onAtualizarDiarias(item, item.total_diarias - 1)}><Minus /></button>
+                <span><strong>{item.total_diarias}</strong> diária(s)</span>
+                <button type="button" aria-label="Aumentar diárias" onClick={() => onAtualizarDiarias(item, item.total_diarias + 1)}><Plus /></button>
+              </div>
               {emVarias && (
                 <button
                   className="btn btn-secondary btn-sm"

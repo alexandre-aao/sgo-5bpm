@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Info, X, UserPlus, Trash2, CheckCircle, Pencil } from 'lucide-react';
+import { Info, X, UserPlus, Trash2, CheckCircle, Pencil, ArrowRightLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { Tables } from '../../../types/supabase';
 import { useToast } from '../../../context/useToast';
 import { ROTULOS_RECORRENCIA } from '../../../lib/tiposOperacao';
@@ -35,10 +36,11 @@ export function DrawerOperacao({
   onFechar,
   onAlterado,
 }: DrawerOperacaoProps) {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const {
     operacao, escalas, atualizarOperacao, marcarExecutada, excluirOperacao,
-    removerEscala, escalarEmLote, removerEmLote,
+    removerEscala, atualizarDiarias, escalarEmLote, removerEmLote,
   } = useOperacaoDrawer(operacaoId);
   // Só busca o grupo quando a operação pertence a um: operação avulsa não faz a chamada.
   const { grupo, recarregar: recarregarGrupo } = useGrupoRecorrencia(operacao?.grupo_recorrencia_id || null);
@@ -134,6 +136,7 @@ export function DrawerOperacao({
                 <div className="detail-item"><strong>Término:</strong> <span>{operacao.data_termino ? operacao.data_termino.split('-').reverse().join('/') : '-'}</span></div>
                 <div className="detail-item"><strong>Hora:</strong> <span>{operacao.horario_inicio || 'Não informada'}</span></div>
                 <div className="detail-item"><strong>Bairro:</strong> <span>{operacao.bairro || '-'}</span></div>
+                <div className="detail-item detalhe-duplo"><strong>Endereço:</strong> <span>{operacao.endereco || '-'}</span></div>
                 <div className="detail-item"><strong>Diárias Estimadas:</strong> <span>{operacao.qtd_diarias_estimada || 0} diária(s)</span></div>
                 <div className="detail-item detalhe-duplo"><strong>Local/Itinerário:</strong> <span>{operacao.local_itinerario || '-'}</span></div>
               </div>
@@ -174,11 +177,20 @@ export function DrawerOperacao({
               <EscalasList
                 escalas={escalasOp} grupo={grupo}
                 onRemover={handleRemoverEscala} onRemoverDoGrupo={handleRemoverDoGrupo}
+                onAtualizarDiarias={async (escala, total) => {
+                  const resultado = await acaoComAlerta(() => atualizarDiarias(escala.id, total), `Diárias de ${escala.militar_nome} atualizadas para ${total}.`);
+                  if (resultado.ok) void recarregarGrupo();
+                }}
               />
             </div>
           </div>
 
           <div className="drawer-footer">
+            {operacao.evento_origem_id && (
+              <button className="btn btn-secondary" onClick={() => navigate(`/eventos?evento=${encodeURIComponent(operacao.evento_origem_id || '')}`)}>
+                <ArrowRightLeft /> Abrir Evento Original
+              </button>
+            )}
             <button className="btn btn-danger drawer-acao-excluir" onClick={() => setModalExcluirAberto(true)}>
               <Trash2 /> Excluir Operação
             </button>

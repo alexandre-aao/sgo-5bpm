@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAtalhoSetasDia } from '../../../hooks/useAtalhosGlobais';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, Maximize2, BookmarkPlus, TriangleAlert } from 'lucide-react';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
@@ -25,6 +25,7 @@ import { ConflitoBanner } from './ConflitoBanner';
 import { TrilhoCartao } from './TrilhoCartao';
 import { TemplatesPanel } from './TemplatesPanel';
 import { GruposModeloPanel } from './GruposModeloPanel';
+import { ModelosOperacaoPanel } from './ModelosOperacaoPanel';
 import { ModalNovoTemplate } from './ModalNovoTemplate';
 import { ModalSalvarComoPadrao } from './ModalSalvarComoPadrao';
 import { CriarDoPadrao } from './CriarDoPadrao';
@@ -37,6 +38,7 @@ export default function CartaoProgramaPage() {
   const { avisarConflito } = useConflitoCartao();
   const { usuario } = useAuth();
   const navigate = useNavigate();
+  const [parametros] = useSearchParams();
   const { dados } = useAppData();
   const { toast } = useToast();
   // Cadastro de bairros: alimenta o vínculo da viatura que traz os Avisos
@@ -87,7 +89,7 @@ export default function CartaoProgramaPage() {
   const [aba, setAba] = useState<'viaturas' | 'roteiro'>('viaturas');
   const [vtrEmEdicao, setVtrEmEdicao] = useState<CartaoViatura | null>(null);
   const [menuAberto, setMenuAberto] = useState(false);
-  const [mostrarTemplatesPanel, setMostrarTemplatesPanel] = useState(false);
+  const [mostrarTemplatesPanel, setMostrarTemplatesPanel] = useState(parametros.get('modelos') === '1');
   const [modalNovoTemplateAberto, setModalNovoTemplateAberto] = useState(false);
   const [modalSalvarPadraoAberto, setModalSalvarPadraoAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
@@ -242,13 +244,13 @@ export default function CartaoProgramaPage() {
                     type="button" className="dropdown-item"
                     onClick={() => { setMostrarTemplatesPanel((v) => !v); setMenuAberto(false); }}
                   >
-                    <LayoutTemplate /> Cartões Padrão
+                    <LayoutTemplate /> Modelos de Cartão
                   </button>
                   <button
                     type="button" className="dropdown-item"
                     onClick={() => { setModalNovoTemplateAberto(true); setMenuAberto(false); }}
                   >
-                    <FilePlus2 /> Novo Cartão Padrão
+                    <FilePlus2 /> Novo Modelo de Cartão
                   </button>
                   {/* Só faz sentido com o cartão de um DIA aberto: é ele que vira padrão. */}
                   {cartaoEditando && !cartaoEditando.is_template && (
@@ -256,7 +258,7 @@ export default function CartaoProgramaPage() {
                       type="button" className="dropdown-item"
                       onClick={() => { setModalSalvarPadraoAberto(true); setMenuAberto(false); }}
                     >
-                      <BookmarkPlus /> Salvar como Cartão Padrão
+                      <BookmarkPlus /> Salvar como Modelo
                     </button>
                   )}
                 </div>
@@ -278,6 +280,9 @@ export default function CartaoProgramaPage() {
           onAtualizado={recarregarAtivo}
           onExcluido={handleTemplateExcluido}
         />
+      )}
+      {cartaoEditando && !cartaoEditando.is_template && (
+        <ModelosOperacaoPanel cartao={cartaoEditando} operacoes={dados.operacoes} podeEditar={podeEditar} onAtualizado={recarregarAtivo} />
       )}
       {cartaoEditando && <GruposModeloPanel cartao={cartaoEditando} podeEditar={podeEditar} onAtualizado={recarregarAtivo} />}
 

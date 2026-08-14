@@ -14,7 +14,6 @@ interface CartaoHeaderProps {
     fiscal?: string;
     adjunto?: string;
     oficial_sobreaviso?: string;
-    tipo_periodo?: string;
     fiscal_pessoal_id?: string;
     adjunto_pessoal_id?: string;
     delta07_viatura?: string;
@@ -104,9 +103,9 @@ export function CartaoHeader({ cartao, pessoal, viaturasCadastradas, onAtualizar
     return (
       <div className="panel cartao-header-panel">
         <div className="cartao-print-title">
-          <h2>CARTÃO PADRÃO: {cartao.nome_template}</h2>
+          <h2>{cartao.tipo_modelo === 'operacao' ? 'MODELO DE OPERAÇÃO' : 'MODELO ORDINÁRIO'}: {cartao.nome_template}</h2>
           <span>
-            {cartao.tipo_periodo === 'fim_de_semana' ? 'Fim de Semana' : 'Dia Útil'} · {cartao.qtd_viaturas_base} viatura(s) base
+            {cartao.qtd_viaturas_base} viatura(s) base
           </span>
         </div>
       </div>
@@ -123,18 +122,6 @@ export function CartaoHeader({ cartao, pessoal, viaturasCadastradas, onAtualizar
         <span>Policiamento Ostensivo Diário · {periodo}</span>
       </div>
       <div className="cartao-header-fields">
-        <div className="form-group">
-          <label htmlFor="cartao-tipo-periodo">Tipo de Cartão</label>
-          <select
-            id="cartao-tipo-periodo"
-            value={cartao.tipo_periodo || ''}
-            onChange={(e) => salvar({ tipo_periodo: e.target.value })}
-          >
-            <option value="">Selecione...</option>
-            <option value="semana">Dia Útil</option>
-            <option value="fim_de_semana">Fim de Semana</option>
-          </select>
-        </div>
         {/* "Delta 07" é o indicativo operacional do Fiscal de Operações — mesmo
             campo, rótulo que o comandante de viatura reconhece no PDF. O seletor
             não filtra por posto: o Delta 07 pode ser oficial ou praça. */}

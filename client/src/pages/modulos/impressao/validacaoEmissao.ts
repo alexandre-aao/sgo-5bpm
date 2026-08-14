@@ -23,7 +23,6 @@ export function validarCentralEmissao(
   const avisos: string[] = [];
 
   if (!cartao.data) erros.push('O Cartão Programa está sem data.');
-  if (!cartao.tipo_periodo) erros.push('Selecione manualmente o tipo de período (Entre semana ou Fim de semana).');
   if (viaturas.length === 0) erros.push('Selecione ao menos uma viatura para emitir.');
   if (!cartao.fiscal_pessoal_id && vazio(cartao.fiscal)) erros.push('Fiscal de Operações não informado.');
   if (!cartao.adjunto_pessoal_id && vazio(cartao.adjunto)) erros.push('Adjunto não informado.');

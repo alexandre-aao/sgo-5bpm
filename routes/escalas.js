@@ -15,6 +15,7 @@ module.exports = function criarRouterEscalas({
   validarCampos,
   writeRow,
   writeRows,
+  registrarAuditoria,
 }) {
   const router = express.Router();
 
@@ -34,6 +35,15 @@ module.exports = function criarRouterEscalas({
 
   function mesDe(dataIso) {
     return String(dataIso || '').slice(0, 7);
+  }
+
+  function normalizarTotalDiarias(valor, padrao = 2) {
+    if (valor === undefined || valor === null || valor === '') return { ok: true, valor: padrao, informado: false };
+    const numero = Number(valor);
+    if (!Number.isInteger(numero) || numero < 0) {
+      return { ok: false, erro: 'Quantidade de diárias inválida. Use um número inteiro maior ou igual a zero.' };
+    }
+    return { ok: true, valor: numero, informado: true };
   }
 
   // Normaliza a lista de militares dos endpoints de lote. Aceita `militar_id` ou
@@ -56,12 +66,15 @@ module.exports = function criarRouterEscalas({
         }
       }
 
+      const diarias = normalizarTotalDiarias(item.total_diarias, 2);
+      if (!diarias.ok) return { ok: false, erro: `${diarias.erro} Militar: "${nome}".` };
+
       // Militar repetido no MESMO payload: o último vence, em vez de gerar duas escalas
       // para a mesma pessoa na mesma operação.
       const chave = chaveMilitar(matricula, nome);
       const jaVisto = vistos.has(chave);
       vistos.add(chave);
-      const registro = { chave, matricula, nome, aparicoes };
+      const registro = { chave, matricula, nome, aparicoes, totalDiarias: diarias.valor, diariasInformadas: diarias.informado };
       if (jaVisto) militares[militares.findIndex(m => m.chave === chave)] = registro;
       else militares.push(registro);
     }
@@ -182,7 +195,11 @@ module.exports = function criarRouterEscalas({
           militar_nome: militar.nome,
           militar_id: militar.matricula,
           qtd_aparicoes: militar.aparicoes,
-          total_diarias: militar.aparicoes * 2, // Regra fixa: 2 diárias por aparição — não alterar
+          // A diária é um valor operacional próprio. Uma escala nova começa em 2;
+          // aparições nunca recalculam uma diária já registrada.
+          total_diarias: militar.diariasInformadas
+            ? militar.totalDiarias
+            : (existente ? existente.total_diarias : 2),
           // Data da ocorrência, não a do início do grupo: cada ocorrência da recorrência
           // é de um dia, e é essa data que o Relatório Diário precisa.
           data: op.data_inicio
@@ -198,6 +215,10 @@ module.exports = function criarRouterEscalas({
     }
 
     await writeRows('escalas', linhas);
+    await registrarAuditoria({
+      req, acao: 'definiu diárias', entidade: 'Escala', entidadeId: idsAlvo.join(','),
+      descricao: `Definiu a escala de ${militares.length} militar(es) em ${idsAlvo.length} operação(ões), com quantidade manual de diárias.`,
+    });
 
     const meses = [...new Set(operacoes.alvo.map(o => mesDe(o.data_inicio)))].sort();
     const resumo = await resumoCotaEteto(meses);
@@ -276,7 +297,7 @@ module.exports = function criarRouterEscalas({
     });
   }));
 
-  // Adicionar militar na escala (trata a automação de diárias: qtd_aparicoes * 2). Sem trava por
+  // Adicionar militar na escala. O padrão inicial é 2 diárias, independente de aparições. Sem trava por
   // situacao da operação — escala pode ser lançada tanto em operação Planejada quanto Executada.
   router.post('/escalas', exigirP3, asyncRoute(async (req, res) => {
     const v = validarCampos(req.body, {
@@ -287,7 +308,8 @@ module.exports = function criarRouterEscalas({
     if (!v.ok) return res.status(400).json({ error: v.erro });
 
     const qtd_aparicoes = parseInt(req.body.qtd_aparicoes, 10) || 1;
-    const total_diarias = qtd_aparicoes * 2; // Automação: Regra de 2 diárias por aparição — não alterar
+    const diarias = normalizarTotalDiarias(req.body.total_diarias, 2);
+    if (!diarias.ok) return res.status(400).json({ error: diarias.erro });
 
     // Data da escala (migration 004). Preenchida aqui também, e não só no lote, senão a
     // coluna nasceria pela metade — escala criada pela gaveta ficaria sem data e só a
@@ -302,33 +324,47 @@ module.exports = function criarRouterEscalas({
       militar_nome: v.valores.militar_nome,
       militar_id: v.valores.militar_id,
       qtd_aparicoes: qtd_aparicoes,
-      total_diarias: total_diarias,
+      total_diarias: diarias.valor,
       data: operacao.data_inicio
     };
 
     await writeRow('escalas', novaEscala);
+    await registrarAuditoria({ req, acao: 'definiu diárias', entidade: 'Escala', entidadeId: novaEscala.id, descricao: `Incluiu ${novaEscala.militar_nome} com ${novaEscala.total_diarias} diária(s).` });
     res.status(201).json(novaEscala);
   }));
 
-  // Atualizar escala (recalcula diárias)
+  // Atualizar escala. Aparições e diárias são independentes.
   router.put('/escalas/:id', exigirP3, asyncRoute(async (req, res) => {
     const escalaAtual = await buscarRow('escalas', req.params.id);
     if (!escalaAtual) {
       return res.status(404).json({ error: 'Militar não escalado nesta operação' });
     }
 
-    const qtd_aparicoes = parseInt(req.body.qtd_aparicoes, 10) || 1;
-    const total_diarias = qtd_aparicoes * 2;
+    const qtd_aparicoes = req.body.qtd_aparicoes === undefined
+      ? escalaAtual.qtd_aparicoes
+      : parseInt(req.body.qtd_aparicoes, 10);
+    if (!Number.isInteger(qtd_aparicoes) || qtd_aparicoes < 1) {
+      return res.status(400).json({ error: 'Número de aparições inválido. Use um inteiro maior ou igual a 1.' });
+    }
+    const diarias = normalizarTotalDiarias(req.body.total_diarias, escalaAtual.total_diarias);
+    if (!diarias.ok) return res.status(400).json({ error: diarias.erro });
 
     const escalaAtualizada = {
       ...escalaAtual,
       militar_nome: req.body.militar_nome || escalaAtual.militar_nome,
       militar_id: req.body.militar_id || escalaAtual.militar_id,
       qtd_aparicoes: qtd_aparicoes,
-      total_diarias: total_diarias
+      total_diarias: diarias.valor
     };
 
     await writeRow('escalas', escalaAtualizada);
+    if (escalaAtualizada.total_diarias !== escalaAtual.total_diarias) {
+      await registrarAuditoria({
+        req, acao: 'alterou diárias', entidade: 'Escala', entidadeId: escalaAtualizada.id,
+        descricao: `Alterou as diárias de ${escalaAtualizada.militar_nome}: ${escalaAtual.total_diarias} → ${escalaAtualizada.total_diarias}.`,
+        antes: escalaAtual, depois: escalaAtualizada, campos: ['total_diarias'],
+      });
+    }
     res.json(escalaAtualizada);
   }));
 
