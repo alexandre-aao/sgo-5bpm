@@ -13,6 +13,16 @@ export interface CartaoItem {
 
 export interface CartaoViatura {
   id: string;
+  /** Metadados da biblioteca do Cartão Ordinário. São opcionais porque os
+   * cartões anteriores à migração não possuem esses campos. */
+  indicativo?: string;
+  ordem?: number;
+  padrao_operacional_id?: string | null;
+  padrao_operacional_nome?: string | null;
+  padrao_operacional_categoria?: string | null;
+  padrao_operacional_versao?: number | null;
+  padrao_desatualizado?: boolean;
+  padrao_operacional_snapshot?: Record<string, unknown> | null;
   prefixo: string;
   setor: string;
   companhia: string;

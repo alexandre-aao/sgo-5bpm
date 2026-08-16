@@ -20,7 +20,7 @@ export function dataInicialCartao(): string {
   return getLocalDateStr(amanha);
 }
 
-export type ResultadoAcao = { ok: true } | { ok: false; mensagem: string };
+export type ResultadoAcao = { ok: true; cartao?: CartaoDetalhado } | { ok: false; mensagem: string };
 
 interface CabecalhoPatch {
   fiscal?: string;
@@ -139,8 +139,9 @@ export function useCartaoPrograma(): UseCartaoPrograma {
           const corpo = (await res.json().catch(() => ({}))) as { error?: string };
           return { ok: false, mensagem: corpo.error || 'Falha ao criar o Cartão Programa.' };
         }
+        const criado = (await res.json()) as CartaoDetalhado;
         await recarregar();
-        return { ok: true };
+        return { ok: true, cartao: criado };
       } catch (erro) {
         console.error('Erro ao criar Cartão Programa:', erro);
         return { ok: false, mensagem: 'Falha ao criar o Cartão Programa.' };

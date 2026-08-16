@@ -312,6 +312,15 @@ create table if not exists cartao_grupos_modelo (
   horario_fim text default '',
   observacoes text default '',
   configuracao jsonb not null default '{}'::jsonb,
+  -- A linha é o rascunho atual; a fotografia publicada fica na tabela de
+  -- versões. `versao = 0` representa um padrão ainda não publicado.
+  versao integer not null default 0,
+  publicado boolean not null default false,
+  publicado_em timestamptz,
+  publicado_por text,
+  descricao text not null default '',
+  metadados jsonb not null default '{}'::jsonb,
+  componentes jsonb not null default '[]'::jsonb,
   ativo boolean not null default true,
   ordem integer not null default 0,
   criado_por text,
@@ -321,6 +330,21 @@ create table if not exists cartao_grupos_modelo (
 create unique index if not exists ux_cartao_grupos_modelo_nome_normalizado
   on cartao_grupos_modelo (lower(regexp_replace(trim(nome), '\s+', ' ', 'g')));
 create index if not exists idx_cartao_grupos_modelo_filtros on cartao_grupos_modelo (ativo, tipo, bairro);
+
+-- Histórico imutável de fotografias dos padrões operacionais. Cartões do dia
+-- copiam a fotografia e os metadados para o JSONB de cada viatura, portanto
+-- uma edição futura do padrão não altera o histórico operacional.
+create table if not exists cartao_grupos_modelo_versoes (
+  id text primary key,
+  grupo_id text not null references cartao_grupos_modelo(id) on delete cascade,
+  versao integer not null check (versao > 0),
+  criado_em timestamptz not null default now(),
+  criado_por text not null,
+  snapshot jsonb not null,
+  unique (grupo_id, versao)
+);
+create index if not exists idx_cartao_grupos_modelo_versoes_grupo
+  on cartao_grupos_modelo_versoes (grupo_id, versao desc);
 
 -- Numeração 000123/2026: única por ano. Templates (sem data) e cartões
 -- históricos ainda não numerados ficam fora do índice.
@@ -690,6 +714,9 @@ alter table if exists tipos_evento        enable row level security;
 alter table if exists auditoria           enable row level security;
 alter table if exists cartao_padrao_versoes enable row level security;
 alter table if exists cartao_grupos_modelo  enable row level security;
+alter table if exists cartao_grupos_modelo_versoes enable row level security;
+revoke all on table cartao_grupos_modelo_versoes from anon, authenticated;
+grant select, insert, update, delete on table cartao_grupos_modelo_versoes to service_role;
 
 -- =================================================================
 -- ALTERAÇÕES DO SERVIÇO — projeção fornecida pelas Sargenteações.

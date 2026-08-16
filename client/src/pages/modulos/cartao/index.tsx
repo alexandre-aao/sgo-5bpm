@@ -1,440 +1,268 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAtalhoSetasDia } from '../../../hooks/useAtalhosGlobais';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Route, ClipboardX, Plus, MoreHorizontal, LayoutTemplate, FilePlus2, Printer, Trash2, Maximize2, BookmarkPlus, TriangleAlert } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, Car, Check, ChevronDown, ChevronUp, Copy, Eye, FileText, Info, Pencil, Plus, Printer, Search, Shield, Trash2, UsersRound, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
 import { apiFetch } from '../../../lib/api';
-import type { CartaoViatura, CartaoDetalhado } from '../../../lib/cartaoConflitos';
-import { calcularAlertasCartao } from '../../../lib/cartaoConflitos';
-import { cabecalhosVersaoCartao, extrairErroCartao } from '../../../lib/concorrenciaCartao';
-import { useConflitoCartao } from '../../../context/useConflitoCartao';
+import type { CartaoDetalhado, CartaoViatura } from '../../../lib/cartaoConflitos';
 import { useCartaoPrograma } from './useCartaoPrograma';
 import { useViaturasCartao } from './useViaturasCartao';
 import { useItensRoteiro } from './useItensRoteiro';
-import { NavegadorData } from './NavegadorData';
-import { QuadroResumo } from './QuadroResumo';
-import { CartoesRecentes } from './CartoesRecentes';
-import { CartaoHeader } from './CartaoHeader';
-import { ViaturasTabela } from './ViaturasTabela';
-import { RoteiroGrid } from './RoteiroGrid';
-import { FormAdicionarViatura } from './FormAdicionarViatura';
-import { ModalEditarViatura } from './ModalEditarViatura';
-import { ConflitoBanner } from './ConflitoBanner';
-import { TrilhoCartao } from './TrilhoCartao';
-import { TemplatesPanel } from './TemplatesPanel';
-import { GruposModeloPanel } from './GruposModeloPanel';
-import { ModelosOperacaoPanel } from './ModelosOperacaoPanel';
-import { ModalNovoTemplate } from './ModalNovoTemplate';
-import { ModalSalvarComoPadrao } from './ModalSalvarComoPadrao';
-import { CriarDoPadrao } from './CriarDoPadrao';
-import { ModalConfirmarExclusaoForte } from '../../../components/ModalConfirmarExclusaoForte';
-import { podeExcluirCartao, proximoDiaISO, dataBr } from '../../../lib/janelaCartao';
+import { usePadroesOperacionais, type PadraoOperacional } from './usePadroesOperacionais';
 import { useBairros } from '../../../hooks/useBairros';
 import { useAvisos } from '../../../hooks/useAvisos';
+import { NavegadorData } from './NavegadorData';
+import { ModalEditarViatura } from './ModalEditarViatura';
+import { RoteiroGrid } from './RoteiroGrid';
+import type { ResultadoAcao } from './useCartaoPrograma';
+
+function categoriaLabel(categoria: string | null | undefined) {
+  const valor = String(categoria || 'bairro').toLowerCase();
+  if (valor === 'especializado') return 'Especializado';
+  if (valor === 'reforco' || valor === 'reforço') return 'Reforço';
+  if (valor === 'missao' || valor === 'missão') return 'Missão';
+  return 'Bairro';
+}
+
+function categoriaClasse(categoria: string | null | undefined) {
+  const valor = String(categoria || 'bairro').toLowerCase();
+  if (valor.includes('especial')) return 'especializado';
+  if (valor.includes('refor')) return 'reforco';
+  if (valor.includes('miss')) return 'missao';
+  return 'bairro';
+}
+
+function hora(horaTexto: string | null | undefined) { return horaTexto ? horaTexto.replace(':', 'h') : ''; }
+
+function primeiroHorario(vtr: CartaoViatura) {
+  const itens = [...(vtr.itens || [])].sort((a, b) => a.inicio.localeCompare(b.inicio));
+  if (!itens[0]) return 'Horário não informado';
+  return `${hora(itens[0].inicio)}${itens[0].fim ? ` às ${hora(itens[0].fim)}` : ''}`;
+}
+
+function locais(vtr: CartaoViatura) {
+  const itens = (vtr.itens || []).filter((item) => item.local).slice(0, 2).map((item) => item.local);
+  return itens.length ? itens.join(' · ') : vtr.setor || 'Local não informado';
+}
+
+function equipe(vtr: CartaoViatura) {
+  const composicao = (vtr.composicao || '').split(/[·|,;]/).map((item) => item.trim()).filter(Boolean);
+  return { comandante: vtr.comandante || composicao[0] || '—', motorista: composicao[1] || '—', patrulheiro: composicao[2] || '—' };
+}
+
+function padraoDoComponente(vtr: CartaoViatura) {
+  return vtr.padrao_operacional_nome || vtr.setor || 'Componente manual';
+}
+
+interface BibliotecaProps {
+  padroes: PadraoOperacional[];
+  busca: string;
+  filtro: string;
+  podeEditar: boolean;
+  adicionando: string | null;
+  onBusca: (valor: string) => void;
+  onFiltro: (valor: string) => void;
+  onAdicionar: (padrao: PadraoOperacional) => void;
+  onVisualizar: (padrao: PadraoOperacional) => void;
+  onEditar: (padrao: PadraoOperacional) => void;
+}
+
+function BibliotecaPadroes({ padroes, busca, filtro, podeEditar, adicionando, onBusca, onFiltro, onAdicionar, onVisualizar, onEditar }: BibliotecaProps) {
+  const filtrados = useMemo(() => {
+    const termo = busca.trim().toLocaleLowerCase('pt-BR');
+    return padroes.filter((padrao) => {
+      const texto = [padrao.nome, padrao.descricao, ...(padrao.bairros || [])].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+      return padrao.ativo && padrao.publicado && (!termo || texto.includes(termo)) && (filtro === 'todos' || categoriaClasse(padrao.categoria) === filtro);
+    });
+  }, [busca, filtro, padroes]);
+
+  return <aside className="cartao-biblioteca" aria-label="Biblioteca de padrões operacionais">
+    <div className="cartao-biblioteca-heading"><div><h2>Biblioteca de Padrões Operacionais</h2><p>Adicione componentes ao cartão do dia.</p></div><span className="cartao-biblioteca-count">{filtrados.length}</span></div>
+    <label className="cartao-search"><Search /><input value={busca} onChange={(e) => onBusca(e.target.value)} placeholder="Pesquisar padrão..." aria-label="Pesquisar padrão" /></label>
+    <div className="cartao-filtros" role="tablist" aria-label="Filtrar biblioteca">{[['todos', 'Todos'], ['bairro', 'Bairros'], ['especializado', 'Especializado'], ['reforco', 'Reforço'], ['missao', 'Missões']].map(([id, label]) => <button type="button" key={id} className={filtro === id ? 'ativo' : ''} onClick={() => onFiltro(id)}>{label}</button>)}</div>
+    <div className="cartao-biblioteca-lista">{filtrados.length === 0 ? <div className="cartao-biblioteca-vazio"><Search /><p>Nenhum padrão ativo encontrado.</p></div> : filtrados.map((padrao) => <article className={`cartao-padrao-item categoria-borda-${categoriaClasse(padrao.categoria)}`} key={padrao.id}><div className="cartao-padrao-item-top"><h3>{padrao.nome}</h3><span className={`cartao-padrao-badge ${categoriaClasse(padrao.categoria)}`}>{categoriaLabel(padrao.categoria)}</span></div><p className="cartao-padrao-line"><strong>Horário:</strong> {hora(padrao.horario_inicio)} às {hora(padrao.horario_fim)}</p>{categoriaClasse(padrao.categoria) === 'bairro' ? <p className="cartao-padrao-line"><strong>PBs:</strong> {padrao.quantidade_pbs || 0}</p> : <p className="cartao-padrao-line"><strong>Missão:</strong> {padrao.descricao || 'Não informada'}</p>}<p className="cartao-padrao-line cartao-padrao-roteiro"><strong>Roteiro:</strong> {padrao.bairros?.join(' / ') || padrao.descricao || 'Não informado'}</p><div className="cartao-padrao-acoes"><button type="button" onClick={() => onVisualizar(padrao)}><Eye /> Visualizar</button>{podeEditar && <button type="button" onClick={() => onEditar(padrao)}><Pencil /> Editar</button>}<button type="button" className="cartao-padrao-adicionar" disabled={adicionando === padrao.id} onClick={() => onAdicionar(padrao)}>{adicionando === padrao.id ? <span className="cartao-spinner" /> : <Plus />} Adicionar</button></div></article>)}</div>
+  </aside>;
+}
+
+function ComponenteCard({
+  vtr, podeEditar, indice, total, onVisualizar, onEditar, onDuplicar,
+  onMover, onExcluir, onAtualizarPadrao, onPdf, onEnviar,
+}: {
+  vtr: CartaoViatura;
+  podeEditar: boolean;
+  indice: number;
+  total: number;
+  onVisualizar: () => void;
+  onEditar: () => void;
+  onDuplicar: () => void;
+  onMover: (direcao: -1 | 1) => void;
+  onExcluir: () => void;
+  onAtualizarPadrao: () => void;
+  onPdf: () => void;
+  onEnviar: () => void;
+}) {
+  const grupo = equipe(vtr);
+  const classe = categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria);
+  return (
+    <article className={`cartao-componente-card ${classe}`}>
+      <div className="cartao-componente-main">
+        <div className={`cartao-componente-icon ${classe}`} aria-hidden="true">
+          {classe === 'especializado' ? <Shield /> : classe === 'reforco' ? <UsersRound /> : <Car />}
+        </div>
+        <div className="cartao-componente-identidade">
+          <div className="cartao-componente-titulo">
+            <h3>{vtr.indicativo || vtr.prefixo || `VTR ${indice + 1}`}</h3>
+            {vtr.operacao_id && <span className="cartao-operacao-badge"><span>↗</span> Operação vinculada</span>}
+          </div>
+          <p>Padrão: <strong>{padraoDoComponente(vtr)}</strong></p>
+        </div>
+        <div className="cartao-equipe">
+          <span className="cartao-coluna-titulo">Equipe</span>
+          <div>
+            <span>Cmt: <b>{grupo.comandante}</b></span>
+            <span>Mot: <b>{grupo.motorista}</b></span>
+            <span>Patr: <b>{grupo.patrulheiro}</b></span>
+          </div>
+        </div>
+        <div className="cartao-horario">
+          <span className="cartao-coluna-titulo">{classe === 'especializado' ? 'Missão' : 'Horário'}</span>
+          <strong>{classe === 'especializado' ? vtr.observacao || 'Apoio operacional' : primeiroHorario(vtr)}</strong>
+        </div>
+        <div className="cartao-locais">
+          <span className="cartao-coluna-titulo">Locais/PBs</span>
+          <strong>{locais(vtr)}</strong>
+        </div>
+        {podeEditar && (
+          <div className="cartao-componente-top-acoes">
+            <button type="button" className="btn-icon btn-sm" title="Mover para cima" disabled={indice === 0} onClick={() => onMover(-1)}><ArrowUp /></button>
+            <button type="button" className="btn-icon btn-sm" title="Mover para baixo" disabled={indice === total - 1} onClick={() => onMover(1)}><ArrowDown /></button>
+            <button type="button" className="btn-icon btn-sm" title="Duplicar componente" onClick={onDuplicar}><Copy /></button>
+            <button type="button" className="btn-icon btn-sm btn-icon-danger" title="Excluir componente" onClick={onExcluir}><Trash2 /></button>
+          </div>
+        )}
+      </div>
+      <div className="cartao-componente-footer">
+        <button type="button" onClick={onVisualizar}><Eye /> Visualizar</button>
+        {podeEditar && <button type="button" onClick={onEditar}><Pencil /> Editar</button>}
+        <button type="button" onClick={onPdf}><FileText /> PDF</button>
+        {podeEditar && <button type="button" onClick={onDuplicar}><Copy /> Duplicar</button>}
+        <button type="button" onClick={onEnviar}><span className="cartao-enviar-icon">➤</span> Enviar</button>
+      </div>
+      {vtr.padrao_desatualizado && (
+        <div className="cartao-versao-aviso" role="status">
+          <Info />
+          <span>Nova versão do padrão {padraoDoComponente(vtr)} disponível.</span>
+          {podeEditar && <button type="button" onClick={onAtualizarPadrao}>Ver e atualizar esta equipe</button>}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function PadraoPreview({ padrao, onFechar }: { padrao: PadraoOperacional; onFechar: () => void }) {
+  return <div className="modal-overlay" role="presentation"><div className="modal-box cartao-padrao-preview" role="dialog" aria-modal="true" aria-labelledby="cartao-padrao-preview-titulo"><div className="modal-header"><h3 id="cartao-padrao-preview-titulo"><Eye /> Visualizar padrão</h3><button type="button" className="btn-close" onClick={onFechar} aria-label="Fechar"><X /></button></div><div className="cartao-padrao-preview-header"><span className={`cartao-padrao-badge ${categoriaClasse(padrao.categoria)}`}>{categoriaLabel(padrao.categoria)}</span><h4>{padrao.nome}</h4><p>{padrao.descricao || 'Sem descrição cadastrada.'}</p></div><dl className="cartao-padrao-preview-dados"><div><dt>Horário</dt><dd>{hora(padrao.horario_inicio)} às {hora(padrao.horario_fim)}</dd></div><div><dt>PBs</dt><dd>{padrao.quantidade_pbs || 0}</dd></div><div><dt>Versão</dt><dd>v{padrao.versao || 1}</dd></div></dl>{padrao.bairros && <div className="cartao-preview-lista"><strong>Locais e roteiro</strong><p>{padrao.bairros.join(' · ') || 'Não informado'}</p></div>}<div className="form-actions form-actions-modal"><button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button></div></div></div>;
+}
+
+function RoteiroPreview({ cartao, vtr, eventos, podeEditar, acoes, onEditarViatura, onFechar }: {
+  cartao: CartaoDetalhado;
+  vtr: CartaoViatura;
+  eventos: Parameters<typeof RoteiroGrid>[0]['eventos'];
+  podeEditar: boolean;
+  acoes: ReturnType<typeof useItensRoteiro>;
+  onEditarViatura: (viatura: CartaoViatura) => void;
+  onFechar: () => void;
+}) {
+  const noop = async (): Promise<ResultadoAcao> => ({ ok: true });
+  return <div className="modal-overlay" role="presentation"><div className="modal-box cartao-roteiro-preview" role="dialog" aria-modal="true" aria-labelledby="cartao-roteiro-preview-titulo"><div className="modal-header"><h3 id="cartao-roteiro-preview-titulo"><Eye /> {vtr.indicativo || vtr.prefixo} — roteiro</h3><button type="button" className="btn-close" onClick={onFechar} aria-label="Fechar"><X /></button></div><RoteiroGrid viaturas={[vtr]} dataCartao={cartao.data || ''} eventos={eventos} podeEditar={podeEditar} onAdicionarItem={podeEditar ? acoes.adicionarItem : noop} onExcluirItem={podeEditar ? acoes.removerItem : noop} onAtualizarItem={podeEditar ? acoes.atualizarItem : noop} onDuplicarItem={podeEditar ? acoes.duplicarItem : noop} onCopiarRoteiro={podeEditar ? acoes.copiarRoteiro : noop} onAplicarAtividade={podeEditar ? acoes.aplicarAtividade : noop} onEditarViatura={onEditarViatura} onExcluirViatura={() => void 0} /><div className="form-actions form-actions-modal"><button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button></div></div></div>;
+}
 
 export default function CartaoProgramaPage() {
-  const { avisarConflito } = useConflitoCartao();
   const { usuario } = useAuth();
-  const navigate = useNavigate();
-  const [parametros] = useSearchParams();
   const { dados } = useAppData();
   const { toast } = useToast();
-  // Cadastro de bairros: alimenta o vínculo da viatura que traz os Avisos
-  // Operacionais. Fica no hook próprio (não no state global) porque só o Cartão
-  // e o Mapa usam — mesma fonte do painel Gerenciar Bairros.
+  const navigate = useNavigate();
   const { bairros } = useBairros();
   const { avisos } = useAvisos();
-  const {
-    dataSelecionada,
-    setDataSelecionada,
-    deslocarDia,
-    cartao,
-    temCartao,
-    criarCartao,
-    atualizarCabecalho,
-    recarregar,
-  } = useCartaoPrograma();
-
-  // Cartão padrão aberto para edição no mesmo editor de viaturas/roteiro —
-  // espelha exibirCartaoNoEditor() recebendo tanto um cartão do dia quanto um
-  // template em public/app.js. Trocar a data sempre sai do modo template.
-  const [templateAberto, setTemplateAberto] = useState<CartaoDetalhado | null>(null);
-  const [dataAnterior, setDataAnterior] = useState(dataSelecionada);
-  if (dataSelecionada !== dataAnterior) {
-    setDataAnterior(dataSelecionada);
-    setTemplateAberto(null);
-  }
-
-  const cartaoEditando = templateAberto ?? cartao;
-
-  const recarregarAtivo = useCallback(async () => {
-    if (templateAberto) {
-      try {
-        const res = await apiFetch(`/api/cartoes/${templateAberto.id}`);
-        const detalhe = (await res.json()) as CartaoDetalhado;
-        setTemplateAberto(detalhe);
-      } catch (erro) {
-        console.error('Erro ao recarregar cartão padrão:', erro);
-      }
-    } else {
-      await recarregar();
-    }
-  }, [templateAberto, recarregar]);
-
-  const { adicionarViatura, editarViatura, removerViatura } = useViaturasCartao(cartaoEditando, recarregarAtivo);
-  const { adicionarItem, removerItem, atualizarItem, duplicarItem, copiarRoteiro, aplicarAtividade } = useItensRoteiro(cartaoEditando, recarregarAtivo);
-
-  const [aba, setAba] = useState<'viaturas' | 'roteiro'>('viaturas');
-  const [vtrEmEdicao, setVtrEmEdicao] = useState<CartaoViatura | null>(null);
-  const [menuAberto, setMenuAberto] = useState(false);
-  const [mostrarTemplatesPanel, setMostrarTemplatesPanel] = useState(parametros.get('modelos') === '1');
-  const [modalNovoTemplateAberto, setModalNovoTemplateAberto] = useState(false);
-  const [modalSalvarPadraoAberto, setModalSalvarPadraoAberto] = useState(false);
-  const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Setas ← → trocam o dia. Só esta tela registra — é a única com navegação por
-  // data. Suspenso com modal aberto: ali o teclado é do modal.
-  useAtalhoSetasDia(
-    useCallback(() => deslocarDia(-1), [deslocarDia]),
-    useCallback(() => deslocarDia(1), [deslocarDia]),
-    modalNovoTemplateAberto || modalSalvarPadraoAberto || modalExcluirAberto || !!vtrEmEdicao,
-  );
-
-  useEffect(() => {
-    if (!menuAberto) return;
-    function handleClickFora(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAberto(false);
-    }
-    document.addEventListener('mousedown', handleClickFora);
-    return () => document.removeEventListener('mousedown', handleClickFora);
-  }, [menuAberto]);
-
-  // Cartão Programa é a única tela que Adjunto/Oficial podem editar — a gestão
-  // de templates segue P3-only.
+  const { dataSelecionada, setDataSelecionada, deslocarDia, cartao, temCartao, criarCartao, recarregar } = useCartaoPrograma();
+  const { padroes, carregando: carregandoPadroes } = usePadroesOperacionais();
+  const [busca, setBusca] = useState('');
+  const [filtro, setFiltro] = useState('todos');
+  const [bibliotecaAberta, setBibliotecaAberta] = useState(true);
+  const [adicionando, setAdicionando] = useState<string | null>(null);
+  const [visualizandoPadrao, setVisualizandoPadrao] = useState<PadraoOperacional | null>(null);
+  const [componenteAberto, setComponenteAberto] = useState<{ viatura: CartaoViatura; editar: boolean } | null>(null);
+  const [editando, setEditando] = useState<CartaoViatura | null>(null);
   const podeEditar = usuario?.role === 'P3' || usuario?.role === 'Adjunto';
   const ehP3 = usuario?.role === 'P3';
-  // Exclusão: P3 sempre; Adjunto só o cartão do dia e até 07h00 do dia seguinte
-  // à data do serviço. O servidor refaz essa checagem no DELETE — aqui é só UI.
-  const podeExcluir = podeExcluirCartao(usuario?.role, cartaoEditando);
+  const cartaoId = cartao?.id;
+  const { editarViatura, removerViatura } = useViaturasCartao(cartao, recarregar);
+  const acoesRoteiro = useItensRoteiro(cartao, recarregar);
+  const viaturas = useMemo(() => {
+    const versoes = new Map(padroes.map((padrao) => [padrao.id, padrao.publicado ? (padrao.versao || 0) : (padrao.versao_publicada || 0)]));
+    return (cartao?.viaturas || [])
+      .map((viatura) => ({
+        ...viatura,
+        padrao_desatualizado: !!viatura.padrao_operacional_id
+          && (versoes.get(viatura.padrao_operacional_id) || 0) > (viatura.padrao_operacional_versao || 0),
+      }))
+      .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+  }, [cartao?.viaturas, padroes]);
 
-  async function handleCriarCartao() {
+  const executar = useCallback(async (path: string, init: RequestInit, sucesso: string) => {
+    try {
+      const res = await apiFetch(path, init);
+      if (!res.ok) { const corpo = await res.json().catch(() => ({})) as { error?: string }; toast(corpo.error || 'Não foi possível concluir a ação.', 'danger'); return false; }
+      await recarregar(); toast(sucesso, 'success'); return true;
+    } catch { toast('Falha na comunicação com o servidor.', 'danger'); return false; }
+  }, [recarregar, toast]);
+
+  async function garantirCartao() {
+    if (cartaoId) return cartaoId;
     const resultado = await criarCartao();
-    if (resultado.ok) {
-      toast('Cartão Programa criado. Adicione as viaturas e roteiros.', 'success');
-    } else {
-      toast(resultado.mensagem, 'warning');
-    }
+    if (!resultado.ok) { toast(resultado.mensagem, 'warning'); return null; }
+    return resultado.cartao?.id || null;
   }
 
-  async function handleAbrirTemplate(id: string) {
-    try {
-      const res = await apiFetch(`/api/cartoes/${id}`);
-      const detalhe = (await res.json()) as CartaoDetalhado;
-      setTemplateAberto(detalhe);
-      setMostrarTemplatesPanel(false);
-    } catch (erro) {
-      console.error('Erro ao abrir cartão padrão:', erro);
-      toast('Falha ao abrir o cartão padrão.', 'danger');
-    }
+  async function adicionarPadrao(padrao: PadraoOperacional) {
+    setAdicionando(padrao.id);
+    let id: string | null = cartaoId ?? null;
+    if (!id) id = await garantirCartao();
+    if (!id) { setAdicionando(null); return; }
+    await executar(`/api/cartoes/${id}/componentes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ padrao_operacional_id: padrao.id }) }, `${padrao.nome} adicionado ao cartão.`);
+    setAdicionando(null);
   }
 
-  function handleTemplateExcluido(id: string) {
-    if (templateAberto?.id === id) setTemplateAberto(null);
+  async function duplicarComponente(vtr: CartaoViatura) {
+    if (!cartaoId) return;
+    await executar(`/api/cartoes/${cartaoId}/componentes/${vtr.id}/duplicar`, { method: 'POST' }, 'Componente duplicado.');
   }
 
-  function abrirCentralEmissao(viaturaId?: string) {
-    if (!cartaoEditando || cartaoEditando.viaturas.length === 0) {
-      toast('Adicione ao menos uma viatura ao cartão antes de emitir.', 'warning');
-      return;
-    }
-    const busca = new URLSearchParams({ cartao: cartaoEditando.id });
-    if (viaturaId) busca.set('viatura', viaturaId);
-    navigate(`/impressao?${busca.toString()}`);
+  async function atualizarPadrao(vtr: CartaoViatura) {
+    if (!cartaoId) return;
+    const confirmado = window.confirm('Atualizar este componente para a versão publicada mais recente? A equipe e a viatura preenchidas serão preservadas.');
+    if (!confirmado) return;
+    await executar(`/api/cartoes/${cartaoId}/componentes/${vtr.id}/atualizar-padrao`, { method: 'POST' }, 'Componente atualizado para a versão atual.');
   }
 
-  function handleAbrirExcluir() {
-    if (!cartaoEditando) {
-      toast('Não há Cartão Programa nesta data para excluir.', 'warning');
-      return;
-    }
-    setModalExcluirAberto(true);
+  async function moverComponente(vtr: CartaoViatura, direcao: -1 | 1) {
+    if (!cartaoId) return;
+    const atual = [...viaturas]; const origem = atual.findIndex((item) => item.id === vtr.id); const destino = origem + direcao;
+    if (origem < 0 || destino < 0 || destino >= atual.length) return;
+    [atual[origem], atual[destino]] = [atual[destino], atual[origem]];
+    await executar(`/api/cartoes/${cartaoId}/componentes/ordem`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordem: atual.map((item, index) => ({ id: item.id, ordem: index })) }) }, 'Ordem atualizada.');
   }
 
-  async function handleConfirmarExclusao() {
-    if (!cartaoEditando) return;
-    try {
-      const res = await apiFetch(`/api/cartoes/${cartaoEditando.id}`, {
-        method: 'DELETE', headers: cabecalhosVersaoCartao(cartaoEditando),
-      });
-      if (!res.ok) {
-        const mensagem = await extrairErroCartao(
-          res,
-          'Falha ao excluir o Cartão Programa.',
-          (erro) => avisarConflito(recarregarAtivo, erro),
-        );
-        toast(mensagem, 'danger');
-        return;
-      }
-      setModalExcluirAberto(false);
-      const eraTemplate = !!templateAberto;
-      toast(eraTemplate ? 'Cartão padrão excluído.' : 'Cartão Programa excluído.', 'info');
-      if (eraTemplate) {
-        setTemplateAberto(null);
-        setMostrarTemplatesPanel(false);
-      } else {
-        await recarregar();
-      }
-    } catch (erro) {
-      console.error('Erro ao excluir Cartão Programa:', erro);
-      toast('Falha na comunicação com o servidor.', 'danger');
-    }
-  }
-
-  async function handleExcluirViatura(vtr: CartaoViatura) {
-    if (!window.confirm('Remover esta viatura e todo o seu roteiro do cartão?')) return;
+  async function excluirComponente(vtr: CartaoViatura) {
+    if (!window.confirm(`Excluir ${vtr.indicativo || vtr.prefixo || 'este componente'} do cartão?`)) return;
     const resultado = await removerViatura(vtr.id);
-    if (resultado.ok) {
-      toast('Viatura removida do cartão.', 'info');
-    } else {
-      toast(resultado.mensagem, 'danger');
-    }
+    toast(resultado.ok ? 'Componente excluído.' : resultado.mensagem, resultado.ok ? 'info' : 'danger');
   }
 
-  return (
-    <>
-      <div className="panel cartao-toolbar-panel">
-        <div className="panel-header flex-column-mobile">
-          <div className="panel-title">
-            <Route />
-            <h2>Cartão Programa de Patrulhamento</h2>
-          </div>
-          <div className="report-filters cartao-toolbar">
-            <NavegadorData
-              dataSelecionada={dataSelecionada}
-              onMudarData={setDataSelecionada}
-              onDeslocarDia={deslocarDia}
-              temCartao={temCartao}
-            />
-            <button type="button" className="btn btn-primary btn-sm" onClick={handleCriarCartao}>
-              <Plus /> Criar Cartão
-            </button>
-            {cartaoEditando && !cartaoEditando.is_template && (
-              <>
-                <Link to={`/cartao/${cartaoEditando.id}`} className="btn btn-secondary btn-sm">
-                  <Maximize2 /> Tela Cheia
-                </Link>
-                <Link to={`/impressao?cartao=${cartaoEditando.id}`} className="btn btn-primary btn-sm">
-                  <Printer /> Central de Emissão
-                </Link>
-              </>
-            )}
-            {ehP3 && (
-              <div className="dropdown" ref={menuRef}>
-                <button
-                  type="button" className="btn-icon" aria-haspopup="true" aria-expanded={menuAberto}
-                  aria-label="Mais ações" title="Mais ações" onClick={() => setMenuAberto((a) => !a)}
-                >
-                  <MoreHorizontal />
-                </button>
-                <div className={`dropdown-menu${menuAberto ? '' : ' hidden'}`}>
-                  <button
-                    type="button" className="dropdown-item"
-                    onClick={() => { setMostrarTemplatesPanel((v) => !v); setMenuAberto(false); }}
-                  >
-                    <LayoutTemplate /> Modelos de Cartão
-                  </button>
-                  <button
-                    type="button" className="dropdown-item"
-                    onClick={() => { setModalNovoTemplateAberto(true); setMenuAberto(false); }}
-                  >
-                    <FilePlus2 /> Novo Modelo de Cartão
-                  </button>
-                  {/* Só faz sentido com o cartão de um DIA aberto: é ele que vira padrão. */}
-                  {cartaoEditando && !cartaoEditando.is_template && (
-                    <button
-                      type="button" className="dropdown-item"
-                      onClick={() => { setModalSalvarPadraoAberto(true); setMenuAberto(false); }}
-                    >
-                      <BookmarkPlus /> Salvar como Modelo
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-            {podeExcluir && (
-              <button type="button" className="btn btn-danger btn-sm" onClick={handleAbrirExcluir}>
-                <Trash2 /> Excluir
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+  async function criarCartaoDia() {
+    const resultado = await criarCartao();
+    toast(resultado.ok ? 'Cartão Ordinário criado.' : resultado.mensagem, resultado.ok ? 'success' : 'warning');
+  }
 
-      {mostrarTemplatesPanel && (
-        <TemplatesPanel
-          onAbrir={handleAbrirTemplate}
-          templateAberto={templateAberto}
-          onAtualizado={recarregarAtivo}
-          onExcluido={handleTemplateExcluido}
-        />
-      )}
-      {cartaoEditando && !cartaoEditando.is_template && (
-        <ModelosOperacaoPanel cartao={cartaoEditando} operacoes={dados.operacoes} podeEditar={podeEditar} onAtualizado={recarregarAtivo} />
-      )}
-      {cartaoEditando && <GruposModeloPanel cartao={cartaoEditando} podeEditar={podeEditar} onAtualizado={recarregarAtivo} />}
-
-      <CartoesRecentes dataSelecionada={dataSelecionada} onAbrir={setDataSelecionada} />
-
-      {temCartao === false && !templateAberto && (
-        <div className="cartao-empty-state">
-          <ClipboardX />
-          <h3>Nenhum Cartão Programa para esta data</h3>
-          <p>O cartão do dia nasce a partir do cartão padrão ativo — as viaturas e o roteiro base já vêm preenchidos.</p>
-          {/* key força um novo fetch ao fechar "Cartões Padrão" — o P3 pode ter trocado o
-              padrão ativo ali, e este bloco só busca no mount. */}
-          <CriarDoPadrao
-            key={String(mostrarTemplatesPanel)}
-            data={dataSelecionada}
-            onCriar={() => void handleCriarCartao()}
-          />
-        </div>
-      )}
-
-      {cartaoEditando && (
-        <>
-           {/* Editar o padrão em vigor abre um rascunho; a fotografia publicada
-               continua originando os cartões do dia até a próxima publicação. */}
-          {cartaoEditando.is_template && cartaoEditando.padrao_ativo && (
-            <div className="cartao-padrao-ativo-banner" role="status">
-              <TriangleAlert aria-hidden="true" />
-              <span>
-                 Você está editando o <strong>cartão padrão ativo</strong>. As mudanças ficam em rascunho
-                 e só passam a valer para novos cartões do dia depois de publicar esta versão.
-              </span>
-            </div>
-          )}
-          <ConflitoBanner alertas={calcularAlertasCartao(cartaoEditando, dados.pessoal)} />
-          <div className="dash-layout">
-          <div className="dash-main">
-            <CartaoHeader
-              cartao={cartaoEditando}
-              pessoal={dados.pessoal}
-              viaturasCadastradas={dados.viaturas}
-              onAtualizar={atualizarCabecalho}
-            />
-            <QuadroResumo viaturas={cartaoEditando.viaturas} />
-
-            <div className="panel cartao-abas-panel">
-              <div className="sub-abas" role="tablist" aria-label="Conteúdo do cartão">
-                <button
-                  type="button"
-                  className={`sub-aba${aba === 'viaturas' ? ' ativo' : ''}`}
-                  role="tab"
-                  aria-selected={aba === 'viaturas'}
-                  onClick={() => setAba('viaturas')}
-                >
-                  Viaturas
-                </button>
-                <button
-                  type="button"
-                  className={`sub-aba${aba === 'roteiro' ? ' ativo' : ''}`}
-                  role="tab"
-                  aria-selected={aba === 'roteiro'}
-                  onClick={() => setAba('roteiro')}
-                >
-                  Roteiro
-                </button>
-              </div>
-
-              {aba === 'viaturas' ? (
-                <ViaturasTabela
-                  viaturas={cartaoEditando.viaturas}
-                  podeEditar={podeEditar}
-                  onEditar={setVtrEmEdicao}
-                  onExcluir={handleExcluirViatura}
-                  onVerCartao={(vtr) => abrirCentralEmissao(vtr.id)}
-                />
-              ) : (
-                <RoteiroGrid
-                  viaturas={cartaoEditando.viaturas}
-                  dataCartao={cartaoEditando.data || dataSelecionada}
-                  eventos={dados.eventos}
-                  podeEditar={podeEditar}
-                  onAdicionarItem={adicionarItem}
-                  onExcluirItem={removerItem}
-                  onAtualizarItem={atualizarItem}
-                  onDuplicarItem={duplicarItem}
-                  onCopiarRoteiro={copiarRoteiro}
-                  onAplicarAtividade={aplicarAtividade}
-                  onEditarViatura={setVtrEmEdicao}
-                  onExcluirViatura={handleExcluirViatura}
-                />
-              )}
-            </div>
-
-            {podeEditar && (
-              <FormAdicionarViatura
-                viaturasCadastradas={dados.viaturas}
-                pessoal={dados.pessoal}
-                bairros={bairros}
-                avisos={avisos}
-                onAdicionar={adicionarViatura}
-              />
-            )}
-          </div>
-
-          <TrilhoCartao viaturas={cartaoEditando.viaturas} alertas={calcularAlertasCartao(cartaoEditando, dados.pessoal)} />
-          </div>
-        </>
-      )}
-
-      {vtrEmEdicao && (
-        <ModalEditarViatura
-          viatura={vtrEmEdicao}
-          pessoal={dados.pessoal}
-          bairros={bairros}
-          avisos={avisos}
-          onFechar={() => setVtrEmEdicao(null)}
-          onSalvar={editarViatura}
-        />
-      )}
-
-      {modalNovoTemplateAberto && (
-        <ModalNovoTemplate
-          onFechar={() => setModalNovoTemplateAberto(false)}
-          onCriado={(t) => { setModalNovoTemplateAberto(false); setTemplateAberto(t); }}
-        />
-      )}
-
-      {modalSalvarPadraoAberto && cartaoEditando && !cartaoEditando.is_template && (
-        <ModalSalvarComoPadrao
-          cartao={cartaoEditando}
-          onFechar={() => setModalSalvarPadraoAberto(false)}
-          onCriado={(t) => { setModalSalvarPadraoAberto(false); setTemplateAberto(t); }}
-        />
-      )}
-
-      {modalExcluirAberto && cartaoEditando && (
-        <ModalConfirmarExclusaoForte
-          titulo={templateAberto ? 'Excluir Cartão Padrão' : 'Excluir Cartão Programa'}
-          aviso={
-            templateAberto
-              ? 'Isso excluirá permanentemente este cartão padrão, com todas as viaturas e roteiros associados.'
-              : `Isso excluirá permanentemente o Cartão Programa desta data, com todas as viaturas e roteiros associados.${
-                  ehP3 || !cartaoEditando.data
-                    ? ''
-                    : ` Seu prazo para excluir este cartão termina às 07h00 de ${dataBr(proximoDiaISO(cartaoEditando.data))}.`
-                }`
-          }
-          label={`Digite "${templateAberto ? cartaoEditando.nome_template : cartaoEditando.data?.split('-').reverse().join('/')}" para confirmar`}
-          valorEsperado={(templateAberto ? cartaoEditando.nome_template : cartaoEditando.data?.split('-').reverse().join('/')) || ''}
-          onFechar={() => setModalExcluirAberto(false)}
-          onConfirmar={() => void handleConfirmarExclusao()}
-        />
-      )}
-    </>
-  );
+  return <div className="cartao-ordinario-page"><div className="cartao-ordinario-toolbar"><div className="cartao-ordinario-titulo"><div className="cartao-ordinario-breadcrumb">Planejamento <span>/</span> Cartão Ordinário</div><h2>Cartão Ordinário <span>•</span> {new Date(`${dataSelecionada}T12:00:00`).toLocaleDateString('pt-BR')}</h2><div className="cartao-ordinario-metadados"><span><span className="cartao-meta-icon">☼</span> Turno: Diurno</span><span><UsersRound /> Companhia: 1ª CIA</span><span><Pencil /> Status: <strong>{cartao ? 'Em edição' : 'Não criado'}</strong></span></div></div><div className="cartao-ordinario-toolbar-actions"><NavegadorData dataSelecionada={dataSelecionada} onMudarData={setDataSelecionada} onDeslocarDia={deslocarDia} temCartao={temCartao} />{!cartao && <button type="button" className="btn btn-primary" onClick={() => void criarCartaoDia()}><Plus /> Criar cartão</button>}{cartao && <button type="button" className="btn btn-primary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><Printer /> Emitir cartão</button>}</div></div>{cartao && <div className="cartao-ordinario-info"><Info /><span>Os componentes adicionados podem ser editados sem alterar o padrão original da P3.</span></div>}<div className="cartao-ordinario-layout"><div className={`cartao-biblioteca-wrap${bibliotecaAberta ? ' aberta' : ''}`}><button type="button" className="cartao-biblioteca-mobile-toggle" onClick={() => setBibliotecaAberta((valor) => !valor)}><span><Search /> Biblioteca de Padrões Operacionais</span>{bibliotecaAberta ? <ChevronUp /> : <ChevronDown />}</button><BibliotecaPadroes padroes={padroes} busca={busca} filtro={filtro} podeEditar={ehP3} adicionando={adicionando} onBusca={setBusca} onFiltro={setFiltro} onAdicionar={(padrao) => void adicionarPadrao(padrao)} onVisualizar={setVisualizandoPadrao} onEditar={() => navigate('/padroes')} /></div><main className="cartao-componentes-area"><div className="cartao-componentes-heading"><div><h2>Cartão Ordinário <span>•</span> {new Date(`${dataSelecionada}T12:00:00`).toLocaleDateString('pt-BR')}</h2><div className="cartao-componentes-chips"><span>☼ Turno: Diurno</span><span><UsersRound /> Companhia: 1ª CIA</span><span><Pencil /> Status: <strong>{cartao ? 'Em edição' : 'Não criado'}</strong></span></div></div>{cartao && podeEditar && <button type="button" className="btn btn-primary" onClick={() => { document.querySelector('.cartao-biblioteca')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setBibliotecaAberta(true); }}><Plus /> Adicionar componente</button>}</div>{cartao && <div className="cartao-componentes-info"><Info /><span>Os componentes adicionados podem ser editados sem alterar o padrão original da P3.</span></div>}{!cartao ? <div className="cartao-sem-cartao"><FileText /><h3>Nenhum Cartão Ordinário para esta data</h3><p>Crie o cartão do dia ou selecione um padrão na biblioteca para começar.</p><button type="button" className="btn btn-primary" onClick={() => void criarCartaoDia()}><Plus /> Criar cartão</button></div> : viaturas.length === 0 ? <div className="cartao-sem-cartao"><Car /><h3>Nenhum componente adicionado</h3><p>Escolha um padrão na biblioteca para montar o cartão.</p></div> : <div className="cartao-componentes-lista">{viaturas.map((vtr, indice) => <ComponenteCard key={vtr.id} vtr={vtr} podeEditar={podeEditar} indice={indice} total={viaturas.length} onVisualizar={() => setComponenteAberto({ viatura: vtr, editar: false })} onEditar={() => setComponenteAberto({ viatura: vtr, editar: true })} onDuplicar={() => void duplicarComponente(vtr)} onMover={(direcao) => void moverComponente(vtr, direcao)} onExcluir={() => void excluirComponente(vtr)} onAtualizarPadrao={() => void atualizarPadrao(vtr)} onPdf={() => navigate(`/impressao?cartao=${cartao.id}&viatura=${vtr.id}`)} onEnviar={() => navigate(`/impressao?cartao=${cartao.id}&viatura=${vtr.id}`)} />)}</div>}<div className="cartao-rodape-acoes">{cartao && <><button type="button" className="btn btn-secondary" onClick={() => toast('Rascunho salvo.', 'success')}><Check /> Salvar rascunho</button><button type="button" className="btn btn-secondary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><FileText /> Gerar cartão completo</button><button type="button" className="btn btn-primary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><Printer /> Emitir cartão da equipe</button></>}</div></main>{cartao && <aside className="cartao-resumo-lateral"><div className="cartao-resumo-titulo"><span>▱</span><strong>Componentes no cartão</strong><b>{viaturas.length}</b></div><div className="cartao-resumo-linha"><span><Car /> Bairros</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'bairro').length}</b></div><div className="cartao-resumo-linha"><span><Shield /> Especializado</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'especializado').length}</b></div><div className="cartao-resumo-linha"><span><UsersRound /> Reforço</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'reforco').length}</b></div><div className="cartao-resumo-linha"><span><Info /> Padrões ativos</span><b>{carregandoPadroes ? '—' : padroes.filter((padrao) => padrao.ativo).length}</b></div></aside>}</div>{editando && <ModalEditarViatura viatura={editando} pessoal={dados.pessoal} bairros={bairros} avisos={avisos} onFechar={() => setEditando(null)} onSalvar={editarViatura} />}{visualizandoPadrao && <PadraoPreview padrao={visualizandoPadrao} onFechar={() => setVisualizandoPadrao(null)} />}{componenteAberto && cartao && <RoteiroPreview cartao={cartao} vtr={componenteAberto.viatura} eventos={dados.eventos} podeEditar={componenteAberto.editar && podeEditar} acoes={acoesRoteiro} onEditarViatura={setEditando} onFechar={() => setComponenteAberto(null)} />}</div>;
 }

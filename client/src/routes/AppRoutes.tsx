@@ -13,6 +13,7 @@ const paginas = {
   mapa: lazy(() => import('../pages/modulos/mapa')),
   turno: lazy(() => import('../pages/modulos/turno')),
   cartao: lazy(() => import('../pages/modulos/cartao')),
+  padroes: lazy(() => import('../pages/modulos/cartao/PadroesPage')),
   operacoes: lazy(() => import('../pages/modulos/operacoes')),
   planejador: lazy(() => import('../pages/modulos/planejador')),
   relatorio: lazy(() => import('../pages/modulos/relatorio')),

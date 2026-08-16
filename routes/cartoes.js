@@ -184,6 +184,14 @@ module.exports = function criarRouterCartoes({
       viatura.prefixo, viatura.companhia, viatura.categoria, viatura.setor,
       viatura.comandante, viatura.comandante_pessoal_id, viatura.composicao,
       viatura.observacao, viatura.bairro_id, (viatura.bairros_ids || []).join('|'),
+      // A fotografia do Padrão Operacional e a operação vinculada saem no
+      // documento/identificam a origem do componente. Alterar qualquer um
+      // desses campos invalida uma emissão anterior.
+      viatura.padrao_operacional_id, viatura.padrao_operacional_nome,
+      viatura.padrao_operacional_versao, viatura.padrao_operacional_publicado_em,
+      viatura.operacao_id,
+      JSON.stringify(viatura.padrao_operacional_metadados || {}),
+      JSON.stringify(viatura.padrao_operacional_snapshot || {}),
       (viatura.avisos_ids || []).join('|'),
       (viatura.itens || []).map(i => `${i.inicio}~${i.fim}~${i.local}~${i.atividade}`).join('|')
     ];
@@ -456,6 +464,235 @@ module.exports = function criarRouterCartoes({
     }
   }));
 
+  // -------------------------------------------------------------
+  // PADRÕES OPERACIONAIS → COMPONENTES DO CARTÃO
+  // -------------------------------------------------------------
+
+  function semDiarias(valor) {
+    if (Array.isArray(valor)) return valor.map(semDiarias);
+    if (!valor || typeof valor !== 'object') return valor;
+    const proibidos = new Set(['diaria', 'diária', 'diárias', 'diarias', 'qtd_diarias', 'qtd_diarias_estimada', 'total_diarias', 'escalas']);
+    return Object.fromEntries(Object.entries(valor)
+      .filter(([chave]) => {
+        const chaveNormalizada = String(chave).toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return !proibidos.has(chave.toLocaleLowerCase('pt-BR')) && !chaveNormalizada.includes('diar');
+      })
+      .map(([chave, item]) => [chave, semDiarias(item)]));
+  }
+
+  async function buscarPadraoOperacionalPublicado(id) {
+    const { data: grupo, error } = await supabase.from('cartao_grupos_modelo')
+      .select('*').eq('id', id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!grupo || grupo.ativo === false) return null;
+    const { data: versao, error: erroVersao } = await supabase.from('cartao_grupos_modelo_versoes')
+      .select('*').eq('grupo_id', id).order('versao', { ascending: false }).limit(1).maybeSingle();
+    if (erroVersao && !/relation|column|tabela/i.test(erroVersao.message || '')) throw new Error(erroVersao.message);
+    if (versao?.snapshot) {
+      return {
+        ...grupo,
+        ...copiarSnapshot(versao.snapshot),
+        id: grupo.id,
+        versao: Number(versao.versao) || Number(grupo.versao) || 0,
+        publicado: true,
+        publicado_em: versao.snapshot.publicado_em || grupo.publicado_em || null,
+        _snapshot: copiarSnapshot(versao.snapshot),
+      };
+    }
+    if (!grupo.publicado) return null;
+    return { ...grupo, _snapshot: copiarSnapshot(grupo) };
+  }
+
+  function componentesDoPadrao(padrao) {
+    const configuracao = padrao.configuracao && typeof padrao.configuracao === 'object' ? padrao.configuracao : {};
+    if (Array.isArray(padrao.componentes) && padrao.componentes.length) return padrao.componentes;
+    if (Array.isArray(configuracao.componentes) && configuracao.componentes.length) return configuracao.componentes;
+    if (Array.isArray(configuracao.viaturas) && configuracao.viaturas.length) return configuracao.viaturas;
+    if (Array.isArray(configuracao.itens) && configuracao.itens.length) return [{ itens: configuracao.itens }];
+    return [{
+      prefixo: padrao.prefixo || '', setor: padrao.area || padrao.bairro || '',
+      companhia: padrao.companhia || '', categoria: padrao.categoria || 'Ordinária',
+      observacao: padrao.observacoes || '',
+      itens: [{
+        inicio: padrao.horario_inicio || '', fim: padrao.horario_fim || '',
+        local: padrao.area || padrao.bairro || padrao.pontos || '',
+        atividade: [padrao.missao || padrao.nome, padrao.pontos ? `Pontos: ${padrao.pontos}` : ''].filter(Boolean).join(' · '),
+      }],
+    }];
+  }
+
+  function categoriaDoPadrao(padrao) {
+    return String(padrao.tipo || padrao.categoria || 'bairro').toLowerCase();
+  }
+
+  function proximoIndicativo(cartao, padrao) {
+    const categoria = categoriaDoPadrao(padrao);
+    const base = categoria.includes('especial') ? 'FT' : categoria.includes('refor') ? 'REFORÇO' : categoria.includes('miss') ? 'MISSÃO' : 'DELTA';
+    const usados = new Set((cartao.viaturas || []).map((item) => String(item.indicativo || '').toUpperCase()));
+    let numero = 1;
+    while (usados.has(`${base} ${String(numero).padStart(2, '0')}`)) numero += 1;
+    return `${base} ${String(numero).padStart(2, '0')}`;
+  }
+
+  function normalizarItensComponente(componente, padrao) {
+    const itens = Array.isArray(componente.itens)
+      ? componente.itens
+      : (componente.inicio || componente.horario_inicio ? [componente] : []);
+    return ordenarPorTurno(itens.map((item) => ({
+      id: generateId('cpi'), inicio: String(item.inicio || item.horario_inicio || ''),
+      fim: String(item.fim || item.horario_fim || ''), local: String(item.local || item.area || padrao.area || padrao.bairro || ''),
+      atividade: String(item.atividade || item.missao || padrao.missao || padrao.nome || ''),
+    })));
+  }
+
+  async function adicionarComponentesPadrao(req, res) {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao || cartao.is_template && req.user.role !== 'P3') {
+      return res.status(404).json({ error: 'Cartão do dia não encontrado.' });
+    }
+    const padraoId = req.params.padraoId || req.body?.padrao_id || req.body?.padrao_operacional_id || req.body?.grupo_id;
+    if (!padraoId) return res.status(400).json({ error: 'Informe o padrão operacional.' });
+    const padrao = await buscarPadraoOperacionalPublicado(padraoId);
+    if (!padrao) return res.status(404).json({ error: 'Padrão operacional não encontrado ou não publicado.' });
+
+    const operacaoId = String(req.body?.operacao_id || req.body?.operacaoId || '').trim();
+    if (operacaoId) {
+      // Só os campos de data são lidos: diárias/escala nunca são expostas nem
+      // copiada para o cartão operacional.
+      const { data: operacao, error: erroOperacao } = await supabase.from('operacoes')
+        .select('id,data_inicio,data_termino').eq('id', operacaoId).maybeSingle();
+      if (erroOperacao) throw new Error(`Falha ao validar operação vinculada: ${erroOperacao.message}`);
+      if (!operacao) return res.status(400).json({ error: 'A operação vinculada não existe.' });
+      if (operacao.data_inicio !== cartao.data) return res.status(400).json({ error: 'A operação vinculada deve pertencer à mesma data do cartão.' });
+    }
+
+    let componentes = componentesDoPadrao(padrao);
+    const componenteId = String(req.body?.componente_id || req.body?.componenteId || '').trim();
+    if (componenteId) componentes = componentes.filter((item) => String(item.id || item.codigo || '') === componenteId);
+    if (!componentes.length) return res.status(404).json({ error: 'Componente não encontrado no padrão operacional.' });
+
+    const snapshot = semDiarias(copiarSnapshot(padrao._snapshot || padrao));
+    const metadados = semDiarias(copiarSnapshot(padrao.metadados || {}));
+    const novasViaturas = componentes.map((componente) => {
+      const viatura = componente.viatura && typeof componente.viatura === 'object' ? componente.viatura : componente;
+      return {
+        id: generateId('cpv'), prefixo: String(viatura.prefixo || ''),
+        indicativo: String(viatura.indicativo || proximoIndicativo(cartao, padrao)),
+        ordem: (cartao.viaturas || []).length,
+        setor: String(viatura.setor || viatura.area || padrao.area || padrao.bairro || ''),
+        companhia: String(viatura.companhia || ''), categoria: String(viatura.categoria || 'Ordinária'),
+        comandante: '', composicao: '', observacao: String(viatura.observacao || padrao.observacoes || ''),
+        ...camposEnvioIniciais(), bairro_id: String(viatura.bairro_id || padrao.bairro_id || ''),
+        bairros_ids: Array.isArray(viatura.bairros_ids) ? [...viatura.bairros_ids] : [],
+        padrao_operacional_id: padrao.id,
+        padrao_operacional_nome: padrao.nome || '',
+        padrao_operacional_categoria: categoriaDoPadrao(padrao),
+        padrao_operacional_versao: Number(padrao.versao) || 0,
+        padrao_operacional_publicado_em: padrao.publicado_em || null,
+        padrao_operacional_snapshot: snapshot,
+        padrao_operacional_metadados: metadados,
+        componente_operacional_id: componente.id || componente.codigo || null,
+        operacao_id: operacaoId || null,
+        itens: normalizarItensComponente(viatura, padrao),
+      };
+    });
+    cartao.viaturas = [...(cartao.viaturas || []), ...novasViaturas];
+    reavaliarStatusEnvio(cartao);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (!atualizado) return;
+    await registrarAuditoria({ req, acao: 'aplicou', entidade: 'Padrão Operacional', entidadeId: padrao.id, descricao: `Adicionou o padrão “${padrao.nome}” ao Cartão Programa ${cartao.data || cartao.id}.` });
+    return res.json(atualizado);
+  }
+
+  router.post('/cartoes/:id/componentes', exigirEdicaoCartao, asyncRoute(adicionarComponentesPadrao));
+  router.post('/cartoes/:id/padroes-operacionais/:padraoId/componentes', exigirEdicaoCartao, asyncRoute(adicionarComponentesPadrao));
+  router.post('/cartoes/:id/padroes-operacionais/:padraoId/adicionar', exigirEdicaoCartao, asyncRoute(adicionarComponentesPadrao));
+  router.post('/cartoes/:id/adicionar-padrao-operacional/:padraoId', exigirEdicaoCartao, asyncRoute(adicionarComponentesPadrao));
+
+  async function atualizarComponentePeloPadrao(req, res) {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao || cartao.is_template && req.user.role !== 'P3') return res.status(404).json({ error: 'Cartão do dia não encontrado.' });
+    const viatura = (cartao.viaturas || []).find((item) => item.id === req.params.vid);
+    if (!viatura) return res.status(404).json({ error: 'Componente não encontrado no cartão.' });
+    const padraoId = req.body?.padrao_id || req.body?.padrao_operacional_id || viatura.padrao_operacional_id;
+    if (!padraoId) return res.status(400).json({ error: 'O componente não possui padrão operacional de origem.' });
+    const padrao = await buscarPadraoOperacionalPublicado(padraoId);
+    if (!padrao) return res.status(404).json({ error: 'Padrão operacional não encontrado ou não publicado.' });
+    let componentes = componentesDoPadrao(padrao);
+    const componenteId = String(req.body?.componente_id || req.body?.componenteId || viatura.componente_operacional_id || '').trim();
+    if (componenteId) componentes = componentes.filter((item) => String(item.id || item.codigo || '') === componenteId);
+    const componente = componentes[0];
+    if (!componente) return res.status(404).json({ error: 'Componente não encontrado no padrão operacional.' });
+    const fonte = componente.viatura && typeof componente.viatura === 'object' ? componente.viatura : componente;
+    const campos = Array.isArray(req.body?.campos) && req.body.campos.length
+      ? new Set(req.body.campos.map(String))
+      : new Set(['setor', 'categoria', 'observacao', 'bairro_id', 'bairros_ids', 'itens']);
+    const valores = {
+      prefixo: String(fonte.prefixo || ''), setor: String(fonte.setor || fonte.area || padrao.area || padrao.bairro || ''),
+      companhia: String(fonte.companhia || ''), categoria: String(fonte.categoria || 'Ordinária'),
+      observacao: String(fonte.observacao || padrao.observacoes || ''), bairro_id: String(fonte.bairro_id || padrao.bairro_id || ''),
+      bairros_ids: Array.isArray(fonte.bairros_ids) ? [...fonte.bairros_ids] : [],
+      itens: normalizarItensComponente(fonte, padrao),
+    };
+    for (const campo of campos) {
+      if (Object.prototype.hasOwnProperty.call(valores, campo)) viatura[campo] = valores[campo];
+    }
+    viatura.padrao_operacional_id = padrao.id;
+    viatura.padrao_operacional_nome = padrao.nome || '';
+    viatura.padrao_operacional_categoria = categoriaDoPadrao(padrao);
+    viatura.padrao_operacional_versao = Number(padrao.versao) || 0;
+    viatura.padrao_operacional_publicado_em = padrao.publicado_em || null;
+    viatura.padrao_operacional_snapshot = semDiarias(copiarSnapshot(padrao._snapshot || padrao));
+    viatura.padrao_operacional_metadados = semDiarias(copiarSnapshot(padrao.metadados || {}));
+    viatura.componente_operacional_id = componente.id || componente.codigo || null;
+    reavaliarStatusEnvio(cartao);
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json(atualizado);
+  }
+
+  async function duplicarComponente(req, res) {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao || cartao.is_template && req.user.role !== 'P3') return res.status(404).json({ error: 'Cartão do dia não encontrado.' });
+    const origem = (cartao.viaturas || []).find((item) => item.id === req.params.vid);
+    if (!origem) return res.status(404).json({ error: 'Componente não encontrado no cartão.' });
+    const copia = copiarSnapshot(origem);
+    copia.id = generateId('cpv');
+    copia.indicativo = proximoIndicativo(cartao, { tipo: copia.padrao_operacional_categoria || copia.categoria });
+    copia.ordem = (cartao.viaturas || []).length;
+    copia.comandante = '';
+    copia.comandante_pessoal_id = '';
+    copia.comandante_exibicao = '';
+    Object.assign(copia, camposEnvioIniciais());
+    copia.itens = (copia.itens || []).map((item) => ({ ...item, id: generateId('cpi') }));
+    cartao.viaturas = [...(cartao.viaturas || []), copia];
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.status(201).json(atualizado);
+  }
+
+  async function reordenarComponentesCartao(req, res) {
+    const cartao = await buscarCartaoPorId(req.params.id);
+    if (!cartao || cartao.is_template && req.user.role !== 'P3') return res.status(404).json({ error: 'Cartão do dia não encontrado.' });
+    const ids = Array.isArray(req.body?.ids)
+      ? req.body.ids.map(String)
+      : (Array.isArray(req.body?.ordem) ? req.body.ordem.toSorted((a, b) => Number(a.ordem) - Number(b.ordem)).map((item) => String(item.id)) : []);
+    const porId = new Map((cartao.viaturas || []).map((item) => [String(item.id), item]));
+    cartao.viaturas = [...ids.map((id) => porId.get(id)).filter(Boolean), ...(cartao.viaturas || []).filter((item) => !ids.includes(String(item.id)))];
+    cartao.viaturas.forEach((item, indice) => { item.ordem = indice; });
+    const atualizado = await gravarCartaoSeAtual(req, res, cartao);
+    if (atualizado) res.json(atualizado);
+  }
+
+  router.put('/cartoes/:id/componentes/:vid/atualizar-padrao', exigirEdicaoCartao, asyncRoute(atualizarComponentePeloPadrao));
+  router.post('/cartoes/:id/componentes/:vid/atualizar-padrao', exigirEdicaoCartao, asyncRoute(atualizarComponentePeloPadrao));
+  router.put('/cartoes/:id/viaturas/:vid/atualizar-padrao', exigirEdicaoCartao, asyncRoute(atualizarComponentePeloPadrao));
+  router.post('/cartoes/:id/componentes/:vid/duplicar', exigirEdicaoCartao, asyncRoute(duplicarComponente));
+  router.post('/cartoes/:id/viaturas/:vid/duplicar', exigirEdicaoCartao, asyncRoute(duplicarComponente));
+  router.post('/cartoes/:id/componentes/reordenar', exigirEdicaoCartao, asyncRoute(reordenarComponentesCartao));
+  router.put('/cartoes/:id/componentes/reordenar', exigirEdicaoCartao, asyncRoute(reordenarComponentesCartao));
+  router.put('/cartoes/:id/componentes/ordem', exigirEdicaoCartao, asyncRoute(reordenarComponentesCartao));
+  router.post('/cartoes/:id/viaturas/reordenar', exigirEdicaoCartao, asyncRoute(reordenarComponentesCartao));
+  router.put('/cartoes/:id/viaturas/reordenar', exigirEdicaoCartao, asyncRoute(reordenarComponentesCartao));
+
   // Cartão de Operação: adiciona ao cartão do dia uma cópia profunda do modelo
   // publicado. A cópia fica independente; publicar mudanças no modelo depois
   // não altera retroativamente o serviço já preparado.
@@ -634,6 +871,10 @@ module.exports = function criarRouterCartoes({
       return res.status(201).json(novoTemplate);
     }
 
+    if (!req.user || !['P3', 'Adjunto'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Seu perfil não tem permissão para criar o Cartão Ordinário.' });
+    }
+
     const dataCartao = req.body.data;
     if (!dataCartao) {
       return res.status(400).json({ error: 'A data do Cartão Programa é obrigatória.' });
@@ -645,15 +886,16 @@ module.exports = function criarRouterCartoes({
       return res.status(409).json({ error: 'Já existe um Cartão Programa para esta data.' });
     }
 
-    // Todo dia nasce do único Modelo Ordinário ativo, sem regra por dia da semana.
-    const padrao = await buscarPadraoAtivo(dataCartao);
-    if (!padrao) {
-      return res.status(409).json({
-        error: 'Nenhum cartão padrão ativo. Peça ao P3 para definir o padrão antes de criar o cartão do dia.'
-      });
-    }
-
     const { ano, numero } = await proximoNumeroCartao(dataCartao);
+
+    // O cartão do dia é deliberadamente um documento vazio. Padrões
+    // operacionais são adicionados pelo operador, com snapshot explícito, e
+    // não existe dependência de template ativo para abrir o serviço. Templates
+    // legados continuam intactos e cartões históricos não são reescritos.
+    const qtdBaseInformada = req.body.qtd_viaturas_base === undefined ? 0 : Number(req.body.qtd_viaturas_base);
+    if (!Number.isInteger(qtdBaseInformada) || qtdBaseInformada < 0 || qtdBaseInformada > 20) {
+      return res.status(400).json({ error: 'A quantidade base deve ser um inteiro entre 0 e 20.' });
+    }
 
     const novoCartao = {
       id: generateId('cp'),
@@ -665,8 +907,8 @@ module.exports = function criarRouterCartoes({
       nome_template: null,
       tipo_modelo: null,
       tipo_periodo: null,
-      qtd_viaturas_base: padrao.qtd_viaturas_base,
-      origem_template_id: padrao.id,
+      qtd_viaturas_base: qtdBaseInformada,
+      origem_template_id: null,
       ano,
       numero,
       fiscal_pessoal_id: req.body.fiscal_pessoal_id || '',
@@ -675,28 +917,7 @@ module.exports = function criarRouterCartoes({
       adjunto_exibicao: '',
       delta07_viatura: req.body.delta07_viatura || '',
       padrao_ativo: false,
-      // Clone do padrão ativo: comandante e controle de envio nascem zerados (é um
-      // cartão novo, ainda não gerado nem mandado); bairro é estrutural e vem junto.
-      // Os avisos selecionados não vêm — a vigência pode ter mudado desde o padrão
-      // e são recalculados na data nova (camposEnvioIniciais já zera avisos_ids).
-      viaturas: (padrao.viaturas || []).map(v => ({
-        id: generateId('cpv'),
-        prefixo: v.prefixo,
-        setor: v.setor,
-        companhia: v.companhia || '',
-        categoria: v.categoria || 'Ordinária',
-        comandante: '',
-        observacao: v.observacao || '',
-        ...camposEnvioIniciais(),
-        bairro_id: v.bairro_id || '',
-        itens: ordenarPorTurno((v.itens || []).map(i => ({
-          id: generateId('cpi'),
-          inicio: i.inicio,
-          fim: i.fim,
-          local: i.local,
-          atividade: i.atividade
-        })))
-      }))
+      viaturas: []
     };
 
     await writeRow('cartoes', novoCartao);
