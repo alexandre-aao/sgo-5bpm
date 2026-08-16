@@ -1,5 +1,18 @@
 const express = require('express');
 
+// Menor privilégio: estes são os únicos campos de Operação enviados a quem
+// executa o turno sem administrar diárias. A lista é deliberadamente explícita.
+const CAMPOS_OPERACIONAIS = [
+  'id', 'nome_operacao', 'tipo_operacao', 'data_inicio', 'data_termino',
+  'horario_inicio', 'local_itinerario', 'bairro', 'endereco', 'num_oficio',
+  'num_os_manual', 'num_sei', 'demandante', 'situacao', 'tipo_recorrencia',
+  'grupo_recorrencia_id', 'evento_origem_id',
+];
+
+function selecionarCamposOperacionais(operacao) {
+  return Object.fromEntries(CAMPOS_OPERACIONAIS.map((campo) => [campo, operacao[campo]]));
+}
+
 module.exports = function criarRouterOperacoes({
   LIMITES_RECORRENCIA,
   asyncRoute,
@@ -29,8 +42,9 @@ module.exports = function criarRouterOperacoes({
   // não no evento. `operacoes` e `escalas` são de alta escrita concorrente -> writeRow/deleteRow.
   const TIPOS_OPERACAO = ['Ostensiva', 'Saturação', 'Cerco', 'Blitz', 'Cumprimento de Mandado', 'Reforço', 'Outras'];
 
-  router.get('/operacoes', exigirP3, asyncRoute(async (req, res) => {
-    res.json(await readTabela('operacoes'));
+  router.get('/operacoes', asyncRoute(async (req, res) => {
+    const operacoes = await readTabela('operacoes');
+    res.json(req.user?.role === 'P3' ? operacoes : operacoes.map(selecionarCamposOperacionais));
   }));
 
   // Schema de criação de operação, compartilhado por POST /api/operacoes (uma) e
@@ -404,3 +418,5 @@ module.exports = function criarRouterOperacoes({
 
   return router;
 };
+
+module.exports.selecionarCamposOperacionais = selecionarCamposOperacionais;

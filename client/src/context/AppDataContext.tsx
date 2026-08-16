@@ -37,8 +37,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [erro, setErro] = useState<string | null>(null);
 
   const recarregar = useCallback(async () => {
-    // operacoes/escalas exigem P3 no server (ver server.js) — nenhuma tela de
-    // Adjunto/Oficial usa esses dados, então nem pede (evita 403 a cada refresh).
+    // Operações são carregadas para todos os perfis: a API devolve a linha
+    // completa à P3 e uma projeção operacional sem dados de diárias aos demais.
+    // Escalas continuam exclusivas da P3.
     const ehP3 = usuario?.role === 'P3';
 
     setAtualizando(true);
@@ -48,7 +49,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // sem travar a primeira pintura.
       const [eventosResp, operacoesResp, alocacoesResp, escalasResp, configResp, tiposEventoResp] = await Promise.all([
         buscarJson<unknown>('/api/eventos'),
-        ehP3 ? buscarJson<unknown>('/api/operacoes') : Promise.resolve([]),
+        buscarJson<unknown>('/api/operacoes'),
         buscarJson<unknown>('/api/alocacoes'),
         ehP3 ? buscarJson<unknown>('/api/escalas') : Promise.resolve([]),
         buscarJson<unknown>('/api/config'),

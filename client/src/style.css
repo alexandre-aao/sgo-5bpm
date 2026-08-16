@@ -2612,6 +2612,28 @@ body.sgo-sincronizando .topbar::before {
   margin-bottom: var(--space-1);
 }
 
+.turno-linha-badges {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.badge.turno-badge-origem {
+  background: transparent;
+  border: 1px solid currentColor;
+  letter-spacing: 0.04em;
+}
+
+.badge.turno-badge-evento { color: var(--badge-evento-1); }
+.badge.turno-badge-operacao { color: var(--info); }
+
+@media (max-width: 560px) {
+  .turno-linha { align-items: flex-start; gap: var(--space-2); padding-inline: var(--space-3); }
+  .turno-linha-hora { width: 46px; }
+  .turno-linha-fim { max-width: 42%; }
+  .turno-linha-badges { flex-wrap: wrap; }
+}
+
 /* Equipe de serviço (trilho) */
 .turno-equipe {
   display: flex;

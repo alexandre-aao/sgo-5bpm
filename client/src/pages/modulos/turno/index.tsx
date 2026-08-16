@@ -3,12 +3,14 @@ import { Calendar, Car, Users, AlertTriangle, Route } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAppData } from '../../../context/useAppData';
 import { useCartaoPorData } from '../../../hooks/useCartaoPorData';
-import { EventosDoDia } from './EventosDoDia';
+import { AtividadesDoDia, type AtividadeDoTurno } from './EventosDoDia';
 import { ViaturasDoTurno } from './ViaturasDoTurno';
 import { EquipeDeServico } from './EquipeDeServico';
 import { AvisosDoTurno } from './AvisosDoTurno';
 import { calcularAvisosDoTurno } from './avisos';
 import { DrawerEvento } from '../eventos/DrawerEvento';
+import { DrawerOperacaoTurno } from './DrawerOperacaoTurno';
+import { ocorreNaData } from '../../../lib/periodo';
 
 const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
@@ -33,6 +35,7 @@ export default function TurnoPage() {
   const { dados, recarregar: recarregarAppData } = useAppData();
   const [diaSelecionado, setDiaSelecionado] = useState<'hoje' | 'amanha'>('hoje');
   const [eventoAbertoId, setEventoAbertoId] = useState<string | null>(null);
+  const [operacaoAbertaId, setOperacaoAbertaId] = useState<string | null>(null);
 
   const hoje = new Date();
   const amanha = new Date(hoje);
@@ -43,17 +46,37 @@ export default function TurnoPage() {
 
   const { cartao, carregando: carregandoCartao } = useCartaoPorData(dataStr);
 
-  const eventosDoDia = dados.eventos
-    .filter((e) => e.data_inicio === dataStr)
-    .sort((a, b) => (a.horario_inicio || '').localeCompare(b.horario_inicio || ''));
+  const operacoesDoDia = dados.operacoes.filter((op) => ocorreNaData(op.data_inicio, op.data_termino, dataStr));
+  const idsOperacoes = new Set(dados.operacoes.map((op) => op.id));
+  const idsEventosConvertidos = new Set(dados.operacoes.map((op) => op.evento_origem_id).filter(Boolean));
+  const eventosDoDia = dados.eventos.filter((evento) =>
+    ocorreNaData(evento.data_inicio, evento.data_termino, dataStr) &&
+    !(evento.operacao_gerada_id && idsOperacoes.has(evento.operacao_gerada_id)) &&
+    !idsEventosConvertidos.has(evento.id),
+  );
+  const atividadesDoDia: AtividadeDoTurno[] = [
+    ...eventosDoDia.map((item) => ({ origem: 'evento' as const, item })),
+    ...operacoesDoDia.map((item) => ({ origem: 'operacao' as const, item })),
+  ].sort((a, b) => (a.item.horario_inicio || '').localeCompare(b.item.horario_inicio || ''));
 
-  const totalEfetivo = eventosDoDia.reduce(
-    (soma, evt) => soma + dados.alocacoes.filter((a) => a.evento_id === evt.id).reduce((s, a) => s + (a.qtd_policiais || 0), 0),
+  const totalEfetivo = atividadesDoDia.reduce(
+    (soma, atividade) => soma + dados.alocacoes
+      .filter((alocacao) => atividade.origem === 'evento'
+        ? alocacao.evento_id === atividade.item.id
+        : alocacao.operacao_id === atividade.item.id)
+      .reduce((subtotal, alocacao) => subtotal + (alocacao.qtd_policiais || 0), 0),
     0,
   );
 
   const viaturas = cartao?.viaturas || [];
-  const avisos = calcularAvisosDoTurno(cartao, eventosDoDia, dados.pessoal);
+  const avisos = calcularAvisosDoTurno(cartao, atividadesDoDia.map((atividade) => ({
+    nome: atividade.origem === 'evento' ? atividade.item.nome_evento : atividade.item.nome_operacao,
+    num_os_manual: atividade.item.num_os_manual,
+    num_sei: atividade.item.num_sei,
+  })), dados.pessoal);
+  const operacaoAberta = operacaoAbertaId
+    ? dados.operacoes.find((operacao) => operacao.id === operacaoAbertaId) || null
+    : null;
 
   const textoStatusCartao = carregandoCartao ? 'Verificando cartão...' : cartao ? 'Cartão Programa lançado' : 'Cartão Programa não lançado';
   const classePill = carregandoCartao ? '' : cartao ? ' status-pill-ok' : ' status-pill-pendente';
@@ -89,8 +112,8 @@ export default function TurnoPage() {
         <div className="kpi-card kpi-card-horizontal">
           <span className="kpi-icone fundo-primary tom-primary"><Calendar /></span>
           <div>
-            <div className="kpi-valor">{eventosDoDia.length}</div>
-            <div className="kpi-label-sob">Eventos do dia</div>
+            <div className="kpi-valor">{atividadesDoDia.length}</div>
+            <div className="kpi-label-sob">Atividades do dia</div>
           </div>
         </div>
         <div className="kpi-card kpi-card-horizontal">
@@ -120,9 +143,9 @@ export default function TurnoPage() {
 
       <div className="dash-layout">
         <div className="dash-main">
-          <EventosDoDia
-            eventos={eventosDoDia} alocacoes={dados.alocacoes} dataBr={dataBr} diaLabel={DIAS[alvo.getDay()]}
-            onAbrir={setEventoAbertoId}
+          <AtividadesDoDia
+            atividades={atividadesDoDia} alocacoes={dados.alocacoes} dataBr={dataBr} diaLabel={DIAS[alvo.getDay()]}
+            onAbrirEvento={setEventoAbertoId} onAbrirOperacao={setOperacaoAbertaId}
           />
           <ViaturasDoTurno viaturas={viaturas} />
         </div>
@@ -138,6 +161,9 @@ export default function TurnoPage() {
           onFechar={() => setEventoAbertoId(null)}
           onAlterado={() => void recarregarAppData()}
         />
+      )}
+      {operacaoAberta && (
+        <DrawerOperacaoTurno operacao={operacaoAberta} onFechar={() => setOperacaoAbertaId(null)} />
       )}
     </>
   );

@@ -1,5 +1,6 @@
 import type { Tables } from '../../../types/supabase';
 import { normalizarTexto } from '../../../lib/cartaoConflitos';
+import { periodosSeSobrepoem } from '../../../lib/periodo';
 
 export interface OperacaoComResumo extends Tables<'operacoes'> {
   militares_escalados: number;
@@ -38,8 +39,11 @@ export function getOperacoesFiltradas(
   });
 
   if (filtros.situacao) lista = lista.filter((op) => op.situacao === filtros.situacao);
-  if (filtros.dataInicio) lista = lista.filter((op) => op.data_inicio >= filtros.dataInicio);
-  if (filtros.dataFim) lista = lista.filter((op) => op.data_inicio <= filtros.dataFim);
+  if (filtros.dataInicio || filtros.dataFim) {
+    const inicioFiltro = filtros.dataInicio || '0000-01-01';
+    const fimFiltro = filtros.dataFim || '9999-12-31';
+    lista = lista.filter((op) => periodosSeSobrepoem(op.data_inicio, op.data_termino, inicioFiltro, fimFiltro));
+  }
   if (filtros.busca) {
     const termo = normalizarTexto(filtros.busca);
     lista = lista.filter((op) =>
