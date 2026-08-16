@@ -50,6 +50,7 @@ const criarRouterViaturas = require('./routes/viaturas');
 const criarRouterAuditoria = require('./routes/auditoria');
 const criarRouterTiposEvento = require('./routes/tipos-evento');
 const { criarRouterGruposModelo } = require('./routes/grupos-modelo');
+const criarRouterAlteracoesServico = require('./routes/alteracoes-servico');
 
 const app = express();
 // Na Vercel (e atrás de qualquer proxy reverso) o IP real do cliente chega em X-Forwarded-For;
@@ -394,6 +395,7 @@ async function autenticar(req, res, next) {
       usuario: sessao.usuario,
       role: sessao.role,
       nome: sessao.nome,
+      unidade: sessao.unidade || null,
       exigir_troca_senha: !!sessao.exigir_troca_senha,
     };
     next();
@@ -430,7 +432,7 @@ function exigirSenhaAtualizada(req, res, next) {
 // Cartões com is_template=true exigem uma checagem adicional, feita dentro de
 // cada handler depois de carregar o cartão (aqui ainda não se sabe qual é).
 function exigirEdicaoCartao(req, res, next) {
-  if (!req.user || req.user.role === 'Oficial') {
+  if (!req.user || !['P3', 'Adjunto'].includes(req.user.role)) {
     return res.status(403).json({ error: 'Seu perfil não tem permissão para editar o Cartão Programa.' });
   }
   next();
@@ -471,6 +473,27 @@ app.use('/api', criarRouterAutenticacaoProtegida({
 }));
 
 app.use('/api', exigirSenhaAtualizada);
+
+// Um Sargenteante só usa o módulo da própria unidade e consulta o cadastro de
+// policiais para selecionar nomes. Esta barreira vem antes de todos os routers
+// antigos: adulterar a URL não libera Eventos, Operações, Cartões ou áreas P3.
+function restringirSargenteante(req, res, next) {
+  if (req.user?.role !== 'Sargenteante') return next();
+  const caminho = req.path;
+  const permitido = caminho === '/pessoal' && req.method === 'GET'
+    || caminho.startsWith('/alteracoes-servico')
+    || caminho.startsWith('/composicoes-servico');
+  if (!permitido) return res.status(403).json({ error: 'Este recurso não está disponível para o perfil Sargenteante.' });
+  next();
+}
+app.use('/api', restringirSargenteante);
+
+app.use('/api', criarRouterAlteracoesServico({
+  asyncRoute,
+  generateId,
+  supabase,
+  registrarAuditoria: (dados) => registrarAuditoria({ supabase, generateId, ...dados }),
+}));
 
 app.use('/api', criarRouterAuditoria({
   asyncRoute,

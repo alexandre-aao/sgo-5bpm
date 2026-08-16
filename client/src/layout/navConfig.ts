@@ -16,6 +16,7 @@ import {
   Printer,
   Menu,
   History,
+  RefreshCcw,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '../types/auth';
@@ -35,7 +36,8 @@ export type SectionId =
   | 'viaturas'
   | 'avisos'
   | 'impressao'
-  | 'historico';
+  | 'historico'
+  | 'alteracoes';
 
 export interface NavItem {
   id: SectionId;
@@ -64,6 +66,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'dashboard', label: 'Início', icon: LayoutDashboard, roles: ['P3'] },
       { id: 'turno', label: 'Meu Turno', icon: UserCheck, roles: ['P3', 'Adjunto', 'Oficial'] },
+      { id: 'alteracoes', label: 'Alterações do Serviço', icon: RefreshCcw, roles: ['P3', 'Adjunto', 'Oficial', 'Sargenteante'] },
     ],
   },
   {
@@ -125,11 +128,14 @@ export const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string
   avisos: { title: 'Alertas', subtitle: 'Orientações da P3 por bairro e Companhia, que entram no Cartão Programa das viaturas.' },
   impressao: { title: 'Central de Emissão', subtitle: 'Saídas oficiais do Cartão Programa, num lugar só.' },
   historico: { title: 'Histórico de Atividades', subtitle: 'Quem fez o quê no SGO nos últimos 30 dias.' },
+  alteracoes: { title: 'Alterações do Serviço', subtitle: 'Composição informada pelas unidades e situação projetada do efetivo.' },
 };
 
 /** Tela inicial por perfil — regra 7 do MIGRACAO.md. */
 export function secaoInicialDoPerfil(role: Role): SectionId {
-  return role === 'P3' ? 'dashboard' : 'turno';
+  if (role === 'P3') return 'dashboard';
+  if (role === 'Sargenteante') return 'alteracoes';
+  return 'turno';
 }
 
 interface BottomTabItem {
@@ -151,6 +157,10 @@ export const BOTTOM_TABS_OPERACIONAL: BottomTabItem[] = [
   { id: 'cartao', label: 'Cartão', icon: ClipboardList },
   { id: 'eventos', label: 'Eventos', icon: Calendar },
   { id: 'mapa', label: 'Mapa', icon: Map },
+];
+
+export const BOTTOM_TABS_SARGENTEANTE: BottomTabItem[] = [
+  { id: 'alteracoes', label: 'Alterações', icon: RefreshCcw },
 ];
 
 export const MAIS_ICON = Menu;

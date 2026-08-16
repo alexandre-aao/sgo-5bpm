@@ -9,6 +9,7 @@ export interface UsuarioPublico {
   role: string;
   ativo?: boolean;
   exigir_troca_senha?: boolean;
+  unidade?: string | null;
 }
 
 export interface NovoUsuarioPayload {
@@ -17,12 +18,14 @@ export interface NovoUsuarioPayload {
   role: string;
   senha: string;
   exigir_troca_senha?: boolean;
+  unidade?: string | null;
 }
 
 export interface EditarUsuarioPayload {
   nome: string;
   role: string;
   ativo: boolean;
+  unidade?: string | null;
 }
 
 async function extrairErro(res: Response, padrao: string): Promise<string> {

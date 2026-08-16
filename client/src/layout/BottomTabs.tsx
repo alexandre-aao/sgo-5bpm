@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
-import { BOTTOM_TABS_P3, BOTTOM_TABS_OPERACIONAL, MAIS_ICON } from './navConfig';
+import { BOTTOM_TABS_P3, BOTTOM_TABS_OPERACIONAL, BOTTOM_TABS_SARGENTEANTE, MAIS_ICON } from './navConfig';
 
 interface BottomTabsProps {
   onAbrirDrawer: () => void;
@@ -14,7 +14,9 @@ export function BottomTabs({ onAbrirDrawer }: BottomTabsProps) {
   const { usuario } = useAuth();
   if (!usuario) return null;
 
-  const itens = usuario.role === 'P3' ? BOTTOM_TABS_P3 : BOTTOM_TABS_OPERACIONAL;
+  const itens = usuario.role === 'P3'
+    ? BOTTOM_TABS_P3
+    : usuario.role === 'Sargenteante' ? BOTTOM_TABS_SARGENTEANTE : BOTTOM_TABS_OPERACIONAL;
 
   return (
     <nav className="bottom-tabs" id="bottom-tabs">

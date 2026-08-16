@@ -54,7 +54,7 @@ export function TabelaUsuarios({ usuarios, onEditar, onResetarSenha, onExcluir }
                 {/* O login é a identidade da conta — é ele que titula o card. */}
                 <td className="card-title-cell">{u.usuario}</td>
                 <td data-label="Nome">{u.nome}</td>
-                <td data-label="Perfil"><span className={`badge perfil-${u.role.toLowerCase()}`}>{u.role}</span>{u.ativo === false && <span className="badge status-inativa">Inativo</span>}{u.exigir_troca_senha && <span className="badge status-pendente">Troca pendente</span>}</td>
+                <td data-label="Perfil"><span className={`badge perfil-${u.role.toLowerCase()}`}>{u.role}</span>{u.unidade && <span className="badge">{u.unidade}</span>}{u.ativo === false && <span className="badge status-inativa">Inativo</span>}{u.exigir_troca_senha && <span className="badge status-pendente">Troca pendente</span>}</td>
                 {/* Editar fica no botão direto; resetar senha e excluir são
                     pouco frequentes e vão pro menu (Etapa 1, item 2). */}
                 <td className="text-right">

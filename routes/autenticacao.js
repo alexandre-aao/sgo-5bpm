@@ -68,6 +68,7 @@ router.post('/login', loginRateLimiter, asyncRoute(async (req, res) => {
     usuario: user.usuario,
     role: user.role,
     nome: user.nome,
+    unidade: user.unidade || null,
     expira,
     exigir_troca_senha: !!user.exigir_troca_senha,
   });
@@ -80,7 +81,7 @@ router.post('/login', loginRateLimiter, asyncRoute(async (req, res) => {
   // `token` continua no corpo durante a transição: o cliente antigo (que guarda
   // em localStorage e manda Bearer) segue funcionando até todo mundo ter
   // recarregado a página com o build novo. Remover depois disso.
-  res.json({ usuario: user.usuario, role: user.role, nome: user.nome, ativo: true, exigir_troca_senha: !!user.exigir_troca_senha, token, expira });
+  res.json({ usuario: user.usuario, role: user.role, nome: user.nome, unidade: user.unidade || null, ativo: true, exigir_troca_senha: !!user.exigir_troca_senha, token, expira });
 }));
 
 // Entrega o PDF já montado pela Central de Emissão como uma resposta HTTP real.

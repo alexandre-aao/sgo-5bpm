@@ -17,6 +17,7 @@ export function ModalUsuario({ usuario, onFechar, onSalvar }: ModalUsuarioProps)
   const [login, setLogin] = useState(usuario?.usuario ?? '');
   const [nome, setNome] = useState(usuario?.nome ?? '');
   const [role, setRole] = useState(usuario?.role ?? 'P3');
+  const [unidade, setUnidade] = useState(usuario?.unidade ?? '');
   const [ativo, setAtivo] = useState(usuario?.ativo !== false);
   const [senha, setSenha] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -24,8 +25,8 @@ export function ModalUsuario({ usuario, onFechar, onSalvar }: ModalUsuarioProps)
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const payload: NovoUsuarioPayload | EditarUsuarioPayload = modoEdicao
-      ? { nome: nome.trim(), role, ativo }
-      : { usuario: login.trim(), nome: nome.trim(), role, senha };
+      ? { nome: nome.trim(), role, ativo, unidade: role === 'Sargenteante' ? unidade : null }
+      : { usuario: login.trim(), nome: nome.trim(), role, senha, unidade: role === 'Sargenteante' ? unidade : null };
 
     setEnviando(true);
     const resultado = await onSalvar(payload);
@@ -66,8 +67,21 @@ export function ModalUsuario({ usuario, onFechar, onSalvar }: ModalUsuarioProps)
               <option value="P3">P3 (Administrador)</option>
               <option value="Adjunto">Adjunto</option>
               <option value="Oficial">Oficial</option>
+              <option value="Sargenteante">Sargenteante</option>
             </select>
           </div>
+          {role === 'Sargenteante' && (
+            <div className="form-group">
+              <label htmlFor="usr-unidade">Unidade vinculada</label>
+              <select id="usr-unidade" required value={unidade} onChange={(e) => setUnidade(e.target.value)}>
+                <option value="">Selecione</option>
+                <option value="1ª Companhia">1ª CIA</option>
+                <option value="2ª Companhia">2ª CIA</option>
+                <option value="3ª Companhia">3ª CIA</option>
+                <option value="PCS">PCS</option>
+              </select>
+            </div>
+          )}
           {modoEdicao && (
             <label className="checkbox-inline">
               <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />

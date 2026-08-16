@@ -564,6 +564,7 @@ export type Database = {
           role: string
           token: string
           usuario: string
+          unidade: string | null
         }
         Insert: {
           exigir_troca_senha?: boolean
@@ -572,6 +573,7 @@ export type Database = {
           role: string
           token: string
           usuario: string
+          unidade?: string | null
         }
         Update: {
           exigir_troca_senha?: boolean
@@ -580,6 +582,7 @@ export type Database = {
           role?: string
           token?: string
           usuario?: string
+          unidade?: string | null
         }
         Relationships: []
       }
@@ -591,6 +594,7 @@ export type Database = {
           role: string
           senha: string
           usuario: string
+          unidade: string | null
         }
         Insert: {
           ativo?: boolean
@@ -599,6 +603,7 @@ export type Database = {
           role: string
           senha: string
           usuario: string
+          unidade?: string | null
         }
         Update: {
           ativo?: boolean
@@ -607,6 +612,7 @@ export type Database = {
           role?: string
           senha?: string
           usuario?: string
+          unidade?: string | null
         }
         Relationships: []
       }

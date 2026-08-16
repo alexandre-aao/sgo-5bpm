@@ -151,11 +151,13 @@ create index if not exists idx_escalas_operacao_data on escalas(operacao_id, dat
 create table if not exists usuarios (
   usuario text primary key,
   senha text not null,
-  role text not null check (role in ('P3', 'Adjunto', 'Oficial')),
-  nome text not null
+  role text not null check (role in ('P3', 'Adjunto', 'Oficial', 'Sargenteante')),
+  nome text not null,
+  unidade text
 );
 alter table usuarios add column if not exists exigir_troca_senha boolean not null default false;
 alter table usuarios add column if not exists ativo boolean not null default true;
+alter table usuarios add column if not exists unidade text;
 
 create table if not exists sessoes (
   token text primary key,
@@ -163,9 +165,11 @@ create table if not exists sessoes (
   role text not null,
   nome text not null,
   expira bigint not null,
+  unidade text,
   exigir_troca_senha boolean not null default false
 );
 alter table sessoes add column if not exists exigir_troca_senha boolean not null default false;
+alter table sessoes add column if not exists unidade text;
 
 -- Log operacional curto (30 dias). Nunca recebe senha, hash, token ou segredo.
 create table if not exists auditoria (
@@ -686,3 +690,47 @@ alter table if exists tipos_evento        enable row level security;
 alter table if exists auditoria           enable row level security;
 alter table if exists cartao_padrao_versoes enable row level security;
 alter table if exists cartao_grupos_modelo  enable row level security;
+
+-- =================================================================
+-- ALTERAÇÕES DO SERVIÇO — projeção fornecida pelas Sargenteações.
+-- A migration versionada com constraints, índices e grants completos é
+-- migrations/016_alteracoes_servico.sql.
+-- =================================================================
+create table if not exists composicoes_servico (
+  id text primary key, unidade text not null, data date not null, turno text not null,
+  qtd_viaturas_previstas integer not null, policiais_por_viatura integer not null,
+  qtd_extras integer not null default 0, observacao text,
+  criado_por text not null references usuarios(usuario), criado_em timestamptz not null default now(),
+  atualizado_por text not null references usuarios(usuario), atualizado_em timestamptz not null default now(),
+  unique (unidade, data, turno)
+);
+create table if not exists alteracoes_servico (
+  id text primary key, unidade text not null, data_inicio date not null, data_fim date not null,
+  turno text not null, policial_pessoal_id text not null references pessoal(id),
+  policial_nome text not null, policial_matricula text, tipo text not null,
+  substituto_pessoal_id text references pessoal(id), substituto_nome text, substituto_matricula text,
+  data_referencia_servico date, motivo text not null, observacoes text, numero_documento text,
+  situacao text not null default 'INFORMADA', criado_por text not null references usuarios(usuario),
+  criado_em timestamptz not null default now(), atualizado_por text not null references usuarios(usuario),
+  atualizado_em timestamptz not null default now(), check (data_fim >= data_inicio)
+);
+create table if not exists alteracoes_servico_ciencias (
+  id text primary key, alteracao_id text not null references alteracoes_servico(id) on delete restrict,
+  usuario text not null references usuarios(usuario), usuario_nome text not null,
+  criado_em timestamptz not null default now(), unique (alteracao_id, usuario)
+);
+create table if not exists alteracoes_servico_divergencias (
+  id text primary key, alteracao_id text not null references alteracoes_servico(id) on delete restrict,
+  descricao text not null, criado_por text not null references usuarios(usuario),
+  criado_por_nome text not null, criado_em timestamptz not null default now()
+);
+create table if not exists alteracoes_servico_historico (
+  id text primary key, alteracao_id text not null references alteracoes_servico(id) on delete restrict,
+  acao text not null, usuario text not null references usuarios(usuario), usuario_nome text not null,
+  criado_em timestamptz not null default now(), valores_anteriores jsonb, valores_novos jsonb
+);
+alter table if exists composicoes_servico enable row level security;
+alter table if exists alteracoes_servico enable row level security;
+alter table if exists alteracoes_servico_ciencias enable row level security;
+alter table if exists alteracoes_servico_divergencias enable row level security;
+alter table if exists alteracoes_servico_historico enable row level security;

@@ -22,6 +22,7 @@ const paginas = {
   avisos: lazy(() => import('../pages/modulos/avisos')),
   impressao: lazy(() => import('../pages/modulos/impressao')),
   historico: lazy(() => import('../pages/modulos/historico')),
+  alteracoes: lazy(() => import('../pages/modulos/alteracoes')),
 } as const;
 
 export function AppRoutes() {

@@ -11,6 +11,7 @@ import { calcularAvisosDoTurno } from './avisos';
 import { DrawerEvento } from '../eventos/DrawerEvento';
 import { DrawerOperacaoTurno } from './DrawerOperacaoTurno';
 import { ocorreNaData } from '../../../lib/periodo';
+import { AlteracoesEfetivo } from './AlteracoesEfetivo';
 
 const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
@@ -140,6 +141,8 @@ export default function TurnoPage() {
           </div>
         </div>
       </div>
+
+      <AlteracoesEfetivo data={dataStr} />
 
       <div className="dash-layout">
         <div className="dash-main">

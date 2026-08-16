@@ -44,6 +44,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     setAtualizando(true);
     try {
+      if (usuario?.role === 'Sargenteante') {
+        const pessoalResp = await buscarJson<unknown>('/api/pessoal');
+        setDados({ ...DADOS_VAZIOS, pessoal: usarLista(pessoalResp, []) });
+        setCarregandoNucleo(false);
+        setCarregandoSecundario(false);
+        setAtualizadoEm(new Date());
+        setErro(null);
+        return;
+      }
       // 1ª onda (núcleo): mesmo recorte de fetchData() no app antigo — eventos,
       // operações, alocações, escalas, config. pessoal/viaturas ficam pra 2ª onda,
       // sem travar a primeira pintura.

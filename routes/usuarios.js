@@ -5,6 +5,7 @@ function usuarioPublico(usuario) {
     usuario: usuario.usuario,
     nome: usuario.nome,
     role: usuario.role,
+    unidade: usuario.unidade || null,
     ativo: usuario.ativo !== false,
     exigir_troca_senha: !!usuario.exigir_troca_senha,
   };
@@ -32,7 +33,7 @@ function criarRouterUsuarios({
     const v = validarCampos(req.body, {
       usuario: { obrigatorio: true, tipo: 'string', max: 60, label: 'Usuário' },
       nome: { obrigatorio: true, tipo: 'string', max: 150, label: 'Nome de Exibição' },
-      role: { obrigatorio: true, tipo: 'string', valores: ['P3', 'Adjunto', 'Oficial'], label: 'Perfil' }
+      role: { obrigatorio: true, tipo: 'string', valores: ['P3', 'Adjunto', 'Oficial', 'Sargenteante'], label: 'Perfil' }
     });
     if (!v.ok) return res.status(400).json({ error: v.erro });
     const senha = req.body.senha;
@@ -48,11 +49,20 @@ function criarRouterUsuarios({
       return res.status(409).json({ error: 'Já existe um usuário com esse login.' });
     }
 
+    const unidades = ['1ª Companhia', '2ª Companhia', '3ª Companhia', 'PCS'];
+    const unidade = req.body.unidade ? String(req.body.unidade).trim() : null;
+    if (v.valores.role === 'Sargenteante' && !unidades.includes(unidade)) {
+      return res.status(400).json({ error: 'O Sargenteante deve estar vinculado a uma unidade válida.' });
+    }
+    if (v.valores.role !== 'Sargenteante' && unidade) {
+      return res.status(400).json({ error: 'Somente o perfil Sargenteante pode possuir unidade vinculada.' });
+    }
     const novoUsuario = {
       usuario: v.valores.usuario,
       senha: hashSenha(senha),
       nome: v.valores.nome,
       role: v.valores.role,
+      unidade: v.valores.role === 'Sargenteante' ? unidade : null,
       ativo: true,
       exigir_troca_senha: !!req.body.exigir_troca_senha,
     };
@@ -69,11 +79,19 @@ function criarRouterUsuarios({
     const atualizado = { ...alvo };
 
     if (req.body.role !== undefined) {
-      if (!['P3', 'Adjunto', 'Oficial'].includes(req.body.role)) {
+      if (!['P3', 'Adjunto', 'Oficial', 'Sargenteante'].includes(req.body.role)) {
         return res.status(400).json({ error: 'Perfil inválido.' });
       }
       atualizado.role = req.body.role;
     }
+
+    const roleFinal = atualizado.role;
+    const unidades = ['1ª Companhia', '2ª Companhia', '3ª Companhia', 'PCS'];
+    const unidadeRecebida = req.body.unidade !== undefined ? (String(req.body.unidade || '').trim() || null) : atualizado.unidade;
+    if (roleFinal === 'Sargenteante' && !unidades.includes(unidadeRecebida)) {
+      return res.status(400).json({ error: 'O Sargenteante deve estar vinculado a uma unidade válida.' });
+    }
+    atualizado.unidade = roleFinal === 'Sargenteante' ? unidadeRecebida : null;
 
     if (req.body.nome !== undefined) {
       const nome = String(req.body.nome).trim();
@@ -96,7 +114,7 @@ function criarRouterUsuarios({
     // requisição. Portanto, uma mudança de papel ou desativação precisa revogar
     // os tokens antes de confirmar a conta; caso contrário o acesso antigo
     // continuaria válido por até 12 horas.
-    const deveRevogarSessoes = atualizado.role !== antes.role
+    const deveRevogarSessoes = atualizado.role !== antes.role || atualizado.unidade !== antes.unidade
       || (antes.ativo !== false && atualizado.ativo === false);
     if (deveRevogarSessoes) {
       const { error: erroSessoes } = await supabase.from('sessoes').delete().eq('usuario', atualizado.usuario);
@@ -104,7 +122,7 @@ function criarRouterUsuarios({
     }
 
     await writeRow('usuarios', atualizado);
-    await registrarAuditoria({ req, acao: atualizado.ativo === false ? 'desativou' : 'alterou', entidade: 'Usuário', entidadeId: atualizado.usuario, descricao: `Atualizou o usuário “${atualizado.usuario}”.`, campos: ['nome', 'role', 'ativo'], antes, depois: atualizado });
+    await registrarAuditoria({ req, acao: atualizado.ativo === false ? 'desativou' : 'alterou', entidade: 'Usuário', entidadeId: atualizado.usuario, descricao: `Atualizou o usuário “${atualizado.usuario}”.`, campos: ['nome', 'role', 'unidade', 'ativo'], antes, depois: atualizado });
     res.json(usuarioPublico(atualizado));
   }));
 

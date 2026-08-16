@@ -99,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Persistir aqui recolocaria em localStorage exatamente o que a Fase 4 tirou.
     const semToken: Usuario = {
       usuario: dados.usuario, role: dados.role, nome: dados.nome, expira: dados.expira,
+      unidade: dados.unidade || null,
       ativo: dados.ativo !== false, exigir_troca_senha: !!dados.exigir_troca_senha,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(semToken));
