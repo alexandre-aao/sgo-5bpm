@@ -14,6 +14,7 @@ import {
   ClipboardList,
   Megaphone,
   Printer,
+  FilePlus2,
   Menu,
   History,
   RefreshCcw,
@@ -74,6 +75,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Planejamento',
     items: [
+      { id: 'cadastro', label: 'Novo Evento', icon: FilePlus2, roles: ['P3'] },
       { id: 'eventos', label: 'Eventos', icon: CalendarRange, roles: ['P3', 'Adjunto', 'Oficial'] },
       { id: 'operacoes', label: 'Operações', icon: ShieldAlert, roles: ['P3'] },
       { id: 'cartao', label: 'Cartão Ordinário', icon: Route, roles: ['P3', 'Adjunto', 'Oficial'] },
