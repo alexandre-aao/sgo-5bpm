@@ -79,7 +79,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { id: 'eventos', label: 'Eventos', icon: CalendarRange, roles: ['P3', 'Adjunto', 'Oficial'] },
       { id: 'operacoes', label: 'Operações', icon: ShieldAlert, roles: ['P3'] },
       { id: 'cartao', label: 'Cartão Ordinário', icon: Route, roles: ['P3', 'Adjunto', 'Oficial'] },
-      { id: 'padroes', label: 'Padrões Operacionais', icon: GitBranch, roles: ['P3'] },
+      { id: 'padroes', label: 'Cartões Programa Padrão', icon: GitBranch, roles: ['P3'] },
       // Alertas (id/tabela seguem "avisos" — só o rótulo mudou): só a P3 cria e
       // edita, mas todos veem — o Adjunto precisa consultar para selecionar no
       // cartão, e o Oficial para saber o que foi orientado ao turno. Fica só no
@@ -127,7 +127,7 @@ export const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string
   operacoes: { title: 'Operações (Diárias)', subtitle: 'Operações planejadas e executadas, com efetivo escalado e diárias.' },
   planejador: { title: 'Planejador Mensal de Diárias', subtitle: 'Controle da cota mensal e distribuição de diárias operacionais por operação.' },
   cartao: { title: 'Cartão Ordinário', subtitle: 'Roteiro diário de patrulhamento das viaturas: locais, horários e atividades.' },
-  padroes: { title: 'Padrões Operacionais', subtitle: 'Biblioteca de modelos usados para montar o Cartão Ordinário.' },
+  padroes: { title: 'Cartões Programa Padrão', subtitle: 'Biblioteca de modelos usados para montar o Cartão Ordinário.' },
   usuarios: { title: 'Usuários do Sistema', subtitle: 'Gestão de perfis de acesso e redefinição de senhas.' },
   pessoal: { title: 'Cadastro de Pessoal', subtitle: 'Adjuntos, Fiscais de Operações, Oficiais de Operações e Oficiais de Sobreaviso.' },
   viaturas: { title: 'Cadastro de Viaturas', subtitle: 'Registro central de viaturas, usado para sugerir o prefixo no Cartão Programa.' },

@@ -800,6 +800,130 @@ module.exports = function criarRouterCartoes({
     res.status(201).json(novoPadrao);
   }));
 
+  // Transforma um cartão de serviço em um padrão operacional da biblioteca
+  // atual. A cópia fica em `cartao_grupos_modelo`; nenhum cartão do dia é
+  // atualizado e os itens recebem ids próprios para deixar explícita a
+  // independência entre o histórico e o novo padrão.
+  router.post('/cartoes/:id/salvar-como-padrao-operacional', exigirP3, asyncRoute(async (req, res) => {
+    const origem = await buscarCartaoPorId(req.params.id);
+    if (!origem || origem.is_template) {
+      return res.status(400).json({ error: 'Selecione um Cartão Programa de serviço, não um padrão.' });
+    }
+
+    const separarPorBairro = req.body?.separar_por_bairro === true;
+    const nome = String(req.body?.nome || '').trim().slice(0, 120);
+    if (!nome && !separarPorBairro) return res.status(400).json({ error: 'Informe o nome do novo padrão.' });
+
+    const bairros = Array.isArray(req.body?.bairros)
+      ? [...new Set(req.body.bairros.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean))].slice(0, 30)
+      : [];
+    const categoria = String(req.body?.categoria || 'bairro').trim().slice(0, 80) || 'bairro';
+    const descricao = String(req.body?.descricao || '').trim().slice(0, 500);
+    const bairrosNormalizados = bairros.map((bairro) => ({
+      nome: bairro,
+      busca: String(bairro).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
+    }));
+
+    function componenteCopiado(viatura, indice, setor = null) {
+      return {
+        id: generateId('pcomp'),
+        prefixo: String(viatura.prefixo || `VTR ${indice + 1}`),
+        setor: String(setor || viatura.setor || ''),
+        companhia: String(viatura.companhia || ''),
+        categoria: String(viatura.categoria || 'Ordinária'),
+        observacao: String(viatura.observacao || ''),
+        bairro_id: String(viatura.bairro_id || ''),
+        bairros_ids: Array.isArray(viatura.bairros_ids) ? [...new Set(viatura.bairros_ids.filter((id) => typeof id === 'string' && id))] : [],
+        itens: ordenarPorTurno((viatura.itens || []).map((item) => ({
+          id: generateId('pitem'),
+          inicio: String(item.inicio || ''),
+          fim: String(item.fim || ''),
+          local: String(item.local || ''),
+          atividade: String(item.atividade || 'CPB'),
+        }))),
+      };
+    }
+
+    function padraoCopiado(nomePadrao, bairrosPadrao, componentes, agora, descricaoPadrao = descricao) {
+      return {
+        id: generateId('pop'),
+        nome: nomePadrao,
+        tipo: categoria,
+        area: bairrosPadrao.join(' + '),
+        bairro: bairrosPadrao.join(' + '),
+        missao: descricaoPadrao,
+        pontos: '',
+        horario_inicio: '',
+        horario_fim: '',
+        observacoes: '',
+        descricao: descricaoPadrao,
+        configuracao: { bairros: bairrosPadrao },
+        metadados: {},
+        componentes,
+        ativo: true,
+        ordem: 0,
+        versao: 0,
+        publicado: false,
+        publicado_em: null,
+        publicado_por: null,
+        criado_por: req.user.usuario,
+        criado_em: agora,
+        atualizado_em: agora,
+      };
+    }
+
+    const agora = new Date().toISOString();
+    let padroes;
+    if (separarPorBairro) {
+      const definicoes = [];
+      (origem.viaturas || []).forEach((viatura, indice) => {
+        const setorBusca = String(viatura.setor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const bairrosDaViatura = bairrosNormalizados.filter((bairro) => setorBusca.includes(bairro.busca)).map((bairro) => bairro.nome);
+        const destinos = bairrosDaViatura.length ? bairrosDaViatura : [String(viatura.setor || `Bairro ${indice + 1}`).trim()];
+        destinos.forEach((bairro) => definicoes.push({ bairro, viatura, indice }));
+      });
+      if (!definicoes.length) return res.status(400).json({ error: 'Não foi possível identificar bairros nas viaturas do cartão.' });
+
+      const nomesBase = [...new Set(definicoes.map((item) => item.bairro))];
+      const { data: existentes, error: erroExistentes } = await supabase.from('cartao_grupos_modelo').select('nome').in('nome', nomesBase);
+      if (erroExistentes) throw new Error(erroExistentes.message);
+      const nomesUsados = new Set((existentes || []).map((item) => String(item.nome || '')));
+      const nomesCriados = new Set();
+      function nomeDisponivel(base) {
+        let candidato = base;
+        let sufixo = 2;
+        while (nomesUsados.has(candidato) || nomesCriados.has(candidato)) {
+          candidato = `${base} — ${origem.data || '12/08/2026'}${sufixo > 2 ? ` (${sufixo})` : ''}`.slice(0, 120);
+          sufixo += 1;
+        }
+        nomesCriados.add(candidato);
+        return candidato;
+      }
+
+      padroes = definicoes.map((definicao) => {
+        const nomePadrao = nomeDisponivel(definicao.bairro);
+        const descricaoPadrao = descricao || `Copiado do Cartão Programa de ${origem.data || origem.id} — viatura ${definicao.viatura.prefixo || `VTR ${definicao.indice + 1}`}.`;
+        return padraoCopiado(nomePadrao, [definicao.bairro], [componenteCopiado(definicao.viatura, definicao.indice, definicao.bairro)], agora, descricaoPadrao);
+      });
+    } else {
+      const componentes = (origem.viaturas || []).map((viatura, indice) => componenteCopiado(viatura, indice));
+      padroes = [padraoCopiado(nome, bairros, componentes, agora)];
+    }
+
+    const { data, error } = await supabase.from('cartao_grupos_modelo').insert(padroes).select('*');
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ error: 'Já existe um padrão com esse nome.' });
+      throw new Error(error.message);
+    }
+    for (const padrao of padroes) {
+      await registrarAuditoria({ req, acao: 'criou', entidade: 'Padrão operacional', entidadeId: padrao.id, descricao: `Criou o padrão “${padrao.nome}” a partir do Cartão Programa ${origem.data || origem.id}.` });
+    }
+    const criados = data || padroes;
+    res.status(201).json(separarPorBairro
+      ? { ids: criados.map((padrao) => padrao.id), padroes: criados }
+      : { ...(criados[0] || padroes[0]), id: criados[0]?.id || padroes[0].id });
+  }));
+
   // Padrão ativo que originaria o cartão de uma data (fonte de todo cartão do dia
   // novo) — precisa vir antes de /api/cartoes/:id pelo mesmo motivo de /templates.
   // `?data=` faz a rota devolver o MESMO padrão que o POST usaria naquele dia, para

@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Car, Check, ChevronDown, ChevronUp, Copy, Eye, FileText, Info, Pencil, Plus, Printer, Search, Shield, Trash2, UsersRound, X } from 'lucide-react';
+import { Car, Check, ChevronDown, ChevronUp, Copy, Eye, FileText, Info, Pencil, Plus, Printer, Search, Shield, UsersRound, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/useAuth';
 import { useAppData } from '../../../context/useAppData';
 import { useToast } from '../../../context/useToast';
 import { apiFetch } from '../../../lib/api';
-import type { CartaoDetalhado, CartaoViatura } from '../../../lib/cartaoConflitos';
+import type { CartaoViatura } from '../../../lib/cartaoConflitos';
 import { useCartaoPrograma } from './useCartaoPrograma';
 import { useViaturasCartao } from './useViaturasCartao';
 import { useItensRoteiro } from './useItensRoteiro';
@@ -14,8 +14,8 @@ import { useBairros } from '../../../hooks/useBairros';
 import { useAvisos } from '../../../hooks/useAvisos';
 import { NavegadorData } from './NavegadorData';
 import { ModalEditarViatura } from './ModalEditarViatura';
+import { ModalSalvarComoPadraoOperacional } from './ModalSalvarComoPadraoOperacional';
 import { RoteiroGrid } from './RoteiroGrid';
-import type { ResultadoAcao } from './useCartaoPrograma';
 
 function categoriaLabel(categoria: string | null | undefined) {
   const valor = String(categoria || 'bairro').toLowerCase();
@@ -34,26 +34,6 @@ function categoriaClasse(categoria: string | null | undefined) {
 }
 
 function hora(horaTexto: string | null | undefined) { return horaTexto ? horaTexto.replace(':', 'h') : ''; }
-
-function primeiroHorario(vtr: CartaoViatura) {
-  const itens = [...(vtr.itens || [])].sort((a, b) => a.inicio.localeCompare(b.inicio));
-  if (!itens[0]) return 'Horário não informado';
-  return `${hora(itens[0].inicio)}${itens[0].fim ? ` às ${hora(itens[0].fim)}` : ''}`;
-}
-
-function locais(vtr: CartaoViatura) {
-  const itens = (vtr.itens || []).filter((item) => item.local).slice(0, 2).map((item) => item.local);
-  return itens.length ? itens.join(' · ') : vtr.setor || 'Local não informado';
-}
-
-function equipe(vtr: CartaoViatura) {
-  const composicao = (vtr.composicao || '').split(/[·|,;]/).map((item) => item.trim()).filter(Boolean);
-  return { comandante: vtr.comandante || composicao[0] || '—', motorista: composicao[1] || '—', patrulheiro: composicao[2] || '—' };
-}
-
-function padraoDoComponente(vtr: CartaoViatura) {
-  return vtr.padrao_operacional_nome || vtr.setor || 'Componente manual';
-}
 
 interface BibliotecaProps {
   padroes: PadraoOperacional[];
@@ -85,96 +65,8 @@ function BibliotecaPadroes({ padroes, busca, filtro, podeEditar, adicionando, on
   </aside>;
 }
 
-function ComponenteCard({
-  vtr, podeEditar, indice, total, onVisualizar, onEditar, onDuplicar,
-  onMover, onExcluir, onAtualizarPadrao, onPdf, onEnviar,
-}: {
-  vtr: CartaoViatura;
-  podeEditar: boolean;
-  indice: number;
-  total: number;
-  onVisualizar: () => void;
-  onEditar: () => void;
-  onDuplicar: () => void;
-  onMover: (direcao: -1 | 1) => void;
-  onExcluir: () => void;
-  onAtualizarPadrao: () => void;
-  onPdf: () => void;
-  onEnviar: () => void;
-}) {
-  const grupo = equipe(vtr);
-  const classe = categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria);
-  return (
-    <article className={`cartao-componente-card ${classe}`}>
-      <div className="cartao-componente-main">
-        <div className={`cartao-componente-icon ${classe}`} aria-hidden="true">
-          {classe === 'especializado' ? <Shield /> : classe === 'reforco' ? <UsersRound /> : <Car />}
-        </div>
-        <div className="cartao-componente-identidade">
-          <div className="cartao-componente-titulo">
-            <h3>{vtr.indicativo || vtr.prefixo || `VTR ${indice + 1}`}</h3>
-            {vtr.operacao_id && <span className="cartao-operacao-badge"><span>↗</span> Operação vinculada</span>}
-          </div>
-          <p>Padrão: <strong>{padraoDoComponente(vtr)}</strong></p>
-        </div>
-        <div className="cartao-equipe">
-          <span className="cartao-coluna-titulo">Equipe</span>
-          <div>
-            <span>Cmt: <b>{grupo.comandante}</b></span>
-            <span>Mot: <b>{grupo.motorista}</b></span>
-            <span>Patr: <b>{grupo.patrulheiro}</b></span>
-          </div>
-        </div>
-        <div className="cartao-horario">
-          <span className="cartao-coluna-titulo">{classe === 'especializado' ? 'Missão' : 'Horário'}</span>
-          <strong>{classe === 'especializado' ? vtr.observacao || 'Apoio operacional' : primeiroHorario(vtr)}</strong>
-        </div>
-        <div className="cartao-locais">
-          <span className="cartao-coluna-titulo">Locais/PBs</span>
-          <strong>{locais(vtr)}</strong>
-        </div>
-        {podeEditar && (
-          <div className="cartao-componente-top-acoes">
-            <button type="button" className="btn-icon btn-sm" title="Mover para cima" disabled={indice === 0} onClick={() => onMover(-1)}><ArrowUp /></button>
-            <button type="button" className="btn-icon btn-sm" title="Mover para baixo" disabled={indice === total - 1} onClick={() => onMover(1)}><ArrowDown /></button>
-            <button type="button" className="btn-icon btn-sm" title="Duplicar componente" onClick={onDuplicar}><Copy /></button>
-            <button type="button" className="btn-icon btn-sm btn-icon-danger" title="Excluir componente" onClick={onExcluir}><Trash2 /></button>
-          </div>
-        )}
-      </div>
-      <div className="cartao-componente-footer">
-        <button type="button" onClick={onVisualizar}><Eye /> Visualizar</button>
-        {podeEditar && <button type="button" onClick={onEditar}><Pencil /> Editar</button>}
-        <button type="button" onClick={onPdf}><FileText /> PDF</button>
-        {podeEditar && <button type="button" onClick={onDuplicar}><Copy /> Duplicar</button>}
-        <button type="button" onClick={onEnviar}><span className="cartao-enviar-icon">➤</span> Enviar</button>
-      </div>
-      {vtr.padrao_desatualizado && (
-        <div className="cartao-versao-aviso" role="status">
-          <Info />
-          <span>Nova versão do padrão {padraoDoComponente(vtr)} disponível.</span>
-          {podeEditar && <button type="button" onClick={onAtualizarPadrao}>Ver e atualizar esta equipe</button>}
-        </div>
-      )}
-    </article>
-  );
-}
-
 function PadraoPreview({ padrao, onFechar }: { padrao: PadraoOperacional; onFechar: () => void }) {
   return <div className="modal-overlay" role="presentation"><div className="modal-box cartao-padrao-preview" role="dialog" aria-modal="true" aria-labelledby="cartao-padrao-preview-titulo"><div className="modal-header"><h3 id="cartao-padrao-preview-titulo"><Eye /> Visualizar padrão</h3><button type="button" className="btn-close" onClick={onFechar} aria-label="Fechar"><X /></button></div><div className="cartao-padrao-preview-header"><span className={`cartao-padrao-badge ${categoriaClasse(padrao.categoria)}`}>{categoriaLabel(padrao.categoria)}</span><h4>{padrao.nome}</h4><p>{padrao.descricao || 'Sem descrição cadastrada.'}</p></div><dl className="cartao-padrao-preview-dados"><div><dt>Horário</dt><dd>{hora(padrao.horario_inicio)} às {hora(padrao.horario_fim)}</dd></div><div><dt>PBs</dt><dd>{padrao.quantidade_pbs || 0}</dd></div><div><dt>Versão</dt><dd>v{padrao.versao || 1}</dd></div></dl>{padrao.bairros && <div className="cartao-preview-lista"><strong>Locais e roteiro</strong><p>{padrao.bairros.join(' · ') || 'Não informado'}</p></div>}<div className="form-actions form-actions-modal"><button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button></div></div></div>;
-}
-
-function RoteiroPreview({ cartao, vtr, eventos, podeEditar, acoes, onEditarViatura, onFechar }: {
-  cartao: CartaoDetalhado;
-  vtr: CartaoViatura;
-  eventos: Parameters<typeof RoteiroGrid>[0]['eventos'];
-  podeEditar: boolean;
-  acoes: ReturnType<typeof useItensRoteiro>;
-  onEditarViatura: (viatura: CartaoViatura) => void;
-  onFechar: () => void;
-}) {
-  const noop = async (): Promise<ResultadoAcao> => ({ ok: true });
-  return <div className="modal-overlay" role="presentation"><div className="modal-box cartao-roteiro-preview" role="dialog" aria-modal="true" aria-labelledby="cartao-roteiro-preview-titulo"><div className="modal-header"><h3 id="cartao-roteiro-preview-titulo"><Eye /> {vtr.indicativo || vtr.prefixo} — roteiro</h3><button type="button" className="btn-close" onClick={onFechar} aria-label="Fechar"><X /></button></div><RoteiroGrid viaturas={[vtr]} dataCartao={cartao.data || ''} eventos={eventos} podeEditar={podeEditar} onAdicionarItem={podeEditar ? acoes.adicionarItem : noop} onExcluirItem={podeEditar ? acoes.removerItem : noop} onAtualizarItem={podeEditar ? acoes.atualizarItem : noop} onDuplicarItem={podeEditar ? acoes.duplicarItem : noop} onCopiarRoteiro={podeEditar ? acoes.copiarRoteiro : noop} onAplicarAtividade={podeEditar ? acoes.aplicarAtividade : noop} onEditarViatura={onEditarViatura} onExcluirViatura={() => void 0} /><div className="form-actions form-actions-modal"><button type="button" className="btn btn-secondary" onClick={onFechar}>Fechar</button></div></div></div>;
 }
 
 export default function CartaoProgramaPage() {
@@ -191,8 +83,8 @@ export default function CartaoProgramaPage() {
   const [bibliotecaAberta, setBibliotecaAberta] = useState(true);
   const [adicionando, setAdicionando] = useState<string | null>(null);
   const [visualizandoPadrao, setVisualizandoPadrao] = useState<PadraoOperacional | null>(null);
-  const [componenteAberto, setComponenteAberto] = useState<{ viatura: CartaoViatura; editar: boolean } | null>(null);
   const [editando, setEditando] = useState<CartaoViatura | null>(null);
+  const [salvarComoPadraoAberto, setSalvarComoPadraoAberto] = useState(false);
   const podeEditar = usuario?.role === 'P3' || usuario?.role === 'Adjunto';
   const ehP3 = usuario?.role === 'P3';
   const cartaoId = cartao?.id;
@@ -261,8 +153,8 @@ export default function CartaoProgramaPage() {
 
   async function criarCartaoDia() {
     const resultado = await criarCartao();
-    toast(resultado.ok ? 'Cartão Ordinário criado.' : resultado.mensagem, resultado.ok ? 'success' : 'warning');
+    toast(resultado.ok ? 'Cartão Programa ordinário criado.' : resultado.mensagem, resultado.ok ? 'success' : 'warning');
   }
 
-  return <div className="cartao-ordinario-page"><div className="cartao-ordinario-toolbar"><div className="cartao-ordinario-titulo"><div className="cartao-ordinario-breadcrumb">Planejamento <span>/</span> Cartão Ordinário</div><h2>Cartão Ordinário <span>•</span> {new Date(`${dataSelecionada}T12:00:00`).toLocaleDateString('pt-BR')}</h2><div className="cartao-ordinario-metadados"><span><span className="cartao-meta-icon">☼</span> Turno: Diurno</span><span><UsersRound /> Companhia: 1ª CIA</span><span><Pencil /> Status: <strong>{cartao ? 'Em edição' : 'Não criado'}</strong></span></div></div><div className="cartao-ordinario-toolbar-actions"><NavegadorData dataSelecionada={dataSelecionada} onMudarData={setDataSelecionada} onDeslocarDia={deslocarDia} temCartao={temCartao} />{!cartao && <button type="button" className="btn btn-primary" onClick={() => void criarCartaoDia()}><Plus /> Criar cartão</button>}{cartao && <button type="button" className="btn btn-primary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><Printer /> Emitir cartão</button>}</div></div>{cartao && <div className="cartao-ordinario-info"><Info /><span>Os componentes adicionados podem ser editados sem alterar o padrão original da P3.</span></div>}<div className="cartao-ordinario-layout"><div className={`cartao-biblioteca-wrap${bibliotecaAberta ? ' aberta' : ''}`}><button type="button" className="cartao-biblioteca-mobile-toggle" onClick={() => setBibliotecaAberta((valor) => !valor)}><span><Search /> Biblioteca de Padrões Operacionais</span>{bibliotecaAberta ? <ChevronUp /> : <ChevronDown />}</button><BibliotecaPadroes padroes={padroes} busca={busca} filtro={filtro} podeEditar={ehP3} adicionando={adicionando} onBusca={setBusca} onFiltro={setFiltro} onAdicionar={(padrao) => void adicionarPadrao(padrao)} onVisualizar={setVisualizandoPadrao} onEditar={() => navigate('/padroes')} /></div><main className="cartao-componentes-area"><div className="cartao-componentes-heading"><div><h2>Cartão Ordinário <span>•</span> {new Date(`${dataSelecionada}T12:00:00`).toLocaleDateString('pt-BR')}</h2><div className="cartao-componentes-chips"><span>☼ Turno: Diurno</span><span><UsersRound /> Companhia: 1ª CIA</span><span><Pencil /> Status: <strong>{cartao ? 'Em edição' : 'Não criado'}</strong></span></div></div>{cartao && podeEditar && <button type="button" className="btn btn-primary" onClick={() => { document.querySelector('.cartao-biblioteca')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setBibliotecaAberta(true); }}><Plus /> Adicionar componente</button>}</div>{cartao && <div className="cartao-componentes-info"><Info /><span>Os componentes adicionados podem ser editados sem alterar o padrão original da P3.</span></div>}{!cartao ? <div className="cartao-sem-cartao"><FileText /><h3>Nenhum Cartão Ordinário para esta data</h3><p>Crie o cartão do dia ou selecione um padrão na biblioteca para começar.</p><button type="button" className="btn btn-primary" onClick={() => void criarCartaoDia()}><Plus /> Criar cartão</button></div> : viaturas.length === 0 ? <div className="cartao-sem-cartao"><Car /><h3>Nenhum componente adicionado</h3><p>Escolha um padrão na biblioteca para montar o cartão.</p></div> : <div className="cartao-componentes-lista">{viaturas.map((vtr, indice) => <ComponenteCard key={vtr.id} vtr={vtr} podeEditar={podeEditar} indice={indice} total={viaturas.length} onVisualizar={() => setComponenteAberto({ viatura: vtr, editar: false })} onEditar={() => setComponenteAberto({ viatura: vtr, editar: true })} onDuplicar={() => void duplicarComponente(vtr)} onMover={(direcao) => void moverComponente(vtr, direcao)} onExcluir={() => void excluirComponente(vtr)} onAtualizarPadrao={() => void atualizarPadrao(vtr)} onPdf={() => navigate(`/impressao?cartao=${cartao.id}&viatura=${vtr.id}`)} onEnviar={() => navigate(`/impressao?cartao=${cartao.id}&viatura=${vtr.id}`)} />)}</div>}<div className="cartao-rodape-acoes">{cartao && <><button type="button" className="btn btn-secondary" onClick={() => toast('Rascunho salvo.', 'success')}><Check /> Salvar rascunho</button><button type="button" className="btn btn-secondary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><FileText /> Gerar cartão completo</button><button type="button" className="btn btn-primary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><Printer /> Emitir cartão da equipe</button></>}</div></main>{cartao && <aside className="cartao-resumo-lateral"><div className="cartao-resumo-titulo"><span>▱</span><strong>Componentes no cartão</strong><b>{viaturas.length}</b></div><div className="cartao-resumo-linha"><span><Car /> Bairros</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'bairro').length}</b></div><div className="cartao-resumo-linha"><span><Shield /> Especializado</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'especializado').length}</b></div><div className="cartao-resumo-linha"><span><UsersRound /> Reforço</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'reforco').length}</b></div><div className="cartao-resumo-linha"><span><Info /> Padrões ativos</span><b>{carregandoPadroes ? '—' : padroes.filter((padrao) => padrao.ativo).length}</b></div></aside>}</div>{editando && <ModalEditarViatura viatura={editando} pessoal={dados.pessoal} bairros={bairros} avisos={avisos} onFechar={() => setEditando(null)} onSalvar={editarViatura} />}{visualizandoPadrao && <PadraoPreview padrao={visualizandoPadrao} onFechar={() => setVisualizandoPadrao(null)} />}{componenteAberto && cartao && <RoteiroPreview cartao={cartao} vtr={componenteAberto.viatura} eventos={dados.eventos} podeEditar={componenteAberto.editar && podeEditar} acoes={acoesRoteiro} onEditarViatura={setEditando} onFechar={() => setComponenteAberto(null)} />}</div>;
+  return <div className="cartao-ordinario-page"><div className="cartao-ordinario-toolbar"><div className="cartao-ordinario-titulo"><div className="cartao-ordinario-breadcrumb">Planejamento <span>/</span> Cartão Programa</div><h2>Cartão Programa ordinário <span>•</span> {new Date(`${dataSelecionada}T12:00:00`).toLocaleDateString('pt-BR')}</h2><div className="cartao-ordinario-metadados"><span><span className="cartao-meta-icon">☼</span> Turno: Diurno</span><span><UsersRound /> Companhia: 1ª CIA</span><span><Pencil /> Status: <strong>{cartao ? 'Em edição' : 'Não criado'}</strong></span></div></div><div className="cartao-ordinario-toolbar-actions"><NavegadorData dataSelecionada={dataSelecionada} onMudarData={setDataSelecionada} onDeslocarDia={deslocarDia} temCartao={temCartao} />{!cartao && <button type="button" className="btn btn-primary" onClick={() => void criarCartaoDia()}><Plus /> Criar cartão</button>}{cartao && <button type="button" className="btn btn-primary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><Printer /> Emitir cartão</button>}</div></div>{cartao && <div className="cartao-ordinario-info"><Info /><span>O cartão do dia fica aberto ao lado direito. Os componentes podem ser editados sem alterar o padrão original da P3.</span></div>}<div className="cartao-ordinario-layout"><div className={`cartao-biblioteca-wrap${bibliotecaAberta ? ' aberta' : ''}`}><button type="button" className="cartao-biblioteca-mobile-toggle" onClick={() => setBibliotecaAberta((valor) => !valor)}><span><Search /> Biblioteca de Padrões Operacionais</span>{bibliotecaAberta ? <ChevronUp /> : <ChevronDown />}</button><BibliotecaPadroes padroes={padroes} busca={busca} filtro={filtro} podeEditar={ehP3} adicionando={adicionando} onBusca={setBusca} onFiltro={setFiltro} onAdicionar={(padrao) => void adicionarPadrao(padrao)} onVisualizar={setVisualizandoPadrao} onEditar={() => navigate('/padroes')} /></div><main className="cartao-componentes-area">{!cartao ? <div className="cartao-sem-cartao"><FileText /><h3>Nenhum Cartão Programa para esta data</h3><p>Crie o cartão do dia ou selecione um padrão na biblioteca para começar.</p><button type="button" className="btn btn-primary" onClick={() => void criarCartaoDia()}><Plus /> Criar cartão</button></div> : viaturas.length === 0 ? <div className="cartao-sem-cartao"><Car /><h3>Nenhum componente adicionado</h3><p>Escolha um padrão na biblioteca para montar o cartão.</p></div> : <section className="cartao-programa-painel" aria-labelledby="cartao-programa-painel-titulo"><div className="cartao-programa-painel-cabecalho"><div><span className="cartao-programa-painel-kicker"><FileText /> Cartão Programa ordinário</span><h3 id="cartao-programa-painel-titulo">Roteiro operacional do dia</h3><p>Viaturas e roteiros completos, organizados em uma única área de leitura.</p></div><div className="cartao-programa-painel-cabecalho-acoes"><strong className="cartao-programa-painel-contador">{viaturas.length} {viaturas.length === 1 ? 'viatura' : 'viaturas'}</strong>{podeEditar && <button type="button" className="btn btn-primary btn-sm" onClick={() => { document.querySelector('.cartao-biblioteca')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setBibliotecaAberta(true); }}><Plus /> Adicionar componente</button>}</div></div><RoteiroGrid viaturas={viaturas} dataCartao={cartao.data || ''} eventos={dados.eventos} podeEditar={podeEditar} onAdicionarItem={acoesRoteiro.adicionarItem} onExcluirItem={acoesRoteiro.removerItem} onAtualizarItem={acoesRoteiro.atualizarItem} onDuplicarItem={acoesRoteiro.duplicarItem} onCopiarRoteiro={acoesRoteiro.copiarRoteiro} onAplicarAtividade={acoesRoteiro.aplicarAtividade} onEditarViatura={setEditando} onExcluirViatura={(vtr) => void excluirComponente(vtr)} onDuplicarViatura={(vtr) => void duplicarComponente(vtr)} onMoverViatura={(vtr, direcao) => void moverComponente(vtr, direcao)} onAtualizarPadrao={(vtr) => void atualizarPadrao(vtr)} onEmitirViatura={(vtr) => navigate(`/impressao?cartao=${cartao.id}&viatura=${vtr.id}`)} /></section>}<div className="cartao-rodape-acoes">{cartao && <>{ehP3 && <button type="button" className="btn btn-secondary" onClick={() => setSalvarComoPadraoAberto(true)}><Copy /> Salvar como cartão padrão</button>}<button type="button" className="btn btn-secondary" onClick={() => toast('Rascunho salvo.', 'success')}><Check /> Salvar rascunho</button><button type="button" className="btn btn-secondary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><FileText /> Gerar cartão completo</button><button type="button" className="btn btn-primary" onClick={() => navigate(`/impressao?cartao=${cartao.id}`)}><Printer /> Emitir cartão da equipe</button></>}</div></main>{cartao && <aside className="cartao-resumo-lateral"><div className="cartao-resumo-titulo"><span>▱</span><strong>Componentes no cartão</strong><b>{viaturas.length}</b></div><div className="cartao-resumo-linha"><span><Car /> Bairros</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'bairro').length}</b></div><div className="cartao-resumo-linha"><span><Shield /> Especializado</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'especializado').length}</b></div><div className="cartao-resumo-linha"><span><UsersRound /> Reforço</span><b>{viaturas.filter((vtr) => categoriaClasse(vtr.padrao_operacional_categoria || vtr.categoria) === 'reforco').length}</b></div><div className="cartao-resumo-linha"><span><Info /> Padrões ativos</span><b>{carregandoPadroes ? '—' : padroes.filter((padrao) => padrao.ativo).length}</b></div></aside>}</div>{editando && <ModalEditarViatura viatura={editando} pessoal={dados.pessoal} bairros={bairros} avisos={avisos} onFechar={() => setEditando(null)} onSalvar={editarViatura} />}{visualizandoPadrao && <PadraoPreview padrao={visualizandoPadrao} onFechar={() => setVisualizandoPadrao(null)} />}{salvarComoPadraoAberto && cartao && <ModalSalvarComoPadraoOperacional cartao={cartao} bairros={bairros} onFechar={() => setSalvarComoPadraoAberto(false)} onCriado={() => { setSalvarComoPadraoAberto(false); navigate('/padroes'); }} />}</div>;
 }

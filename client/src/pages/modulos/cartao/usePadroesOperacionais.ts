@@ -3,6 +3,26 @@ import { apiFetch } from '../../../lib/api';
 
 export type CategoriaPadrao = 'bairro' | 'especializado' | 'reforco' | 'missao' | string;
 
+export interface ItemRoteiroPadrao {
+  id: string;
+  inicio: string;
+  fim: string;
+  local: string;
+  atividade: string;
+}
+
+export interface ComponentePadrao {
+  id: string;
+  prefixo: string;
+  setor: string;
+  companhia: string;
+  categoria: string;
+  observacao: string;
+  bairro_id?: string;
+  bairros_ids?: string[];
+  itens: ItemRoteiroPadrao[];
+}
+
 export interface PadraoOperacional {
   id: string;
   nome: string;
@@ -20,11 +40,12 @@ export interface PadraoOperacional {
   atualizado_em?: string | null;
   criado_em?: string | null;
   tipo_periodo?: string | null;
+  componentes?: ComponentePadrao[];
   [key: string]: unknown;
 }
 
 export interface PadraoOperacionalDetalhe extends PadraoOperacional {
-  componentes?: unknown[];
+  componentes?: ComponentePadrao[];
 }
 
 export interface VersaoPadrao {
@@ -44,6 +65,7 @@ export interface PadraoPayload {
   horario_fim: string;
   quantidade_pbs: number;
   bairros: string[];
+  componentes?: ComponentePadrao[];
   ativo?: boolean;
 }
 
@@ -66,6 +88,31 @@ function normalizarPadrao(item: Record<string, unknown>): PadraoOperacional {
     : Array.isArray(item.bairros_atendidos) ? item.bairros_atendidos.map(String)
       : Array.isArray(configuracao.bairros) ? configuracao.bairros.map(String)
         : (item.bairro ? String(item.bairro).split('+').map((bairro) => bairro.trim()).filter(Boolean) : null);
+  const componentes = Array.isArray(item.componentes)
+    ? item.componentes.map((componente, indice) => {
+      const valor = componente && typeof componente === 'object' ? componente as Record<string, unknown> : {};
+      const itens = Array.isArray(valor.itens) ? valor.itens.map((itemRoteiro, indiceItem) => {
+        const item = itemRoteiro && typeof itemRoteiro === 'object' ? itemRoteiro as Record<string, unknown> : {};
+        return {
+          id: String(item.id ?? `item-${indice}-${indiceItem}`),
+          inicio: String(item.inicio ?? item.horario_inicio ?? ''),
+          fim: String(item.fim ?? item.horario_fim ?? ''),
+          local: String(item.local ?? item.area ?? ''),
+          atividade: String(item.atividade ?? item.missao ?? 'CPB'),
+        };
+      }) : [];
+      return {
+        id: String(valor.id ?? `componente-${indice}`),
+        prefixo: String(valor.prefixo ?? valor.indicativo ?? ''),
+        setor: String(valor.setor ?? valor.area ?? ''),
+        companhia: String(valor.companhia ?? ''),
+        categoria: String(valor.categoria ?? 'Ordinária'),
+        observacao: String(valor.observacao ?? ''),
+        bairro_id: valor.bairro_id ? String(valor.bairro_id) : '',
+        bairros_ids: Array.isArray(valor.bairros_ids) ? valor.bairros_ids.map(String) : [],
+        itens,
+      };
+    }) : [];
   return {
     ...item,
     id: String(item.id),
@@ -80,6 +127,7 @@ function normalizarPadrao(item: Record<string, unknown>): PadraoOperacional {
     publicado: Boolean(item.publicado ?? item.estado === 'publicado'),
     versao: item.versao == null ? null : Number(item.versao),
     versao_publicada: item.versao_publicada == null ? null : Number(item.versao_publicada),
+    componentes,
   };
 }
 
@@ -156,6 +204,17 @@ export function usePadroesOperacionais() {
   const duplicar = useCallback((id: string) => executar(`/api/padroes-operacionais/${id}/duplicar`, { method: 'POST' }, 'Falha ao duplicar padrão operacional.'), [executar]);
   const alterarAtivo = useCallback((id: string, ativo: boolean) => executar(`/api/padroes-operacionais/${id}/ativo`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ativo }) }, 'Falha ao alterar situação do padrão.'), [executar]);
 
+  const excluir = useCallback(async (id: string): Promise<ResultadoPadrao> => {
+    try {
+      const res = await apiFetch(`/api/padroes-operacionais/${id}`, { method: 'DELETE' });
+      if (!res.ok) return { ok: false, mensagem: await erroDaResposta(res, 'Falha ao excluir padrão operacional.') };
+      await recarregar();
+      return { ok: true };
+    } catch {
+      return { ok: false, mensagem: 'Falha na comunicação com o servidor.' };
+    }
+  }, [recarregar]);
+
   const detalhe = useCallback(async (id: string): Promise<PadraoOperacionalDetalhe | null> => {
     try {
       const res = await apiFetch(`/api/padroes-operacionais/${id}`);
@@ -175,5 +234,5 @@ export function usePadroesOperacionais() {
     } catch { return []; }
   }, []);
 
-  return { padroes, carregando, erro, recarregar, criar, atualizar, publicar, duplicar, alterarAtivo, detalhe, versoes };
+  return { padroes, carregando, erro, recarregar, criar, atualizar, publicar, duplicar, alterarAtivo, excluir, detalhe, versoes };
 }

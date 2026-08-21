@@ -21,11 +21,16 @@ interface RoteiroGridProps {
   onAplicarAtividade: (viaturasIds: string[], atividade: string) => Promise<ResultadoAcao>;
   onEditarViatura: (vtr: CartaoViatura) => void;
   onExcluirViatura: (vtr: CartaoViatura) => void;
+  onDuplicarViatura?: (vtr: CartaoViatura) => void;
+  onMoverViatura?: (vtr: CartaoViatura, direcao: -1 | 1) => void;
+  onAtualizarPadrao?: (vtr: CartaoViatura) => void;
+  onEmitirViatura?: (vtr: CartaoViatura) => void;
 }
 
 export function RoteiroGrid({
   viaturas, dataCartao, eventos, podeEditar, onAdicionarItem, onExcluirItem, onAtualizarItem,
   onDuplicarItem, onCopiarRoteiro, onAplicarAtividade, onEditarViatura, onExcluirViatura,
+  onDuplicarViatura, onMoverViatura, onAtualizarPadrao, onEmitirViatura,
 }: RoteiroGridProps) {
   const { toast } = useToast();
   const [atividadeLote, setAtividadeLote] = useState(ATIVIDADES_CARTAO[0]);
@@ -70,6 +75,9 @@ export function RoteiroGrid({
           podeEditar={podeEditar} onExcluirItem={onExcluirItem} onAdicionarItem={onAdicionarItem}
           onAtualizarItem={onAtualizarItem} onDuplicarItem={onDuplicarItem} onCopiarRoteiro={onCopiarRoteiro}
           onEditarViatura={onEditarViatura} onExcluirViatura={onExcluirViatura}
+          indice={viaturas.indexOf(vtr)} totalViaturas={viaturas.length}
+          onDuplicarViatura={onDuplicarViatura} onMoverViatura={onMoverViatura}
+          onAtualizarPadrao={onAtualizarPadrao} onEmitirViatura={onEmitirViatura}
         />
       ))}
     </div>

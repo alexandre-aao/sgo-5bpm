@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarCheck, Check, Copy, CopyPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarCheck, Check, Copy, CopyPlus, FileText, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { Tables } from '../../../types/supabase';
 import type { CartaoItem, CartaoViatura } from '../../../lib/cartaoConflitos';
 import { formatHoraCartao, itensSobrepostos } from '../../../lib/cartaoConflitos';
@@ -24,6 +24,12 @@ interface ViaturaRoteiroCardProps {
   onCopiarRoteiro: (vtrAlvoId: string, origemViaturaId: string, substituir: boolean) => Promise<ResultadoAcao>;
   onEditarViatura: (vtr: CartaoViatura) => void;
   onExcluirViatura: (vtr: CartaoViatura) => void;
+  indice: number;
+  totalViaturas: number;
+  onDuplicarViatura?: (vtr: CartaoViatura) => void;
+  onMoverViatura?: (vtr: CartaoViatura, direcao: -1 | 1) => void;
+  onAtualizarPadrao?: (vtr: CartaoViatura) => void;
+  onEmitirViatura?: (vtr: CartaoViatura) => void;
 }
 
 const ITEM_VAZIO: ItemPayload = { inicio: '', fim: '', local: '', atividade: ATIVIDADES_CARTAO[0] };
@@ -35,6 +41,7 @@ function payloadDoItem(item: CartaoItem): ItemPayload {
 export function ViaturaRoteiroCard({
   vtr, todasViaturas, dataCartao, eventos, podeEditar, onExcluirItem, onAdicionarItem,
   onAtualizarItem, onDuplicarItem, onCopiarRoteiro, onEditarViatura, onExcluirViatura,
+  indice, totalViaturas, onDuplicarViatura, onMoverViatura, onAtualizarPadrao, onEmitirViatura,
 }: ViaturaRoteiroCardProps) {
   const { toast } = useToast();
   const [novoItem, setNovoItem] = useState<ItemPayload>(ITEM_VAZIO);
@@ -111,7 +118,13 @@ export function ViaturaRoteiroCard({
             {vtr.observacao && <span><strong>Obs:</strong> {vtr.observacao}</span>}
           </div>
         </div>
-        {podeEditar && <div className="acoes-linha"><button className="btn-icon btn-sm" title="Editar viatura" aria-label="Editar viatura" onClick={() => onEditarViatura(vtr)}><Pencil /></button><button className="btn-icon btn-sm" title="Remover viatura" aria-label="Remover viatura" onClick={() => onExcluirViatura(vtr)}><Trash2 /></button></div>}
+        <div className="acoes-linha cartao-vtr-header-acoes">
+          {onEmitirViatura && <button className="btn-icon btn-sm" title="Emitir cartão desta viatura" aria-label="Emitir cartão desta viatura" onClick={() => onEmitirViatura(vtr)}><FileText /></button>}
+          {podeEditar && onMoverViatura && <><button className="btn-icon btn-sm" title="Mover viatura para cima" aria-label="Mover viatura para cima" disabled={indice === 0} onClick={() => onMoverViatura(vtr, -1)}><ArrowUp /></button><button className="btn-icon btn-sm" title="Mover viatura para baixo" aria-label="Mover viatura para baixo" disabled={indice === totalViaturas - 1} onClick={() => onMoverViatura(vtr, 1)}><ArrowDown /></button></>}
+          {podeEditar && onDuplicarViatura && <button className="btn-icon btn-sm" title="Duplicar viatura" aria-label="Duplicar viatura" onClick={() => onDuplicarViatura(vtr)}><Copy /></button>}
+          {podeEditar && vtr.padrao_desatualizado && onAtualizarPadrao && <button className="btn-icon btn-sm" title="Atualizar para a versão atual do padrão" aria-label="Atualizar para a versão atual do padrão" onClick={() => onAtualizarPadrao(vtr)}><Check /></button>}
+          {podeEditar && <><button className="btn-icon btn-sm" title="Editar viatura" aria-label="Editar viatura" onClick={() => onEditarViatura(vtr)}><Pencil /></button><button className="btn-icon btn-sm btn-icon-danger" title="Remover viatura" aria-label="Remover viatura" onClick={() => onExcluirViatura(vtr)}><Trash2 /></button></>}
+        </div>
       </div>
 
       <div className="cartao-vtr-body">
