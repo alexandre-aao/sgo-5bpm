@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
+import { contarPbsComponentes } from '../../../lib/padroesOperacionais';
 
 export type CategoriaPadrao = 'bairro' | 'especializado' | 'reforco' | 'missao' | string;
 
@@ -63,7 +64,6 @@ export interface PadraoPayload {
   descricao: string;
   horario_inicio: string;
   horario_fim: string;
-  quantidade_pbs: number;
   bairros: string[];
   componentes?: ComponentePadrao[];
   ativo?: boolean;
@@ -79,8 +79,6 @@ async function erroDaResposta(res: Response, fallback: string) {
 function normalizarPadrao(item: Record<string, unknown>): PadraoOperacional {
   const configuracao = item.configuracao && typeof item.configuracao === 'object' && !Array.isArray(item.configuracao)
     ? item.configuracao as Record<string, unknown> : {};
-  const metadados = item.metadados && typeof item.metadados === 'object' && !Array.isArray(item.metadados)
-    ? item.metadados as Record<string, unknown> : {};
   const nome = String(item.nome ?? item.nome_padrao ?? item.nome_template ?? item.titulo ?? 'Padrão sem nome');
   const categoria = item.categoria ?? item.tipo ?? item.tipo_padrao ?? 'bairro';
   const bairros = Array.isArray(item.bairros)
@@ -121,7 +119,9 @@ function normalizarPadrao(item: Record<string, unknown>): PadraoOperacional {
     descricao: item.descricao == null ? (item.missao == null ? null : String(item.missao)) : String(item.descricao),
     horario_inicio: item.horario_inicio == null ? null : String(item.horario_inicio),
     horario_fim: item.horario_fim == null ? null : String(item.horario_fim),
-    quantidade_pbs: Number(item.quantidade_pbs ?? item.qtd_pbs ?? item.pbs ?? metadados.quantidade_pbs ?? 0) || null,
+    // O campo legado pode continuar vindo da API, mas a tela sempre usa o
+    // roteiro como fonte de verdade.
+    quantidade_pbs: contarPbsComponentes(componentes),
     bairros,
     ativo: item.ativo !== false,
     publicado: Boolean(item.publicado ?? item.estado === 'publicado'),

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const express = require('express');
+const { contarPbsComponentes } = require('../lib/padroes-operacionais');
 
 module.exports = function criarRouterCartoes({
   CATEGORIAS_VIATURA,
@@ -27,6 +28,7 @@ module.exports = function criarRouterCartoes({
   const router = express.Router();
   const CABECALHO_VERSAO_CARTAO = 'x-cartao-atualizado-em';
   const CODIGO_CARTAO_DESATUALIZADO = 'CARTAO_DESATUALIZADO';
+  const MAX_BAIRROS_RELACIONADOS = 3;
 
   function versaoCarregada(req) {
     return String(req.get(CABECALHO_VERSAO_CARTAO) || '').trim();
@@ -815,10 +817,16 @@ module.exports = function criarRouterCartoes({
     if (!nome && !separarPorBairro) return res.status(400).json({ error: 'Informe o nome do novo padrão.' });
 
     const bairros = Array.isArray(req.body?.bairros)
-      ? [...new Set(req.body.bairros.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean))].slice(0, 30)
+      ? [...new Set(req.body.bairros.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean))]
       : [];
     const categoria = String(req.body?.categoria || 'bairro').trim().slice(0, 80) || 'bairro';
     const descricao = String(req.body?.descricao || '').trim().slice(0, 500);
+    if (bairros.length > MAX_BAIRROS_RELACIONADOS) {
+      return res.status(400).json({ error: `O padrão pode possuir no máximo ${MAX_BAIRROS_RELACIONADOS} bairros relacionados.` });
+    }
+    if (!separarPorBairro && categoria.toLocaleLowerCase('pt-BR') === 'bairro' && bairros.length === 0) {
+      return res.status(400).json({ error: 'Padrões da categoria Bairro exigem pelo menos um bairro relacionado.' });
+    }
     const bairrosNormalizados = bairros.map((bairro) => ({
       nome: bairro,
       busca: String(bairro).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
@@ -833,7 +841,7 @@ module.exports = function criarRouterCartoes({
         categoria: String(viatura.categoria || 'Ordinária'),
         observacao: String(viatura.observacao || ''),
         bairro_id: String(viatura.bairro_id || ''),
-        bairros_ids: Array.isArray(viatura.bairros_ids) ? [...new Set(viatura.bairros_ids.filter((id) => typeof id === 'string' && id))] : [],
+        bairros_ids: Array.isArray(viatura.bairros_ids) ? [...new Set(viatura.bairros_ids.filter((id) => typeof id === 'string' && id))].slice(0, MAX_BAIRROS_RELACIONADOS) : [],
         itens: ordenarPorTurno((viatura.itens || []).map((item) => ({
           id: generateId('pitem'),
           inicio: String(item.inicio || ''),
@@ -858,7 +866,7 @@ module.exports = function criarRouterCartoes({
         observacoes: '',
         descricao: descricaoPadrao,
         configuracao: { bairros: bairrosPadrao },
-        metadados: {},
+        metadados: { quantidade_pbs: contarPbsComponentes(componentes) },
         componentes,
         ativo: true,
         ordem: 0,
@@ -992,7 +1000,7 @@ module.exports = function criarRouterCartoes({
       await writeRow('cartoes', novoTemplate);
       await marcarRascunhoSeDisponivel(novoTemplate.id);
       await registrarAuditoria({ req, acao: 'criou', entidade: tipoModelo === 'operacao' ? 'Modelo de Operação' : 'Modelo Ordinário', entidadeId: novoTemplate.id, descricao: `Criou o modelo “${novoTemplate.nome_template}”.` });
-      return res.status(201).json(novoTemplate);
+      return res.status(201).json(await buscarCartaoPorId(novoTemplate.id) || novoTemplate);
     }
 
     if (!req.user || !['P3', 'Adjunto'].includes(req.user.role)) {
@@ -1045,7 +1053,7 @@ module.exports = function criarRouterCartoes({
     };
 
     await writeRow('cartoes', novoCartao);
-    res.status(201).json(novoCartao);
+    res.status(201).json(await buscarCartaoPorId(novoCartao.id) || novoCartao);
   }));
 
   // Define qual template é o padrão único ativo (fonte de todo cartão do dia novo).
@@ -1181,7 +1189,7 @@ module.exports = function criarRouterCartoes({
       bairro_id: v.valores.bairro_id,
       bairros_ids: [...new Set(Array.isArray(req.body.bairros_ids)
         ? req.body.bairros_ids.filter(id => typeof id === 'string' && id)
-        : (v.valores.bairro_id ? [v.valores.bairro_id] : []))].slice(0, 12),
+        : (v.valores.bairro_id ? [v.valores.bairro_id] : []))],
       comandante_pessoal_id: v.valores.comandante_pessoal_id,
       // O Adjunto já escolhe os avisos no mesmo formulário em que aloca a viatura
       // no bairro, então eles podem chegar já no POST.
@@ -1191,6 +1199,9 @@ module.exports = function criarRouterCartoes({
       itens: []
     };
 
+    if (novaViatura.bairros_ids.length > MAX_BAIRROS_RELACIONADOS) {
+      return res.status(400).json({ error: `A viatura pode possuir no máximo ${MAX_BAIRROS_RELACIONADOS} bairros relacionados.` });
+    }
     cartao.viaturas.push(novaViatura);
     const atualizado = await gravarCartaoSeAtual(req, res, cartao);
     if (atualizado) res.status(201).json(novaViatura);
@@ -1226,7 +1237,10 @@ module.exports = function criarRouterCartoes({
       if (!Array.isArray(req.body.bairros_ids)) {
         return res.status(400).json({ error: 'bairros_ids deve ser uma lista de ids de bairro.' });
       }
-      viatura.bairros_ids = [...new Set(req.body.bairros_ids.filter(id => typeof id === 'string' && id))].slice(0, 12);
+      viatura.bairros_ids = [...new Set(req.body.bairros_ids.filter(id => typeof id === 'string' && id))];
+      if (viatura.bairros_ids.length > MAX_BAIRROS_RELACIONADOS) {
+        return res.status(400).json({ error: `A viatura pode possuir no máximo ${MAX_BAIRROS_RELACIONADOS} bairros relacionados.` });
+      }
       viatura.bairro_id = viatura.bairros_ids[0] || '';
     }
 

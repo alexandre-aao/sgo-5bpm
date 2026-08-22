@@ -194,3 +194,42 @@ test('novo cartão do dia nasce vazio mesmo sem padrão ativo', async () => {
   assert.strictEqual(gravado.origem_template_id, null);
   assert.strictEqual(consultouPadrao, false);
 });
+
+test('bairros do padrão aceitam até três e PBs são derivados dos itens do roteiro', async () => {
+  const tabelas = { cartao_grupos_modelo: [] };
+  const router = routerPadroes(tabelas, p3, p3);
+  const componentes = [{
+    id: 'vtr-1', prefixo: '0501', itens: [
+      { id: 'i-1', inicio: '07:00', fim: '08:00', local: 'Candelária', atividade: 'PB' },
+      { id: 'i-2', inicio: '08:00', fim: '09:00', local: 'Capim Macio', atividade: 'Patrulhamento' },
+      { id: 'i-3', inicio: '09:00', fim: '10:00', local: 'Lagoa Nova', atividade: 'PB' },
+      { id: 'i-4', inicio: '10:00', fim: '11:00', local: 'QTL', atividade: 'QTL' },
+    ],
+  }];
+  const criado = await requisitar(router, '/api/padroes-operacionais', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome: 'Ronda Sul', categoria: 'bairro', bairros: ['Candelária', 'Capim Macio', 'Lagoa Nova'], componentes }),
+  });
+  assert.strictEqual(criado.status, 201);
+  assert.strictEqual((await criado.json()).quantidade_pbs, 2);
+  assert.strictEqual(tabelas.cartao_grupos_modelo[0].metadados.quantidade_pbs, 2);
+
+  const atualizado = await requisitar(router, '/api/padroes-operacionais/' + tabelas.cartao_grupos_modelo[0].id, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ componentes: [{ ...componentes[0], itens: [componentes[0].itens[1]] }] }),
+  });
+  assert.strictEqual(atualizado.status, 200);
+  assert.strictEqual((await atualizado.json()).quantidade_pbs, 0);
+
+  const quatroBairros = await requisitar(router, '/api/padroes-operacionais', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome: 'Excesso de bairros', categoria: 'bairro', bairros: ['A', 'B', 'C', 'D'], componentes: [] }),
+  });
+  assert.strictEqual(quatroBairros.status, 400);
+
+  const quatroBairrosNaConfiguracao = await requisitar(router, '/api/padroes-operacionais', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome: 'Excesso na configuração', categoria: 'bairro', configuracao: { bairros: ['A', 'B', 'C', 'D'] }, componentes: [] }),
+  });
+  assert.strictEqual(quatroBairrosNaConfiguracao.status, 400);
+});

@@ -61,7 +61,7 @@ const app = express();
 // função serverless — limitação conhecida e aceita nesta fase; estado externo (ex: Redis)
 // fica para uma fase futura e NÃO deve ser introduzido agora.
 app.set('trust proxy', 1);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3005;
 
 
 // -------------------------------------------------------------
@@ -78,6 +78,19 @@ const ORIGENS_PERMITIDAS = [
 function origemPermitida(origin) {
   if (!origin) return true; // requisições sem Origin (ex: curl, apps nativos) — não é o caso de browsers
   if (ORIGENS_PERMITIDAS.includes(origin)) return true;
+  // O Vite/preview pode escolher uma porta livre e, no Windows, o navegador
+  // pode expor o mesmo servidor como 127.0.0.1 em vez de localhost. Em
+  // desenvolvimento, aceite somente loopback HTTP; produção continua presa
+  // às origens explícitas acima.
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    try {
+      const url = new URL(origin);
+      const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+      if (url.protocol === 'http:' && loopback && /^\d+$/.test(url.port)) return true;
+    } catch {
+      return false;
+    }
+  }
   // Deploys de preview da Vercel para este projeto: sgo-5bpm-<hash>-alexandre-alves.vercel.app
   return /^https:\/\/sgo-5bpm-[a-z0-9]+-alexandre-alves\.vercel\.app$/.test(origin);
 }

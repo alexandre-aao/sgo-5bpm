@@ -1,4 +1,5 @@
 const express = require('express');
+const { contarPbsComponentes, listaBairrosUnica } = require('../lib/padroes-operacionais');
 
 // A biblioteca de padrões nasceu como `cartao_grupos_modelo`.  O nome da
 // tabela é mantido de propósito: há cartões antigos que ainda apontam para o
@@ -16,6 +17,7 @@ const LIMITES_TEXTO = {
 };
 const MAX_COMPONENTES = 100;
 const MAX_JSON = 200_000;
+const MAX_BAIRROS_RELACIONADOS = 3;
 
 function clonar(valor) {
   return valor == null ? valor : JSON.parse(JSON.stringify(valor));
@@ -36,6 +38,12 @@ function normalizarComponentes(valor) {
   for (const componente of valor) {
     if (!componente || typeof componente !== 'object' || Array.isArray(componente)) {
       return { erro: 'Cada componente do padrão deve ser um objeto JSON.' };
+    }
+    if (componente.bairros_ids !== undefined) {
+      const bairros = listaBairrosUnica(componente.bairros_ids);
+      if (!Array.isArray(componente.bairros_ids) || bairros.length > MAX_BAIRROS_RELACIONADOS) {
+        return { erro: `Cada componente pode possuir no máximo ${MAX_BAIRROS_RELACIONADOS} bairros relacionados.` };
+      }
     }
   }
   if (JSON.stringify(valor).length > MAX_JSON) return { erro: 'Os componentes do padrão são muito grandes.' };
@@ -61,21 +69,35 @@ function normalizarPadrao(body = {}, atual = {}, { criacao = false } = {}) {
     if (JSON.stringify(body.configuracao).length > MAX_JSON) return { erro: 'A configuração do padrão é muito grande.' };
     padrao.configuracao = clonar(body.configuracao);
     configuracaoAtual = clonar(padrao.configuracao);
+    if (Object.prototype.hasOwnProperty.call(configuracaoAtual, 'bairros')) {
+      if (!Array.isArray(configuracaoAtual.bairros) || configuracaoAtual.bairros.some((item) => typeof item !== 'string')) {
+        return { erro: 'Os bairros do padrão devem ser uma lista de textos.' };
+      }
+      configuracaoAtual.bairros = listaBairrosUnica(configuracaoAtual.bairros);
+      if (configuracaoAtual.bairros.length > MAX_BAIRROS_RELACIONADOS) {
+        return { erro: `O padrão pode possuir no máximo ${MAX_BAIRROS_RELACIONADOS} bairros relacionados.` };
+      }
+      padrao.bairro = configuracaoAtual.bairros.join(' + ').slice(0, LIMITES_TEXTO.bairro);
+      padrao.configuracao = configuracaoAtual;
+    }
   }
   if (body.bairros !== undefined) {
     if (!Array.isArray(body.bairros) || body.bairros.some((item) => typeof item !== 'string')) {
       return { erro: 'Os bairros do padrão devem ser uma lista de textos.' };
     }
-    configuracaoAtual.bairros = body.bairros.map((item) => item.trim()).filter(Boolean).slice(0, 30);
+    configuracaoAtual.bairros = listaBairrosUnica(body.bairros);
+    if (configuracaoAtual.bairros.length > MAX_BAIRROS_RELACIONADOS) {
+      return { erro: `O padrão pode possuir no máximo ${MAX_BAIRROS_RELACIONADOS} bairros relacionados.` };
+    }
+    const tipoAtual = String(padrao.tipo || '').trim().toLocaleLowerCase('pt-BR');
+    if ((criacao || body.categoria !== undefined || body.tipo !== undefined) && tipoAtual === 'bairro' && configuracaoAtual.bairros.length === 0) {
+      return { erro: 'Padrões da categoria Bairro exigem pelo menos um bairro relacionado.' };
+    }
     padrao.bairro = configuracaoAtual.bairros.join(' + ').slice(0, LIMITES_TEXTO.bairro);
     padrao.configuracao = configuracaoAtual;
   }
-  if (body.quantidade_pbs !== undefined) {
-    const quantidade = Number(body.quantidade_pbs);
-    if (!Number.isInteger(quantidade) || quantidade < 0 || quantidade > 100) return { erro: 'A quantidade de PBs deve ser um inteiro entre 0 e 100.' };
-    metadadosAtuais.quantidade_pbs = quantidade;
-    padrao.metadados = metadadosAtuais;
-  }
+  // `quantidade_pbs` permanece aceito no payload por compatibilidade com
+  // clientes antigos, mas nunca é mais uma fonte de verdade: o roteiro decide.
   const componentes = normalizarComponentes(body.componentes);
   if (componentes?.erro) return componentes;
   if (componentes) padrao.componentes = componentes.valor;
@@ -103,6 +125,12 @@ function normalizarPadrao(body = {}, atual = {}, { criacao = false } = {}) {
   if (!padrao.configuracao || typeof padrao.configuracao !== 'object') padrao.configuracao = {};
   if (!Array.isArray(padrao.componentes)) padrao.componentes = [];
   if (!padrao.metadados || typeof padrao.metadados !== 'object') padrao.metadados = {};
+  if ((criacao || body.categoria !== undefined || body.tipo !== undefined)
+      && String(padrao.tipo || '').trim().toLocaleLowerCase('pt-BR') === 'bairro'
+      && listaBairrosUnica(padrao.configuracao.bairros).length === 0) {
+    return { erro: 'Padrões da categoria Bairro exigem pelo menos um bairro relacionado.' };
+  }
+  padrao.metadados = { ...metadadosAtuais, quantidade_pbs: contarPbsComponentes(padrao.componentes) };
 
   // A validação antiga exigia horário/local para grupos sem itens. Isso não é
   // aplicável a um padrão ainda em montagem: Adjunto pode criar o esqueleto e
@@ -124,7 +152,7 @@ function patchPadraoInformado(body, padrao) {
     patch.bairro = padrao.bairro;
     patch.configuracao = padrao.configuracao;
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'quantidade_pbs')) patch.metadados = padrao.metadados;
+  if (Object.prototype.hasOwnProperty.call(body, 'quantidade_pbs') || Object.prototype.hasOwnProperty.call(body, 'componentes')) patch.metadados = padrao.metadados;
   if (Object.prototype.hasOwnProperty.call(body, 'descricao')) patch.missao = padrao.missao;
   return patch;
 }
@@ -187,6 +215,17 @@ function criarRouterPadroesOperacionais({
     return registrarAuditoria({ req, acao, entidade: 'Padrão Operacional', entidadeId: grupo.id, descricao });
   }
 
+  function respostaPadrao(padrao) {
+    if (!padrao || typeof padrao !== 'object') return padrao;
+    const componentes = Array.isArray(padrao.componentes) ? padrao.componentes : [];
+    const configuracao = padrao.configuracao && typeof padrao.configuracao === 'object' ? padrao.configuracao : {};
+    return {
+      ...padrao,
+      quantidade_pbs: contarPbsComponentes(componentes),
+      bairros: listaBairrosUnica(configuracao.bairros || (padrao.bairro ? String(padrao.bairro).split('+') : [])),
+    };
+  }
+
   function montarRotas(caminho) {
     // Lista e busca: a filtragem fica no backend mesmo quando a instalação
     // ainda está com uma versão antiga do schema sem os novos índices.
@@ -213,21 +252,21 @@ function criarRouterPadroesOperacionais({
         dados = dados.filter((item) => item.ativo !== false);
       }
       dados.sort((a, b) => (Number(a.ordem || 0) - Number(b.ordem || 0)) || String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
-      res.json(dados);
+      res.json(dados.map(respostaPadrao));
     }));
 
     router.get(`${caminho}/:id`, asyncRoute(async (req, res) => {
       const grupo = await buscar(req.params.id);
       if (!grupo) return respostaErro(res, 404, 'Padrão operacional não encontrado.');
       const incluirVersoes = req.query.versoes === '1' || req.query.detalhe === '1';
-      if (!incluirVersoes) return res.json(grupo);
+      if (!incluirVersoes) return res.json(respostaPadrao(grupo));
       const versoes = await listarVersoes(grupo.id);
-      return res.json({ ...grupo, versoes });
+      return res.json({ ...respostaPadrao(grupo), versoes });
     }));
     router.get(`${caminho}/:id/detalhe`, asyncRoute(async (req, res) => {
       const grupo = await buscar(req.params.id);
       if (!grupo) return respostaErro(res, 404, 'Padrão operacional não encontrado.');
-      return res.json({ ...grupo, versoes: await listarVersoes(grupo.id) });
+      return res.json({ ...respostaPadrao(grupo), versoes: await listarVersoes(grupo.id) });
     }));
 
     router.get(`${caminho}/:id/versoes`, asyncRoute(async (req, res) => {
@@ -276,7 +315,7 @@ function criarRouterPadroesOperacionais({
         throw new Error(error.message);
       }
       await registrar(req, 'criou', grupo, `Criou o padrão “${grupo.nome}”.`);
-      res.status(201).json(data || grupo);
+      res.status(201).json(respostaPadrao(data || grupo));
     }));
 
     router.put(`${caminho}/:id`, administrar, asyncRoute(async (req, res) => {
@@ -295,7 +334,7 @@ function criarRouterPadroesOperacionais({
       const resultado = await atualizar(atual.id, patch);
       if (resultado.conflito) return respostaErro(res, 409, 'Já existe um padrão com esse nome.');
       await registrar(req, 'alterou', atual, `Atualizou o padrão “${patch.nome}”.`);
-      res.json(resultado.data);
+      res.json(respostaPadrao(resultado.data));
     }));
     router.patch(`${caminho}/:id`, administrar, asyncRoute(async (req, res) => {
       const atual = await buscar(req.params.id);
@@ -310,7 +349,7 @@ function criarRouterPadroesOperacionais({
       }
       const resultado = await atualizar(atual.id, patch);
       if (resultado.conflito) return respostaErro(res, 409, 'Já existe um padrão com esse nome.');
-      res.json(resultado.data);
+      res.json(respostaPadrao(resultado.data));
     }));
 
     router.delete(`${caminho}/:id`, administrar, asyncRoute(async (req, res) => {
@@ -332,7 +371,7 @@ function criarRouterPadroesOperacionais({
       if (typeof ativo !== 'boolean') return respostaErro(res, 400, 'O status do padrão é inválido.');
       const resultado = await atualizar(grupo.id, { ativo, atualizado_em: new Date().toISOString() });
       await registrar(req, ativo ? 'ativou' : 'inativou', grupo, `${ativo ? 'Ativou' : 'Inativou'} o padrão “${grupo.nome}”.`);
-      res.json(resultado.data);
+      res.json(respostaPadrao(resultado.data));
     });
     router.patch(`${caminho}/:id/ativo`, administrar, alterarAtivo);
     router.put(`${caminho}/:id/ativo`, administrar, alterarAtivo);
@@ -372,7 +411,7 @@ function criarRouterPadroesOperacionais({
         throw new Error(error.message);
       }
       await registrar(req, 'duplicou', copia, `Duplicou o padrão “${origem.nome}” como “${nome}”.`);
-      res.status(201).json(data || copia);
+      res.status(201).json(respostaPadrao(data || copia));
     }));
 
     const reordenarPadroes = asyncRoute(async (req, res) => {
@@ -414,7 +453,7 @@ function criarRouterPadroesOperacionais({
         atualizado_em: agora,
       });
       await registrar(req, 'publicou', grupo, `Publicou o padrão “${grupo.nome}” na versão ${versao}.`);
-      res.json({ ...(resultado.data || { ...grupo, ...snapshot }), versao, publicado: true, snapshot });
+      res.json({ ...respostaPadrao(resultado.data || { ...grupo, ...snapshot }), versao, publicado: true, snapshot });
     });
     router.post(`${caminho}/:id/publicar`, administrar, publicarPadrao);
     router.put(`${caminho}/:id/publicar`, administrar, publicarPadrao);
@@ -431,8 +470,8 @@ function criarRouterPadroesOperacionais({
       if (componentes.length >= MAX_COMPONENTES) return respostaErro(res, 400, `O padrão pode conter no máximo ${MAX_COMPONENTES} componentes.`);
       const novo = { id: String(componente.id || generateId('pcomp')), ...clonar(componente), ordem: componentes.length };
       componentes.push(novo);
-      const resultado = await atualizar(grupo.id, { componentes, publicado: false, atualizado_em: new Date().toISOString() });
-      res.status(201).json({ padrao: resultado.data, componente: novo });
+      const resultado = await atualizar(grupo.id, { componentes, metadados: { ...(grupo.metadados || {}), quantidade_pbs: contarPbsComponentes(componentes) }, publicado: false, atualizado_em: new Date().toISOString() });
+      res.status(201).json({ padrao: respostaPadrao(resultado.data), componente: novo });
     }));
 
     router.put(`${caminho}/:id/componentes/:componenteId`, administrar, asyncRoute(async (req, res) => {
@@ -443,8 +482,8 @@ function criarRouterPadroesOperacionais({
       if (indice < 0) return respostaErro(res, 404, 'Componente não encontrado.');
       const patch = req.body?.componente || req.body;
       componentes[indice] = { ...componentes[indice], ...clonar(patch), id: componentes[indice].id };
-      const resultado = await atualizar(grupo.id, { componentes, publicado: false, atualizado_em: new Date().toISOString() });
-      res.json({ padrao: resultado.data, componente: componentes[indice] });
+      const resultado = await atualizar(grupo.id, { componentes, metadados: { ...(grupo.metadados || {}), quantidade_pbs: contarPbsComponentes(componentes) }, publicado: false, atualizado_em: new Date().toISOString() });
+      res.json({ padrao: respostaPadrao(resultado.data), componente: componentes[indice] });
     }));
 
     router.delete(`${caminho}/:id/componentes/:componenteId`, administrar, asyncRoute(async (req, res) => {
@@ -453,8 +492,8 @@ function criarRouterPadroesOperacionais({
       const componentes = (Array.isArray(grupo.componentes) ? grupo.componentes : []).filter((item) => String(item.id) !== req.params.componenteId);
       if (componentes.length === (grupo.componentes || []).length) return respostaErro(res, 404, 'Componente não encontrado.');
       componentes.forEach((item, indice) => { item.ordem = indice; });
-      const resultado = await atualizar(grupo.id, { componentes, publicado: false, atualizado_em: new Date().toISOString() });
-      res.json(resultado.data);
+      const resultado = await atualizar(grupo.id, { componentes, metadados: { ...(grupo.metadados || {}), quantidade_pbs: contarPbsComponentes(componentes) }, publicado: false, atualizado_em: new Date().toISOString() });
+      res.json(respostaPadrao(resultado.data));
     }));
 
     const reordenarComponentes = asyncRoute(async (req, res) => {
@@ -465,8 +504,8 @@ function criarRouterPadroesOperacionais({
       const porId = new Map(atuais.map((item) => [String(item.id), item]));
       const ordenados = [...ids.map((id) => porId.get(id)).filter(Boolean), ...atuais.filter((item) => !ids.includes(String(item.id)))];
       ordenados.forEach((item, indice) => { item.ordem = indice; });
-      const resultado = await atualizar(grupo.id, { componentes: ordenados, publicado: false, atualizado_em: new Date().toISOString() });
-      res.json(resultado.data);
+      const resultado = await atualizar(grupo.id, { componentes: ordenados, metadados: { ...(grupo.metadados || {}), quantidade_pbs: contarPbsComponentes(ordenados) }, publicado: false, atualizado_em: new Date().toISOString() });
+      res.json(respostaPadrao(resultado.data));
     });
     router.post(`${caminho}/:id/componentes/reordenar`, administrar, reordenarComponentes);
     router.put(`${caminho}/:id/componentes/reordenar`, administrar, reordenarComponentes);
