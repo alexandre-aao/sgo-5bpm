@@ -57,15 +57,15 @@ export function RoteiroGrid({
     <div className="cartao-vtr-grid">
       {podeEditar && (
         <div className="roteiro-acoes-lote">
-          <div><Layers3 /><span><strong>Aplicar atividade a várias viaturas</strong><small>Atualiza todos os itens existentes das VTRs marcadas.</small></span></div>
+          <div className="roteiro-lote-identidade"><Layers3 /><span><strong>Aplicar atividade a várias viaturas</strong><small>Selecione uma atividade e as viaturas desejadas.</small></span></div>
           <div className="roteiro-lote-controles">
-            <select value={atividadeLote} onChange={(e) => setAtividadeLote(e.target.value)}>
+            <label><span>Atividade</span><select value={atividadeLote} onChange={(e) => setAtividadeLote(e.target.value)}>
               {ATIVIDADES_CARTAO.map((atividade) => <option key={atividade}>{atividade}</option>)}
-            </select>
-            <div className="roteiro-lote-checks">
-              {viaturas.map((viatura) => <label className="checkbox-inline" key={viatura.id}><input type="checkbox" checked={viaturasLote.has(viatura.id)} onChange={() => setViaturasLote((atual) => { const nova = new Set(atual); if (nova.has(viatura.id)) nova.delete(viatura.id); else nova.add(viatura.id); return nova; })} />{viatura.prefixo}</label>)}
-            </div>
-            <button type="button" className={`btn btn-secondary btn-sm${aplicando ? ' btn-carregando' : ''}`} disabled={aplicando} onClick={() => void aplicarEmLote()}>Aplicar</button>
+            </select></label>
+            <label><span>Viaturas</span><select multiple size={Math.min(4, Math.max(2, viaturas.length))} value={[...viaturasLote]} aria-label="Viaturas para aplicar atividade" onChange={(e) => setViaturasLote(new Set([...e.target.selectedOptions].map((option) => option.value)))}>
+              {viaturas.map((viatura) => <option key={viatura.id} value={viatura.id}>{viatura.prefixo || 'Sem prefixo'} — {viatura.setor || 'Setor não informado'}</option>)}
+            </select></label>
+            <button type="button" className={`btn btn-primary btn-sm${aplicando ? ' btn-carregando' : ''}`} disabled={aplicando} onClick={() => void aplicarEmLote()}>Aplicar</button>
           </div>
         </div>
       )}

@@ -7148,6 +7148,228 @@ kbd {
   .dash-cota-valores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* =============================================================
+   CARTÃO ORDINÁRIO — workspace operacional
+   Camada visual do redesign: mantém os seletores e handlers do módulo,
+   mas aproxima a leitura da referência (resumo, biblioteca e roteiro).
+   ============================================================= */
+.cartao-ordinario-page {
+  --cartao-ink: #17243a;
+  --cartao-subtle: #61708a;
+  --cartao-border-soft: #dce5f0;
+  --cartao-blue-soft: #edf5ff;
+  --cartao-green-soft: #ecf9f0;
+  --cartao-yellow-soft: #fff8e8;
+  --cartao-purple-soft: #f5f0ff;
+  color: var(--cartao-ink);
+}
+
+.cartao-ordinario-toolbar {
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cartao-ordinario-titulo h2 {
+  color: var(--cartao-ink);
+  font-size: clamp(1.28rem, 1.5vw, 1.6rem);
+  font-weight: 750;
+}
+
+.cartao-ordinario-data-contexto {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--cartao-subtle);
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+.cartao-ordinario-data-contexto svg { width: 14px; height: 14px; color: var(--cartao-blue); }
+.cartao-ordinario-toolbar-actions { align-items: center; }
+.cartao-emitir-principal { min-width: 164px; justify-content: center; }
+
+.cartao-operacional-resumo {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.cartao-resumo-indicador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 76px;
+  border: 1px solid var(--cartao-border-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--bg-panel);
+  box-shadow: 0 1px 2px rgba(21, 44, 76, .04);
+}
+
+.cartao-resumo-indicador-icone {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.cartao-resumo-indicador-icone svg { width: 20px; height: 20px; }
+.cartao-resumo-indicador.azul .cartao-resumo-indicador-icone { color: #1767d2; background: #eaf2ff; }
+.cartao-resumo-indicador.verde .cartao-resumo-indicador-icone { color: #1c9c58; background: #def7e5; }
+.cartao-resumo-indicador.amarelo .cartao-resumo-indicador-icone { color: #d78600; background: #fff1cc; }
+.cartao-resumo-indicador.roxo .cartao-resumo-indicador-icone { color: #7956cc; background: #eee8ff; }
+
+.cartao-resumo-indicador-conteudo { display: grid; min-width: 0; gap: 2px; }
+.cartao-resumo-indicador-conteudo strong { color: var(--cartao-ink); font-size: 1.12rem; line-height: 1.15; }
+.cartao-resumo-indicador-conteudo span { color: var(--cartao-ink); font-size: .72rem; font-weight: 700; }
+.cartao-resumo-indicador-conteudo small { overflow: hidden; color: var(--cartao-subtle); font-size: .64rem; text-overflow: ellipsis; white-space: nowrap; }
+.cartao-resumo-indicador.roxo .cartao-resumo-indicador-conteudo strong { font-size: .95rem; }
+
+.cartao-ordinario-info {
+  margin-bottom: 14px;
+  border-radius: 9px;
+  background: #f2f7ff;
+  font-size: .72rem;
+}
+
+.cartao-ordinario-layout { grid-template-columns: minmax(255px, 28%) minmax(0, 1fr); gap: 14px; }
+.cartao-biblioteca { padding: 15px 13px 12px; border-color: var(--cartao-border-soft); border-radius: 10px; box-shadow: 0 1px 3px rgba(21, 44, 76, .05); }
+.cartao-biblioteca-heading { margin-bottom: 12px; }
+.cartao-section-kicker { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 6px; color: var(--cartao-blue); font-size: .63rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.cartao-section-kicker svg { width: 14px; height: 14px; }
+.cartao-biblioteca-heading h2 { color: var(--cartao-ink); font-size: .9rem; }
+.cartao-biblioteca-heading p { margin-top: 3px; line-height: 1.35; }
+.cartao-biblioteca-count { min-width: 25px; height: 25px; border-radius: 50%; background: var(--cartao-blue-soft); }
+.cartao-search { min-height: 37px; background: #fff; }
+.cartao-filtros { gap: 5px; margin: 10px 0 12px; }
+.cartao-filtros button { min-height: 28px; padding-inline: 9px; font-size: .65rem; }
+.cartao-biblioteca-lista { gap: 7px; max-height: min(660px, calc(100vh - 365px)); }
+.cartao-padrao-item { padding: 10px 9px 8px; border-left-width: 2px; border-radius: 8px; }
+.cartao-padrao-item-top { margin-bottom: 5px; }
+.cartao-padrao-item h3 { font-size: .78rem; }
+.cartao-padrao-line { margin: 3px 0; font-size: .65rem; }
+.cartao-padrao-meta { color: var(--cartao-subtle); font-weight: 600; }
+.cartao-padrao-roteiro { max-width: 100%; }
+.cartao-padrao-acoes { gap: 8px; margin-top: 8px; }
+.cartao-padrao-acoes button { font-size: .63rem; }
+.cartao-padrao-acoes .cartao-padrao-editar { color: var(--cartao-subtle); }
+.cartao-padrao-acoes .cartao-padrao-adicionar { min-height: 27px; padding: 4px 8px; }
+
+.cartao-programa-painel { border-color: var(--cartao-border-soft); border-radius: 10px; box-shadow: 0 1px 3px rgba(21, 44, 76, .05); }
+.cartao-programa-painel-cabecalho { padding: 14px 16px; border-bottom-color: var(--cartao-border-soft); background: var(--bg-panel); }
+.cartao-programa-painel-kicker { letter-spacing: .04em; text-transform: none; }
+.cartao-programa-painel-cabecalho h3 { margin-top: 4px; color: var(--cartao-ink); font-size: 1rem; }
+.cartao-programa-painel-cabecalho p { margin-top: 3px; }
+.cartao-programa-painel-contador { border: 0; border-radius: 6px; padding: 6px 9px; background: var(--cartao-blue-soft); font-weight: 750; }
+.cartao-programa-painel > .cartao-vtr-grid { gap: 10px; margin: 12px; }
+
+.roteiro-acoes-lote {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(0, 2.15fr);
+  align-items: end;
+  gap: 14px;
+  border-color: var(--cartao-border-soft);
+  border-radius: 9px;
+  padding: 11px 13px;
+  background: #f9fbfe;
+}
+
+.roteiro-lote-identidade { display: flex; align-items: center; gap: 9px; }
+.roteiro-lote-identidade > svg { width: 18px; color: var(--cartao-blue); }
+.roteiro-lote-identidade span { display: grid; gap: 2px; }
+.roteiro-lote-identidade strong { color: var(--cartao-ink); font-size: .75rem; }
+.roteiro-lote-identidade small { color: var(--cartao-subtle); font-size: .64rem; line-height: 1.35; }
+.roteiro-lote-controles { display: grid; grid-template-columns: minmax(140px, .8fr) minmax(180px, 1.2fr) auto; align-items: end; gap: 9px; }
+.roteiro-lote-controles label { display: grid; gap: 4px; min-width: 0; }
+.roteiro-lote-controles label > span { color: var(--cartao-subtle); font-size: .62rem; font-weight: 700; }
+.roteiro-lote-controles select { min-width: 0; width: 100%; border-color: var(--cartao-border-soft); border-radius: 6px; background: #fff; font-size: .7rem; }
+.roteiro-lote-controles select[multiple] { min-height: 38px; height: 38px; padding: 7px 8px; }
+.roteiro-lote-controles button { min-height: 38px; }
+
+.cartao-vtr-card { border-color: var(--cartao-border-soft); border-radius: 9px; box-shadow: none; }
+.cartao-vtr-card.aberto { border-color: #94baff; box-shadow: 0 0 0 1px rgba(34, 111, 219, .05); }
+.cartao-vtr-header { align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-panel); border-bottom-color: var(--cartao-border-soft); }
+.cartao-vtr-toggle { display: flex; align-items: center; min-width: 0; flex: 1 1 auto; gap: 9px; border: 0; padding: 3px 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.cartao-vtr-toggle > svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--cartao-subtle); }
+.cartao-vtr-status-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: #d39518; box-shadow: 0 0 0 3px #fff5d9; }
+.cartao-vtr-status-dot.completo { background: #1fa55c; box-shadow: 0 0 0 3px #e1f7e8; }
+.cartao-vtr-identidade { display: grid; min-width: 0; gap: 3px; }
+.cartao-vtr-identidade > strong { overflow: hidden; color: var(--cartao-ink); font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+.cartao-vtr-identidade > span { overflow: hidden; color: var(--cartao-subtle); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
+.cartao-vtr-identidade > span b { margin-inline: 3px; color: #9aa9bc; }
+.cartao-vtr-identidade > small { overflow: hidden; color: #526784; font-size: .63rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.cartao-vtr-header-acoes { display: flex; align-items: flex-start; justify-content: flex-end; flex: 0 0 auto; gap: 4px; }
+.cartao-acao-viatura, .cartao-acao-viatura-grupo { display: inline-flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; min-width: 34px; border: 0; padding: 1px 2px; background: transparent; color: #46617f; font: inherit; cursor: pointer; }
+.cartao-acao-viatura svg { width: 18px; height: 18px; }
+.cartao-acao-viatura span, .cartao-acao-viatura-grupo > span { color: var(--cartao-subtle); font-size: .57rem; line-height: 1.1; }
+.cartao-acao-viatura:hover, .cartao-acao-viatura:focus-visible { color: var(--cartao-blue); }
+.cartao-acao-viatura:disabled, .cartao-acao-viatura-grupo button:disabled { opacity: .35; cursor: not-allowed; }
+.cartao-acao-atualizar { color: #16815d; }
+.cartao-acao-excluir { color: #8b5d65; }
+.cartao-acao-excluir:hover, .cartao-acao-excluir:focus-visible { color: var(--danger); }
+.cartao-acao-viatura-grupo > div { display: flex; gap: 1px; }
+.cartao-acao-viatura-grupo .btn-icon { width: 18px; height: 22px; border: 0; color: #46617f; }
+.cartao-acao-viatura-grupo .btn-icon svg { width: 14px; height: 14px; }
+
+.cartao-vtr-body { padding: 11px 12px 13px; }
+.cartao-vtr-conteudo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(205px, 27%); gap: 12px; align-items: start; }
+.cartao-roteiro-coluna { min-width: 0; }
+.cartao-roteiro-coluna .roteiro-ordem-nota { margin-top: 0; }
+.cartao-itens-table { font-size: .7rem; }
+.cartao-itens-table th { padding: 6px 8px; color: #5d6d84; font-size: .58rem; text-transform: none; }
+.cartao-itens-table td { padding: 8px; }
+.cartao-item-hora { font-size: .66rem; }
+.cartao-evento-alerta { display: grid; gap: 11px; margin: 39px 0 0; border: 1px solid #f2d89e; border-radius: 8px; padding: 12px; background: var(--cartao-yellow-soft); color: #93600d; font-size: .66rem; line-height: 1.4; }
+.cartao-evento-alerta-titulo { display: flex; align-items: center; gap: 7px; padding-bottom: 9px; border-bottom: 1px solid #f2dfb8; color: #a96800; }
+.cartao-evento-alerta-titulo svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.cartao-evento-alerta-titulo strong { font-size: .72rem; }
+.cartao-evento-linha { display: grid; gap: 2px; padding-left: 10px; position: relative; }
+.cartao-evento-linha::before { position: absolute; left: 0; top: 5px; content: '•'; color: #c18114; }
+.cartao-evento-linha strong { color: #87590e; font-weight: 750; }
+.cartao-evento-linha span { color: #a36f1c; }
+.cartao-evento-linha small { color: #ae8243; font-size: .6rem; }
+.cartao-rodape-acoes { margin-top: 13px; }
+
+@media (max-width: 1180px) {
+  .cartao-operacional-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cartao-vtr-conteudo { grid-template-columns: minmax(0, 1fr) 235px; }
+}
+
+@media (max-width: 768px) {
+  .cartao-operacional-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .cartao-resumo-indicador { min-height: 68px; gap: 8px; padding: 9px 10px; }
+  .cartao-resumo-indicador-icone { flex-basis: 34px; width: 34px; height: 34px; }
+  .cartao-resumo-indicador-icone svg { width: 17px; height: 17px; }
+  .cartao-resumo-indicador-conteudo strong { font-size: .98rem; }
+  .cartao-resumo-indicador-conteudo span { font-size: .65rem; }
+  .cartao-resumo-indicador-conteudo small { font-size: .58rem; }
+  .cartao-ordinario-data-contexto { margin-top: 4px; }
+  .cartao-programa-painel-cabecalho { gap: 9px; }
+  .roteiro-acoes-lote { grid-template-columns: 1fr; gap: 10px; }
+  .roteiro-lote-controles { grid-template-columns: 1fr; align-items: stretch; }
+  .roteiro-lote-controles select[multiple] { height: 84px; }
+  .roteiro-lote-controles button { width: 100%; }
+  .cartao-vtr-header { align-items: flex-start; }
+  .cartao-vtr-header-acoes { max-width: 190px; flex-wrap: wrap; }
+  .cartao-acao-viatura, .cartao-acao-viatura-grupo { min-width: 36px; min-height: 40px; }
+  .cartao-vtr-conteudo { display: flex; flex-direction: column; }
+  .cartao-evento-alerta { width: 100%; margin-top: 0; }
+  .cartao-rodape-acoes { justify-content: stretch; }
+}
+
+@media (max-width: 520px) {
+  .cartao-operacional-resumo { grid-template-columns: 1fr 1fr; }
+  .cartao-resumo-indicador-conteudo small { white-space: normal; }
+  .cartao-vtr-identidade > strong { white-space: normal; }
+  .cartao-vtr-header-acoes { max-width: 144px; }
+  .cartao-acao-viatura, .cartao-acao-viatura-grupo { min-width: 32px; }
+}
+
 /* Escopo da replicação para as demais ocorrências do grupo de recorrência. */
 .escala-escopo {
   padding: var(--space-3);
