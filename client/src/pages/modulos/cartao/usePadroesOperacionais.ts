@@ -10,6 +10,7 @@ export interface ItemRoteiroPadrao {
   fim: string;
   local: string;
   atividade: string;
+  observacao?: string;
 }
 
 export interface ComponentePadrao {
@@ -97,6 +98,7 @@ function normalizarPadrao(item: Record<string, unknown>): PadraoOperacional {
           fim: String(item.fim ?? item.horario_fim ?? ''),
           local: String(item.local ?? item.area ?? ''),
           atividade: String(item.atividade ?? item.missao ?? 'CPB'),
+          observacao: String(item.observacao ?? item.observacoes ?? ''),
         };
       }) : [];
       return {
