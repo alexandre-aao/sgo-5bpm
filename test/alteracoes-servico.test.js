@@ -2,7 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   alteracaoAfetaData,
+  alteracaoAfetaServico,
   calcularImpactoOperacional,
+  calcularServicosAfetados,
   quantidadeDiasCorridos,
   projetarCiclo24x72,
 } = require('../lib/alteracoes-servico');
@@ -45,6 +47,25 @@ test('sem referência confiável não inventa serviços do ciclo', () => {
   assert.deepEqual(resultado.servicosAfetados, []);
 });
 
+test('atestado de 21 a 26 continua atingindo os plantões 24x72 de 21 e 25', () => {
+  const atestado = {
+    data_inicio: '2026-08-21', data_fim: '2026-08-26', data_referencia_servico: '2026-08-21',
+    jornada: '24H', turno: '24H', situacao: 'INFORMADA',
+  };
+  assert.deepEqual(calcularServicosAfetados(atestado).map((item) => item.data), ['2026-08-21', '2026-08-25']);
+  assert.equal(alteracaoAfetaData(atestado, '2026-08-25'), true);
+  assert.equal(alteracaoAfetaData(atestado, '2026-08-23'), false);
+});
+
+test('jornada 12h compara intervalos e não marca o turno oposto', () => {
+  const atestado = {
+    data_inicio: '2026-08-21', data_fim: '2026-08-21', jornada: '12H', turno: 'DIURNO',
+    horario_inicio: '07:00', horario_fim: '19:00', situacao: 'INFORMADA',
+  };
+  assert.equal(alteracaoAfetaServico(atestado, { data: '2026-08-21', jornada: '12H', turno: 'DIURNO', horario_inicio: '07:00', horario_fim: '19:00' }), true);
+  assert.equal(alteracaoAfetaServico(atestado, { data: '2026-08-21', jornada: '12H', turno: 'NOTURNO', horario_inicio: '19:00', horario_fim: '07:00' }), false);
+});
+
 const composicao = { qtd_viaturas_previstas: 3, policiais_por_viatura: 3, qtd_extras: 0 };
 const base = {
   data_inicio: '2026-08-15', data_fim: '2026-08-15', turno: '24H',
@@ -71,6 +92,20 @@ test('impacto operacional: 7 policiais formam 2 viaturas e sobra 1', () => {
   assert.equal(impacto.policiaisDisponiveisProjetados, 7);
   assert.equal(impacto.viaturasCompletasPossiveis, 2);
   assert.equal(impacto.policiaisRemanescentes, 1);
+});
+
+test('capacidade final informada prevalece e não soma alterações duplicadas', () => {
+  const capacidade = {
+    qtd_viaturas_previstas: 3, policiais_por_viatura: 3, qtd_extras: 0,
+    qtd_viaturas_completas: 2, qtd_policiais_disponiveis: 3,
+  };
+  const primeira = { ...base, policial_pessoal_id: 'p1', tipo: 'ATESTADO' };
+  const duplicada = { ...base, policial_pessoal_id: 'p1', tipo: 'ATESTADO' };
+  const impacto = calcularImpactoOperacional(capacidade, [primeira, duplicada], '2026-08-15');
+  assert.equal(impacto.viaturasCompletasPossiveis, 2);
+  assert.equal(impacto.policiaisRemanescentes, 3);
+  assert.equal(impacto.ausenciasSemSubstituicao, 1);
+  assert.equal(impacto.capacidadeManual, true);
 });
 
 test('permuta e substituição posterior mantêm o total', () => {

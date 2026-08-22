@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, FileText, Pencil, Plus, UserRound, X } fr
 import { useModalA11y } from '../../../hooks/useModalA11y';
 import { useToast } from '../../../context/useToast';
 import type { AlteracaoPayload, AlteracaoServico, PessoaServico } from './types';
-import { SITUACOES_ALTERACAO, TIPOS_ALTERACAO, TURNOS_SERVICO, UNIDADES_SERVICO } from './types';
+import { JORNADAS_SERVICO, TIPOS_ALTERACAO, TURNOS_SERVICO, UNIDADES_SERVICO } from './types';
 import { dataBr } from './utils';
 
 interface Props {
@@ -27,7 +27,10 @@ function valorInicial(props: Props): AlteracaoPayload {
     data_inicio: item?.data_inicio || props.dataInicial,
     data_fim: item?.data_fim || item?.data_inicio || props.dataInicial,
     data_referencia_servico: item?.data_referencia_servico || item?.data_inicio || props.dataInicial,
+    jornada: item?.jornada || (item?.turno === 'DIURNO' || item?.turno === 'NOTURNO' ? '12H' : '24H'),
     turno: item?.turno || props.turnoInicial,
+    horario_inicio: item?.horario_inicio || (item?.turno === 'NOTURNO' ? '19:00' : '07:00'),
+    horario_fim: item?.horario_fim || (item?.turno === 'NOTURNO' ? '07:00' : '19:00'),
     policial_id: item?.policial_id || null,
     policial_nome: item?.policial_nome || '',
     policial_matricula: item?.policial_matricula || '',
@@ -39,7 +42,6 @@ function valorInicial(props: Props): AlteracaoPayload {
     observacao: item?.observacao || '',
     numero_sei: item?.numero_sei || item?.documento || '',
     documento: item?.documento || '',
-    situacao: item?.situacao || 'INFORMADA',
   };
 }
 
@@ -86,8 +88,11 @@ export function ModalAlteracao({ alteracao, unidades, pessoas, unidadeInicial, d
     if (etapa === 3 && form.data_fim && form.data_fim < form.data_inicio) {
       toast('A data final não pode ser anterior à data inicial.', 'warning'); return false;
     }
-    if (etapa === 3 && form.data_fim !== form.data_inicio && !form.data_referencia_servico) {
+    if (etapa === 3 && form.jornada !== '12H' && form.data_fim !== form.data_inicio && !form.data_referencia_servico) {
       toast('Informe uma data de serviço confiável para projetar o ciclo 24x72.', 'warning'); return false;
+    }
+    if (etapa === 3 && form.jornada === '12H' && (!form.horario_inicio || !form.horario_fim || form.horario_inicio === form.horario_fim)) {
+      toast('Informe o intervalo do turno de 12 horas.', 'warning'); return false;
     }
     return true;
   }
@@ -119,7 +124,11 @@ export function ModalAlteracao({ alteracao, unidades, pessoas, unidadeInicial, d
       policial_pessoal_id: form.policial_id || null,
       substituto_pessoal_id: form.substituto_id || null,
       numero_documento: form.numero_sei?.trim() || form.documento?.trim() || null,
-      data_referencia_servico: form.data_referencia_servico || null,
+      data_referencia_servico: form.jornada === '24H' ? (form.data_referencia_servico || null) : null,
+      jornada: form.jornada || '24H',
+      turno: form.jornada === '24H' ? '24H' : (form.turno === 'NOTURNO' ? 'NOTURNO' : 'DIURNO'),
+      horario_inicio: form.jornada === '12H' ? form.horario_inicio : null,
+      horario_fim: form.jornada === '12H' ? form.horario_fim : null,
     }, alteracao?.id);
     setEnviando(false);
     if (resultado.ok) {
@@ -132,7 +141,11 @@ export function ModalAlteracao({ alteracao, unidades, pessoas, unidadeInicial, d
 
   return (
     <div className="modal-overlay" {...propsOverlay}>
-      <div className="modal-box modal-box-lg" ref={refCaixa}>
+      <div
+        className="modal-box modal-box-lg"
+        ref={refCaixa}
+        onMouseDown={(evento) => evento.stopPropagation()}
+      >
         <div className="modal-header">
           <h3 id={idTitulo}>{modoEdicao ? <Pencil /> : <Plus />} {modoEdicao ? 'Editar alteração' : 'Nova alteração do serviço'}</h3>
           <button type="button" className="btn-close" aria-label="Fechar" onClick={onFechar}><X /></button>
@@ -155,8 +168,17 @@ export function ModalAlteracao({ alteracao, unidades, pessoas, unidadeInicial, d
                 </select>
               </div>
               <div className="form-group">
+                <label htmlFor="alteracao-jornada">Jornada</label>
+                <select id="alteracao-jornada" value={form.jornada || '24H'} onChange={(e) => {
+                  const jornada = e.target.value;
+                  setForm((atual) => ({ ...atual, jornada, turno: jornada === '24H' ? '24H' : (atual.turno === 'NOTURNO' ? 'NOTURNO' : 'DIURNO') }));
+                }} required>
+                  {JORNADAS_SERVICO.map((jornada) => <option key={jornada} value={jornada}>{jornada === '24H' ? '24 horas (24x72)' : '12 horas'}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
                 <label htmlFor="alteracao-turno">Turno</label>
-                <input id="alteracao-turno" list="turnos-alteracao" value={form.turno} onChange={(e) => atualizar('turno', e.target.value)} placeholder="Ex.: 24h" required />
+                {form.jornada === '12H' ? <select id="alteracao-turno" value={form.turno === 'NOTURNO' ? 'NOTURNO' : 'DIURNO'} onChange={(e) => atualizar('turno', e.target.value)} required><option value="DIURNO">Diurno · 07:00–19:00</option><option value="NOTURNO">Noturno · 19:00–07:00</option></select> : <input id="alteracao-turno" value="24H" readOnly />}
                 <datalist id="turnos-alteracao">{TURNOS_SERVICO.map((turno) => <option key={turno} value={turno} />)}</datalist>
               </div>
               <div className="form-group">
@@ -199,11 +221,10 @@ export function ModalAlteracao({ alteracao, unidades, pessoas, unidadeInicial, d
 
           {etapa === 3 && (
             <div>
-              <p className="texto-auxiliar">Para ausências prolongadas, informe o período completo. Os serviços 24x72 atingidos são uma projeção calculada pelo servidor.</p>
+              <p className="texto-auxiliar">Para ausências prolongadas, informe o período completo. O servidor compara o afastamento com os plantões realmente atingidos.</p>
               <div className="alteracoes-form-grid">
                 <div className="form-group"><label htmlFor="alteracao-fim">Data final</label><input id="alteracao-fim" type="date" min={form.data_inicio} value={form.data_fim || form.data_inicio} onChange={(e) => atualizar('data_fim', e.target.value)} disabled={!tipoAusencia} /></div>
-                <div className="form-group"><label htmlFor="alteracao-referencia">Data de referência do serviço 24x72</label><input id="alteracao-referencia" type="date" value={form.data_referencia_servico || ''} onChange={(e) => atualizar('data_referencia_servico', e.target.value)} required={form.data_fim !== form.data_inicio} /><small className="texto-auxiliar">Use uma data em que este policial efetivamente estava previsto para o serviço.</small></div>
-                <div className="form-group"><label htmlFor="alteracao-situacao">Situação</label><select id="alteracao-situacao" value={form.situacao} onChange={(e) => atualizar('situacao', e.target.value)}>{SITUACOES_ALTERACAO.map((situacao) => <option key={situacao} value={situacao}>{situacao}</option>)}</select></div>
+                {form.jornada === '24H' ? <div className="form-group"><label htmlFor="alteracao-referencia">Plantão de referência do ciclo 24x72</label><input id="alteracao-referencia" type="date" value={form.data_referencia_servico || ''} onChange={(e) => atualizar('data_referencia_servico', e.target.value)} required={form.data_fim !== form.data_inicio} /><small className="texto-auxiliar">Use uma data em que este policial efetivamente estava previsto para o serviço.</small></div> : <><div className="form-group"><label htmlFor="alteracao-horario-inicio">Início do turno 12h</label><input id="alteracao-horario-inicio" type="time" value={form.horario_inicio || ''} onChange={(e) => atualizar('horario_inicio', e.target.value)} required /></div><div className="form-group"><label htmlFor="alteracao-horario-fim">Fim do turno 12h</label><input id="alteracao-horario-fim" type="time" value={form.horario_fim || ''} onChange={(e) => atualizar('horario_fim', e.target.value)} required /></div></>}
               </div>
               <div className="form-group"><label htmlFor="alteracao-observacao">Observações</label><textarea id="alteracao-observacao" rows={4} value={form.observacao || ''} onChange={(e) => atualizar('observacao', e.target.value)} placeholder="Informações úteis para o Adjunto e o Oficial de Dia" /></div>
             </div>
@@ -213,13 +234,13 @@ export function ModalAlteracao({ alteracao, unidades, pessoas, unidadeInicial, d
             <div>
                 <div className="panel panel-subsection alteracoes-documento-panel">
                 <div className="panel-title"><FileText /><h2>Documento e revisão</h2></div>
-                <div className="form-group alteracoes-documento-campo"><label htmlFor="alteracao-sei">Nº SEI / processo / documento (opcional)</label><input id="alteracao-sei" value={form.numero_sei || ''} onChange={(e) => atualizar('numero_sei', e.target.value)} /></div>
+                <div className="form-group alteracoes-documento-campo"><label htmlFor="alteracao-sei">Número do processo / SEI (opcional)</label><input id="alteracao-sei" name="numero_processo" type="text" autoComplete="off" value={form.numero_sei || ''} onChange={(e) => atualizar('numero_sei', e.target.value)} /></div>
               </div>
               <dl className="alteracoes-resumo-dl">
                 <dt>Unidade</dt><dd>{form.unidade || '—'} · {form.turno || '—'}</dd>
                 <dt>Período</dt><dd>{dataBr(form.data_inicio)}{form.data_fim && form.data_fim !== form.data_inicio ? ` a ${dataBr(form.data_fim)}` : ''}</dd>
                 <dt>Policial</dt><dd>{form.policial_nome || '—'}{form.policial_matricula ? ` · Mat. ${form.policial_matricula}` : ''}</dd>
-                <dt>Alteração</dt><dd>{form.tipo} · {form.situacao}</dd>
+                <dt>Alteração</dt><dd>{form.tipo} · Jornada {form.jornada === '12H' ? '12h' : '24h'}</dd>
                 <dt>Substituto</dt><dd>{form.substituto_nome || 'Não informado'}{form.substituto_matricula ? ` · Mat. ${form.substituto_matricula}` : ''}</dd>
                 <dt>Observação</dt><dd>{form.observacao || '—'}</dd>
               </dl>

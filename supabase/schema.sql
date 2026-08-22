@@ -756,6 +756,15 @@ create table if not exists alteracoes_servico_historico (
   acao text not null, usuario text not null references usuarios(usuario), usuario_nome text not null,
   criado_em timestamptz not null default now(), valores_anteriores jsonb, valores_novos jsonb
 );
+-- Migration aditiva 018: jornadas 12h e fotografia final de capacidade.
+alter table if exists composicoes_servico add column if not exists jornada text;
+alter table if exists composicoes_servico add column if not exists horario_inicio text;
+alter table if exists composicoes_servico add column if not exists horario_fim text;
+alter table if exists composicoes_servico add column if not exists qtd_viaturas_completas integer;
+alter table if exists composicoes_servico add column if not exists qtd_policiais_disponiveis integer;
+alter table if exists alteracoes_servico add column if not exists jornada text;
+alter table if exists alteracoes_servico add column if not exists horario_inicio text;
+alter table if exists alteracoes_servico add column if not exists horario_fim text;
 alter table if exists composicoes_servico enable row level security;
 alter table if exists alteracoes_servico enable row level security;
 alter table if exists alteracoes_servico_ciencias enable row level security;

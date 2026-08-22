@@ -12,13 +12,19 @@ interface AlteracaoTurno {
   data_inicio: string;
   data_fim: string;
   substituto_nome?: string | null;
+  jornada?: string;
+  turno?: string;
+  horario_inicio?: string | null;
+  horario_fim?: string | null;
   projecao: { servicosAfetados: string[]; quantidadeServicosAfetados: number; proximoServicoProjetado?: string | null };
-  ciencias?: { usuario: string }[];
+  ciencias?: { usuario: string; usuario_nome?: string; criado_em?: string }[];
 }
 interface UnidadeTurno {
   unidade: string;
   composicao: { qtd_viaturas_previstas: number; policiais_por_viatura: number; qtd_extras: number } | null;
   alteracoes: AlteracaoTurno[];
+  turno?: string;
+  jornada?: string;
   resumo: { totalPrevisto: number; permutas: number; ausenciasSemSubstituicao: number; viaturasCompletasPossiveis: number; policiaisRemanescentes: number } | null;
 }
 
@@ -30,7 +36,7 @@ export function AlteracoesEfetivo({ data }: { data: string }) {
   const [unidades, setUnidades] = useState<UnidadeTurno[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
-  const turno = '24H';
+  const turno = 'TODOS';
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -80,7 +86,7 @@ export function AlteracoesEfetivo({ data }: { data: string }) {
         <div className="alteracoes-turno-grid">
           {unidades.map((grupo) => (
             <article className="alteracoes-unidade-card" key={grupo.unidade}>
-              <header><div><h4>{grupo.unidade}</h4><span>Composição informada pela unidade</span></div><Users /></header>
+              <header><div><h4>{grupo.unidade} · {grupo.jornada || '24H'}</h4><span>Turno {grupo.turno || '24H'} · composição informada pela unidade</span></div><Users /></header>
               {!grupo.composicao || !grupo.resumo ? (
                 <p className="turno-vazio">Sem composição informada para este turno.</p>
               ) : (
@@ -98,11 +104,11 @@ export function AlteracoesEfetivo({ data }: { data: string }) {
                     <div className="alteracao-individual" key={alteracao.id}>
                       <div><strong>{alteracao.policial_nome}</strong><span className="badge">{alteracao.tipo}</span></div>
                       <p>Período: {dataBr(alteracao.data_inicio)} a {dataBr(alteracao.data_fim)}</p>
-                      <p>Serviço atual afetado: <strong>SIM</strong> · Serviços projetados: {alteracao.projecao.servicosAfetados.map(dataBr).join(', ') || '—'}</p>
+                      <p>Plantão de {dataBr(data)} afetado: <strong>SIM</strong> · Serviços projetados: {alteracao.projecao.servicosAfetados.map(dataBr).join(', ') || '—'}{alteracao.jornada === '12H' && ` · ${alteracao.horario_inicio || '—'}–${alteracao.horario_fim || '—'}`}</p>
                       <p>Substituto: {alteracao.substituto_nome || 'não informado'}</p>
-                      {['Adjunto', 'Oficial'].includes(usuario?.role || '') && (
+                      {usuario?.role === 'Adjunto' && (
                         <div className="acoes-linha">
-                          <button className="btn btn-secondary btn-sm" disabled={ciente} onClick={() => void marcarCiencia(alteracao)}><Check /> {ciente ? 'Ciente' : 'Marcar como ciente'}</button>
+                          <button className="btn btn-secondary btn-sm" disabled={ciente} onClick={() => void marcarCiencia(alteracao)}><Check /> {ciente ? `Ciente${alteracao.ciencias?.[0]?.usuario_nome ? ` · ${alteracao.ciencias[0].usuario_nome}` : ''}` : 'Registrar ciência'}</button>
                           <button className="btn btn-secondary btn-sm" onClick={() => void informarDivergencia(alteracao)}><AlertTriangle /> Informar divergência</button>
                         </div>
                       )}

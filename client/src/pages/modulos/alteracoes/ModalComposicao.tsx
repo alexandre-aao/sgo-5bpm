@@ -3,7 +3,7 @@ import { Calculator, Check, Plus, X } from 'lucide-react';
 import { useModalA11y } from '../../../hooks/useModalA11y';
 import { useToast } from '../../../context/useToast';
 import type { ComposicaoPayload, ComposicaoServico } from './types';
-import { TURNOS_SERVICO, UNIDADES_SERVICO } from './types';
+import { JORNADAS_SERVICO, TURNOS_SERVICO, UNIDADES_SERVICO } from './types';
 
 interface Props {
   composicao?: ComposicaoServico | null;
@@ -24,9 +24,14 @@ export function ModalComposicao({
     unidade: composicao?.unidade || unidadeInicial,
     data: composicao?.data || dataInicial,
     turno: composicao?.turno || turnoInicial,
+    jornada: composicao?.jornada || (composicao?.turno === 'DIURNO' || composicao?.turno === 'NOTURNO' ? '12H' : '24H'),
+    horario_inicio: composicao?.horario_inicio || (composicao?.turno === 'NOTURNO' ? '19:00' : '07:00'),
+    horario_fim: composicao?.horario_fim || (composicao?.turno === 'NOTURNO' ? '07:00' : '19:00'),
     viaturas_previstas: composicao?.viaturas_previstas || 0,
     policiais_por_viatura: composicao?.policiais_por_viatura || 3,
     extras: composicao?.extras || 0,
+    qtd_viaturas_completas: composicao?.qtd_viaturas_completas ?? 0,
+    qtd_policiais_disponiveis: composicao?.qtd_policiais_disponiveis ?? 0,
     observacao: composicao?.observacao || '',
   }));
   const [enviando, setEnviando] = useState(false);
@@ -52,6 +57,12 @@ export function ModalComposicao({
       viaturas_previstas: Math.max(0, Number(form.viaturas_previstas) || 0),
       policiais_por_viatura: Math.max(0, Number(form.policiais_por_viatura) || 0),
       extras: Math.max(0, Number(form.extras) || 0),
+      jornada: form.jornada || '24H',
+      turno: form.jornada === '24H' ? '24H' : (form.turno === 'NOTURNO' ? 'NOTURNO' : 'DIURNO'),
+      horario_inicio: form.jornada === '12H' ? form.horario_inicio : null,
+      horario_fim: form.jornada === '12H' ? form.horario_fim : null,
+      qtd_viaturas_completas: Math.max(0, Number(form.qtd_viaturas_completas) || 0),
+      qtd_policiais_disponiveis: Math.max(0, Number(form.qtd_policiais_disponiveis) || 0),
       qtd_viaturas_previstas: Math.max(0, Number(form.viaturas_previstas) || 0),
       qtd_extras: Math.max(0, Number(form.extras) || 0),
       observacao: form.observacao?.trim() || '',
@@ -88,13 +99,21 @@ export function ModalComposicao({
             </div>
             <div className="form-group">
               <label htmlFor="composicao-turno">Turno</label>
-              <input id="composicao-turno" list="turnos-composicao" value={form.turno} onChange={(e) => atualizar('turno', e.target.value)} placeholder="Ex.: 24h" required />
+              {form.jornada === '12H' ? <select id="composicao-turno" value={form.turno === 'NOTURNO' ? 'NOTURNO' : 'DIURNO'} onChange={(e) => atualizar('turno', e.target.value)} required><option value="DIURNO">Diurno · 07:00–19:00</option><option value="NOTURNO">Noturno · 19:00–07:00</option></select> : <input id="composicao-turno" value="24H" readOnly required />}
               <datalist id="turnos-composicao">{TURNOS_SERVICO.map((turno) => <option key={turno} value={turno} />)}</datalist>
             </div>
+            <div className="form-group">
+              <label htmlFor="composicao-jornada">Jornada</label>
+              <select id="composicao-jornada" value={form.jornada || '24H'} onChange={(e) => {
+                const jornada = e.target.value;
+                setForm((atual) => ({ ...atual, jornada, turno: jornada === '24H' ? '24H' : (atual.turno === 'NOTURNO' ? 'NOTURNO' : 'DIURNO') }));
+              }} required>{JORNADAS_SERVICO.map((jornada) => <option key={jornada} value={jornada}>{jornada === '24H' ? '24 horas (24x72)' : '12 horas'}</option>)}</select>
+            </div>
+            {form.jornada === '12H' && <><div className="form-group"><label htmlFor="composicao-horario-inicio">Início do turno</label><input id="composicao-horario-inicio" type="time" value={form.horario_inicio || ''} onChange={(e) => atualizar('horario_inicio', e.target.value)} required /></div><div className="form-group"><label htmlFor="composicao-horario-fim">Fim do turno</label><input id="composicao-horario-fim" type="time" value={form.horario_fim || ''} onChange={(e) => atualizar('horario_fim', e.target.value)} required /></div></>}
           </div>
           <div className="alteracoes-form-grid alteracoes-form-grid-numeros">
             <div className="form-group">
-              <label htmlFor="composicao-viaturas">Viaturas completas previstas</label>
+              <label htmlFor="composicao-viaturas">Viaturas previstas (base)</label>
               <input id="composicao-viaturas" type="number" min="0" step="1" value={form.viaturas_previstas} onChange={(e) => atualizar('viaturas_previstas', Number(e.target.value))} required />
             </div>
             <div className="form-group">
@@ -102,8 +121,16 @@ export function ModalComposicao({
               <input id="composicao-policiais-vtr" type="number" min="1" step="1" value={form.policiais_por_viatura} onChange={(e) => atualizar('policiais_por_viatura', Number(e.target.value))} required />
             </div>
             <div className="form-group">
-              <label htmlFor="composicao-extras">Extras/disponíveis</label>
+              <label htmlFor="composicao-extras">Policiais extras previstos</label>
               <input id="composicao-extras" type="number" min="0" step="1" value={form.extras} onChange={(e) => atualizar('extras', Number(e.target.value))} required />
+            </div>
+          </div>
+          <div className="panel panel-subsection alteracoes-capacidade-final-panel">
+            <div className="panel-title"><Calculator /><h2>Após as alterações deste serviço</h2></div>
+            <p className="texto-auxiliar">Informe uma fotografia final da Companhia. Esses números não serão somados por alteração.</p>
+            <div className="alteracoes-form-grid alteracoes-form-grid-numeros">
+              <div className="form-group"><label htmlFor="composicao-viaturas-completas">Viaturas completas</label><input id="composicao-viaturas-completas" type="number" min="0" step="1" value={form.qtd_viaturas_completas ?? 0} onChange={(e) => atualizar('qtd_viaturas_completas', Number(e.target.value))} required /></div>
+              <div className="form-group"><label htmlFor="composicao-policiais-disponiveis">Policiais disponíveis fora de guarnição</label><input id="composicao-policiais-disponiveis" type="number" min="0" step="1" value={form.qtd_policiais_disponiveis ?? 0} onChange={(e) => atualizar('qtd_policiais_disponiveis', Number(e.target.value))} required /></div>
             </div>
           </div>
           <div className="panel panel-subsection alteracoes-total-panel">

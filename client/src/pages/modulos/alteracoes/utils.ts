@@ -86,7 +86,10 @@ export function normalizarAlteracao(value: unknown): AlteracaoServico {
     data: inicio || null,
     data_inicio: inicio,
     data_fim: fim || null,
+    jornada: texto(item.jornada ?? (texto(item.turno).toUpperCase().includes('12') || ['DIURNO', 'NOTURNO'].includes(texto(item.turno).toUpperCase()) ? '12H' : '24H')) || '24H',
     turno: texto(item.turno),
+    horario_inicio: texto(item.horario_inicio) || null,
+    horario_fim: texto(item.horario_fim) || null,
     policial_id: texto(item.policial_pessoal_id ?? item.policial_id ?? policial?.id) || null,
     policial_nome: texto(item.policial_nome ?? item.nome_policial ?? policial?.nome ?? policial?.nome_guerra),
     policial_matricula: texto(item.policial_matricula ?? item.matricula ?? policial?.matricula) || null,
@@ -139,6 +142,11 @@ export function normalizarComposicao(value: unknown): ComposicaoServico {
     viaturas_previstas: viaturas,
     policiais_por_viatura: porViatura,
     extras,
+    jornada: texto(item.jornada) || (texto(item.turno).toUpperCase().includes('12') || ['DIURNO', 'NOTURNO'].includes(texto(item.turno).toUpperCase()) ? '12H' : '24H'),
+    horario_inicio: texto(item.horario_inicio) || null,
+    horario_fim: texto(item.horario_fim) || null,
+    qtd_viaturas_completas: item.qtd_viaturas_completas == null ? null : numero(item.qtd_viaturas_completas),
+    qtd_policiais_disponiveis: item.qtd_policiais_disponiveis == null ? null : numero(item.qtd_policiais_disponiveis),
     total_previsto: numero(item.total_previsto, viaturas * porViatura + extras),
     observacao: texto(item.observacao) || null,
     criado_por: texto(item.criado_por) || null,
@@ -173,8 +181,10 @@ export function normalizarResumo(value: unknown, data: string, turno: string): R
           permutas,
           ausencias_sem_reposicao: ausencias,
           policiais_disponiveis: disponiveis,
-          viaturas_completas: numero(resumoRaw.viaturasCompletasPossiveis ?? resumoRaw.viaturas_completas, porVtr ? Math.floor(disponiveis / porVtr) : 0),
-          policiais_remanescentes: numero(resumoRaw.policiaisRemanescentes ?? resumoRaw.policiais_remanescentes, porVtr ? disponiveis % porVtr : disponiveis),
+           viaturas_completas: numero(resumoRaw.viaturasCompletasPossiveis ?? resumoRaw.viaturas_completas ?? composicao?.qtd_viaturas_completas, porVtr ? Math.floor(disponiveis / porVtr) : 0),
+           policiais_remanescentes: numero(resumoRaw.policiaisRemanescentes ?? resumoRaw.policiais_remanescentes ?? composicao?.qtd_policiais_disponiveis, porVtr ? disponiveis % porVtr : disponiveis),
+           policiais_disponiveis_total: numero(resumoRaw.policiaisDisponiveisProjetados ?? resumoRaw.policiais_disponiveis_total, disponiveis),
+           capacidade_manual: Boolean(resumoRaw.capacidadeManual ?? resumoRaw.capacidade_manual ?? (composicao?.qtd_viaturas_completas != null || composicao?.qtd_policiais_disponiveis != null)),
           composicao,
         },
       } satisfies ResumoUnidade;
@@ -184,10 +194,13 @@ export function normalizarResumo(value: unknown, data: string, turno: string): R
 
 export function calcularResumoLocal(composicao: ComposicaoServico | null, alteracoes: AlteracaoServico[]): ResumoOperacional {
   const previstos = composicao?.total_previsto || 0;
+  const capacidadeManual = composicao?.qtd_viaturas_completas != null || composicao?.qtd_policiais_disponiveis != null;
   const ativas = alteracoes.filter((alteracao) => alteracao.situacao !== 'CANCELADA');
   const permutas = ativas.filter((alteracao) => alteracao.tipo === 'PERMUTA').length;
   const ausencias = ativas.filter((alteracao) => alteracao.tipo !== 'PERMUTA' && !alteracao.substituto_nome).length;
-  const disponiveis = Math.max(0, previstos - ausencias);
+  const disponiveis = capacidadeManual
+    ? (composicao?.qtd_viaturas_completas || 0) * (composicao?.policiais_por_viatura || 0) + (composicao?.qtd_policiais_disponiveis || 0)
+    : Math.max(0, previstos - ausencias);
   const porVtr = composicao?.policiais_por_viatura || 0;
   return {
     policiais_previstos: previstos,
@@ -195,8 +208,10 @@ export function calcularResumoLocal(composicao: ComposicaoServico | null, altera
     permutas,
     ausencias_sem_reposicao: ausencias,
     policiais_disponiveis: disponiveis,
-    viaturas_completas: porVtr ? Math.floor(disponiveis / porVtr) : 0,
-    policiais_remanescentes: porVtr ? disponiveis % porVtr : disponiveis,
+    viaturas_completas: capacidadeManual ? (composicao?.qtd_viaturas_completas || 0) : porVtr ? Math.floor(disponiveis / porVtr) : 0,
+    policiais_remanescentes: capacidadeManual ? (composicao?.qtd_policiais_disponiveis || 0) : porVtr ? disponiveis % porVtr : disponiveis,
+    policiais_disponiveis_total: disponiveis,
+    capacidade_manual: capacidadeManual,
     composicao,
   };
 }
