@@ -95,7 +95,7 @@ interface FormPadraoProps {
 }
 
 function FormPadrao({ inicial, modo, bairrosDisponiveis, salvando, onFechar, onSalvar }: FormPadraoProps) {
-  const [form, setForm] = useState(() => ({ ...inicial, componentes: clonarComponentes(inicial.componentes) }));
+  const [form, setForm] = useState<PadraoPayload>(() => ({ ...inicial, componentes: clonarComponentes(inicial.componentes) }));
   const bairrosAtivos = bairrosDisponiveis.filter((bairro) => bairro.ativo !== false);
   const bairrosNomes = bairrosAtivos.map((bairro) => bairro.nome_bairro);
   const [bairrosSelecionados, setBairrosSelecionados] = useState(() => inicial.bairros.filter((bairro) => bairrosNomes.includes(bairro)));
@@ -302,10 +302,6 @@ function DetalhePadrao({
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setAbertas(new Set(componentes[0]?.id ? [componentes[0].id] : []));
-  }, [padrao.id]);
-
-  useEffect(() => {
     if (!menuAberto) return undefined;
     function fecharMenu(evento: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(evento.target as Node)) setMenuAberto(false);
@@ -400,6 +396,8 @@ export default function PadroesPage() {
     const padraoSolicitado = idSelecaoSolicitado ? padroes.find((padrao) => padrao.id === idSelecaoSolicitado) : null;
     if (padraoSolicitado && selecionadoId !== padraoSolicitado.id) {
       // A navegação de Editar no Cartão Ordinário chega com o id do padrão.
+      // A seleção atualiza o estado e a URL após carregar o detalhe completo.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void selecionar(padraoSolicitado, parametros.get('editar') === '1');
     }
     if (selecionadoId && !padroes.some((padrao) => padrao.id === selecionadoId)) {
@@ -479,7 +477,7 @@ export default function PadroesPage() {
   return <div className="padroes-page">
     {!padraoAtual && <div className="padroes-page-header"><div><div className="padroes-breadcrumb"><span>Cartão Programa</span><span>/</span><strong>Padrões operacionais</strong></div><h2>Cartão Programa Padrão</h2><p>Biblioteca de modelos operacionais para montar o Cartão Programa do dia.</p></div><button type="button" className="btn btn-primary" onClick={() => setForm({ modo: 'novo' })}><Plus /> Novo padrão</button></div>}
     {erro && <div className="padroes-erro" role="alert">{erro}<button type="button" onClick={() => window.location.reload()}>Tentar novamente</button></div>}
-    {carregando ? <div className="padroes-loading"><LoaderCircle className="spin" /><span>Carregando padrões operacionais...</span></div> : form ? <FormPadrao modo={form.modo} inicial={form.padrao ? payloadDoPadrao(form.padrao) : VAZIO} bairrosDisponiveis={bairros} salvando={salvando} onFechar={() => setForm(null)} onSalvar={salvar} /> : padraoAtual ? <DetalhePadrao padrao={padraoAtual} versoesRecentes={versoesRecentes} onVoltar={voltarBiblioteca} onEditar={() => void abrirEdicao(padraoAtual)} onDuplicar={() => void duplicarSelecionado()} onPublicar={() => void publicarSelecionado()} onAlternarAtivo={() => void alternarAtivo()} onHistorico={() => void abrirHistorico(padraoAtual)} onExcluir={() => setAExcluir(padraoAtual)} /> : <section className="padroes-biblioteca-view" aria-label="Biblioteca de padrões operacionais">
+    {carregando ? <div className="padroes-loading"><LoaderCircle className="spin" /><span>Carregando padrões operacionais...</span></div> : form ? <FormPadrao modo={form.modo} inicial={form.padrao ? payloadDoPadrao(form.padrao) : VAZIO} bairrosDisponiveis={bairros} salvando={salvando} onFechar={() => setForm(null)} onSalvar={salvar} /> : padraoAtual ? <DetalhePadrao key={padraoAtual.id} padrao={padraoAtual} versoesRecentes={versoesRecentes} onVoltar={voltarBiblioteca} onEditar={() => void abrirEdicao(padraoAtual)} onDuplicar={() => void duplicarSelecionado()} onPublicar={() => void publicarSelecionado()} onAlternarAtivo={() => void alternarAtivo()} onHistorico={() => void abrirHistorico(padraoAtual)} onExcluir={() => setAExcluir(padraoAtual)} /> : <section className="padroes-biblioteca-view" aria-label="Biblioteca de padrões operacionais">
       <div className="padroes-info"><Info /><span>Estes são os padrões disponíveis para serem utilizados na montagem do Cartão Programa do dia. Crie, edite ou gerencie os roteiros e viaturas-base.</span></div>
       <div className="padroes-resumo"><CartaoResumo icone={<Archive />} valor={padroes.length} rotulo="Padrões cadastrados" detalhe="Na biblioteca" /><CartaoResumo icone={<MapPin />} valor={resumo.bairros} rotulo="Bairros únicos" detalhe="Relacionados aos padrões" /><CartaoResumo icone={<Truck />} valor={resumo.viaturas} rotulo="Viaturas totais" detalhe="Em todos os padrões" /><CartaoResumo icone={<Route />} valor={resumo.roteiros} rotulo="Roteiros padrão" detalhe="Itens cadastrados" /><CartaoResumo icone={<History />} valor={formatarData(resumo.ultimaAtualizacao)} rotulo="Última atualização" detalhe="Fonte da biblioteca" /></div>
       <div className="padroes-biblioteca-toolbar"><label className="padroes-search"><Search /><input aria-label="Buscar padrão" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Digite o nome do padrão, bairro ou descrição..." /></label><label className="padroes-filtro-select"><span>Tipo de padrão</span><select value={filtro} onChange={(e) => setFiltro(e.target.value)}>{FILTROS.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}</select></label><label className="padroes-filtro-select"><span>Bairro</span><select value={filtroBairro} onChange={(e) => setFiltroBairro(e.target.value)}><option value="">Todos</option>{bairrosCatalogo.map((bairro) => <option value={bairro} key={bairro}>{bairro}</option>)}</select></label><label className="padroes-filtro-select"><span>Ordenar por</span><select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as 'nome' | 'atualizado')}><option value="nome">Nome (A–Z)</option><option value="atualizado">Última atualização</option></select></label></div>
